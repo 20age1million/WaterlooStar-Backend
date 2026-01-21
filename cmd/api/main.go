@@ -2,7 +2,9 @@ package main
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -11,7 +13,10 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
+
+var db *sql.DB
 
 type apiResponse struct {
 	Code    int            `json:"code"`
@@ -76,6 +81,22 @@ var (
 )
 
 func main() {
+	// Initialize Postgres connection
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		log.Fatal("DATABASE_URL is not set")
+	}
+
+	var err error
+	db, err = sql.Open("pgx", dsn)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := db.Ping(); err != nil {
+		log.Fatal(err)
+	}
+	log.Println("Connected to Postgres successfully")
+
 	router := gin.Default()
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:3000", "http://127.0.0.1:3000"},
@@ -85,11 +106,11 @@ func main() {
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
-
 	api := router.Group("/api")
 	auth := api.Group("/auth")
 	auth.POST("/login", loginHandler)
 	auth.GET("/me", meHandler)
+	api.GET("/health/db", dbHealthHandler)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -99,6 +120,18 @@ func main() {
 	if err := router.Run(":" + port); err != nil {
 		panic(err)
 	}
+
+}
+func dbHealthHandler(c *gin.Context) {
+	if db == nil {
+		respond(c, http.StatusInternalServerError, "DB not initialized", nil)
+		return
+	}
+	if err := db.Ping(); err != nil {
+		respond(c, http.StatusInternalServerError, "DB ping failed", map[string]any{"error": err.Error()})
+		return
+	}
+	respond(c, http.StatusOK, "DB OK", nil)
 }
 
 func loginHandler(c *gin.Context) {
