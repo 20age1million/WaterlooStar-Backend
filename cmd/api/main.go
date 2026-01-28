@@ -1,6 +1,7 @@
 package main
 
 import (
+	"golang.org/x/crypto/bcrypt"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"fmt"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -17,6 +19,13 @@ import (
 )
 
 var db *sql.DB
+
+type dbUser struct {
+	ID           int64
+	Username     string
+	Email        string
+	PasswordHash string
+}
 
 type apiResponse struct {
 	Code    int            `json:"code"`
@@ -75,10 +84,26 @@ func (s *sessionStore) delete(token string) {
 }
 
 var (
-	demoUser     = userAuth{ID: "user_demo_1", Username: "demo", Email: "demo@waterloo.star"}
-	demoPassword = "password123"
 	store        = newSessionStore()
 )
+// getUserByEmail retrieves a user from the database by email.
+func getUserByEmail(email string) (dbUser, bool, error) {
+	var u dbUser
+	err := db.QueryRow(`
+		SELECT id, username, email, password_hash
+		FROM public.users
+		WHERE lower(email) = lower($1)
+		LIMIT 1
+	`, email).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash)
+
+	if err == sql.ErrNoRows {
+		return dbUser{}, false, nil
+	}
+	if err != nil {
+		return dbUser{}, false, err
+	}
+	return u, true, nil
+}
 
 func main() {
 	// Initialize Postgres connection
@@ -141,10 +166,20 @@ func loginHandler(c *gin.Context) {
 		return
 	}
 
-	if !strings.EqualFold(request.Email, demoUser.Email) || request.Password != demoPassword {
-		respond(c, http.StatusUnauthorized, "Invalid email or password", nil)
-		return
-	}
+	u, found, err := getUserByEmail(request.Email)
+if err != nil {
+	respond(c, http.StatusInternalServerError, "DB error", map[string]any{"error": err.Error()})
+	return
+}
+if !found {
+	respond(c, http.StatusUnauthorized, "Invalid email or password", nil)
+	return
+}
+
+if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(request.Password)); err != nil {
+	respond(c, http.StatusUnauthorized, "Invalid email or password", nil)
+	return
+}
 
 	token, err := generateToken()
 	if err != nil {
@@ -160,7 +195,11 @@ func loginHandler(c *gin.Context) {
 	session := authSession{
 		Token:     token,
 		ExpiresAt: time.Now().Add(sessionDuration),
-		User:      demoUser,
+		User:      userAuth{
+		ID:       fmt.Sprintf("%d", u.ID),
+		Username: u.Username,
+		Email:    u.Email,
+	},
 	}
 	store.set(session)
 
