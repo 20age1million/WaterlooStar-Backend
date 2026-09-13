@@ -1,0 +1,19 @@
+# binaries
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# test artefacts
+*.test
+*.out
+coverage.*
+
+# env
+.env
+.env.local
+
+# local
+/tmp/
