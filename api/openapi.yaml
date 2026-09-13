@@ -27,6 +27,10 @@ tags:
     description: Registration, address verification, and session lifecycle.
   - name: me
     description: The signed-in user.
+  - name: housing
+    description: |
+      Housing Available - places students are offering. Public: browsing does
+      not require an account.
 
 paths:
   /healthz:
@@ -259,6 +263,59 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /listings:
+    get:
+      tags: [housing]
+      operationId: listListings
+      summary: Browse Housing Available
+      description: |
+        Published listings, newest first. Public - anyone can browse; an account
+        is only needed to save one or message the poster.
+
+        Filtering, searching and sorting arrive in the next feature; this
+        endpoint currently returns everything published, one page at a time.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: A page of listings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListingPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /listings/{id}:
+    get:
+      tags: [housing]
+      operationId: getListing
+      summary: One listing in full
+      description: |
+        A published listing with everything the detail screen shows. A listing
+        that does not exist, or is not published, returns 404 - a paused or
+        archived post must not be distinguishable from one that never existed.
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The listing.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Listing"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
 components:
   schemas:
     Health:
@@ -391,6 +448,190 @@ components:
           type: string
           minLength: 10
           maxLength: 72
+
+    Listing:
+      type: object
+      description: |
+        A "Housing Available" post. Every fact the interface displays is a
+        field here rather than a sentence to be parsed: the filters in the next
+        feature depend on it, and the frontend formats these into display text
+        at the point of display.
+      required:
+        - id
+        - title
+        - body
+        - conditions
+        - price_cents
+        - start_date
+        - end_date
+        - lease_months
+        - term_tag
+        - unit_type
+        - bedrooms_total
+        - bathrooms
+        - bath_type
+        - furnished
+        - utilities
+        - parking
+        - pets
+        - laundry
+        - address_line
+        - neighbourhood
+        - commute_mode
+        - status
+        - views
+        - replies
+        - saves
+        - created_at
+        - owner
+        - photos
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        body:
+          type: string
+          description: The poster's description of the place.
+        conditions:
+          type: array
+          items:
+            type: string
+          description: The poster's own terms, shown as a list.
+        price_cents:
+          type: integer
+          description: Monthly rent in cents of CAD.
+        deposit_cents:
+          type: integer
+          nullable: true
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        lease_months:
+          type: integer
+        term_tag:
+          type: string
+          description: Display label for the term, e.g. "Winter term".
+        unit_type:
+          type: string
+          enum: [room, studio, unit]
+        bedrooms_total:
+          type: integer
+        bedroom_of:
+          type: integer
+          nullable: true
+          description: Which bedroom of bedrooms_total is offered. Null for a whole unit.
+        bathrooms:
+          type: number
+        bath_type:
+          type: string
+          enum: [shared, private, ensuite]
+        furnished:
+          type: boolean
+        utilities:
+          type: array
+          items:
+            type: string
+            enum: [internet, hydro, water, heat, gas]
+          description: Which bills are included in the rent.
+        parking:
+          type: boolean
+        pets:
+          type: boolean
+        laundry:
+          type: boolean
+        address_line:
+          type: string
+          description: |
+            Street address. Public for now; whether the exact address should
+            instead be revealed only after contact is an open product decision.
+        neighbourhood:
+          type: string
+        lat:
+          type: number
+          nullable: true
+        lng:
+          type: number
+          nullable: true
+        distance_m:
+          type: integer
+          nullable: true
+          description: Straight-line metres to campus.
+        commute_minutes:
+          type: integer
+          nullable: true
+        commute_mode:
+          type: string
+          enum: [walk, bus]
+        minutes_to_transit:
+          type: integer
+          nullable: true
+        minutes_to_grocery:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum: [draft, published, paused, archived]
+        views:
+          type: integer
+        replies:
+          type: integer
+        saves:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        owner:
+          $ref: "#/components/schemas/ListingOwner"
+        photos:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListingPhoto"
+
+    ListingOwner:
+      type: object
+      description: |
+        Just enough about the poster to render a listing. Never their email -
+        contact details stay private until both sides agree to talk.
+      required: [id, username, verified]
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        avatar_url:
+          type: string
+          nullable: true
+        verified:
+          type: boolean
+
+    ListingPhoto:
+      type: object
+      required: [id, url, position]
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+        position:
+          type: integer
+
+    ListingPage:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Listing"
+        meta:
+          $ref: "#/components/schemas/PageMeta"
 
     Error:
       type: object

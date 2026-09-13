@@ -19,7 +19,18 @@ oapi-codegen are pinned as `go.mod` tool dependencies.
 cp .env.example .env     # defaults match docker-compose.yml
 make up                  # start PostgreSQL 18
 make migrate-up          # apply migrations
+make seed                # load the six development listings
 make run                 # start the API on :8080
+```
+
+`make` is a convenience, not a requirement — it is not installed by default on
+Windows. Every target is a one-line Go or Docker command, and the equivalents are:
+
+```bash
+docker compose up -d
+go run ./cmd/migrate up
+go run ./cmd/seed
+go run ./cmd/api
 ```
 
 Then:
@@ -37,13 +48,15 @@ curl localhost:8080/healthz
 api/openapi.yaml         The contract. Authoritative — edit before the handler.
 cmd/api                  Service entry point.
 cmd/migrate              Migration runner (golang-migrate as a library).
+cmd/seed                 Loads development fixtures. Refuses to run outside development.
 internal/apierror        The single error envelope every failure returns.
 internal/config          Environment binding and validation.
 internal/db              pgx pool; queries/ holds the .sql sqlc generates from.
 internal/db/sqlcgen      Generated. Do not edit.
 internal/httpapi         Router and handlers.
 internal/httpapi/gen     Generated from openapi.yaml. Do not edit.
-internal/middleware      Request id, logging, recovery, CORS.
+internal/db/seed         Development fixtures: the six prototype listings.
+internal/middleware      Request id, logging, recovery, CORS, auth, CSRF.
 migrations               Schema source of truth; sqlc reads these too.
 docs/specs               Feature specifications.
 ```

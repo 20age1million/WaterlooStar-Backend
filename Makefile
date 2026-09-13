@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help up down run build test vet generate sqlc openapi migrate-up migrate-down migrate-version tidy check
+.PHONY: help up down run build test vet generate sqlc openapi migrate-up migrate-down migrate-version seed tidy check
 
 ## help: list available targets
 help:
@@ -24,6 +24,10 @@ migrate-down:
 ## migrate-version: print the current schema version
 migrate-version:
 	go run ./cmd/migrate version
+
+## seed: load development fixtures (development only; rewrites all listings)
+seed:
+	go run ./cmd/seed
 
 ## generate: run every code generator (OpenAPI server + sqlc queries)
 generate: openapi sqlc

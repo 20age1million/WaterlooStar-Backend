@@ -19,6 +19,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gin-gonic/gin"
 	"github.com/oapi-codegen/nullable"
+	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
@@ -94,6 +95,117 @@ func (e HealthStatus) Valid() bool {
 	}
 }
 
+// Defines values for ListingBathType.
+const (
+	Ensuite ListingBathType = "ensuite"
+	Private ListingBathType = "private"
+	Shared  ListingBathType = "shared"
+)
+
+// Valid indicates whether the value is a known member of the ListingBathType enum.
+func (e ListingBathType) Valid() bool {
+	switch e {
+	case Ensuite:
+		return true
+	case Private:
+		return true
+	case Shared:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListingCommuteMode.
+const (
+	Bus  ListingCommuteMode = "bus"
+	Walk ListingCommuteMode = "walk"
+)
+
+// Valid indicates whether the value is a known member of the ListingCommuteMode enum.
+func (e ListingCommuteMode) Valid() bool {
+	switch e {
+	case Bus:
+		return true
+	case Walk:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListingStatus.
+const (
+	Archived  ListingStatus = "archived"
+	Draft     ListingStatus = "draft"
+	Paused    ListingStatus = "paused"
+	Published ListingStatus = "published"
+)
+
+// Valid indicates whether the value is a known member of the ListingStatus enum.
+func (e ListingStatus) Valid() bool {
+	switch e {
+	case Archived:
+		return true
+	case Draft:
+		return true
+	case Paused:
+		return true
+	case Published:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListingUnitType.
+const (
+	Room   ListingUnitType = "room"
+	Studio ListingUnitType = "studio"
+	Unit   ListingUnitType = "unit"
+)
+
+// Valid indicates whether the value is a known member of the ListingUnitType enum.
+func (e ListingUnitType) Valid() bool {
+	switch e {
+	case Room:
+		return true
+	case Studio:
+		return true
+	case Unit:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListingUtilities.
+const (
+	Gas      ListingUtilities = "gas"
+	Heat     ListingUtilities = "heat"
+	Hydro    ListingUtilities = "hydro"
+	Internet ListingUtilities = "internet"
+	Water    ListingUtilities = "water"
+)
+
+// Valid indicates whether the value is a known member of the ListingUtilities enum.
+func (e ListingUtilities) Valid() bool {
+	switch e {
+	case Gas:
+		return true
+	case Heat:
+		return true
+	case Hydro:
+		return true
+	case Internet:
+		return true
+	case Water:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UserRole.
 const (
 	UserRoleAdmin     UserRole = "admin"
@@ -162,10 +274,130 @@ type HealthDatabase string
 // HealthStatus Overall service state.
 type HealthStatus string
 
+// Listing A "Housing Available" post. Every fact the interface displays is a
+// field here rather than a sentence to be parsed: the filters in the next
+// feature depend on it, and the frontend formats these into display text
+// at the point of display.
+type Listing struct {
+	// AddressLine Street address. Public for now; whether the exact address should
+	// instead be revealed only after contact is an open product decision.
+	AddressLine string          `json:"address_line"`
+	BathType    ListingBathType `json:"bath_type"`
+	Bathrooms   float32         `json:"bathrooms"`
+
+	// BedroomOf Which bedroom of bedrooms_total is offered. Null for a whole unit.
+	BedroomOf     nullable.Nullable[int] `json:"bedroom_of,omitempty"`
+	BedroomsTotal int                    `json:"bedrooms_total"`
+
+	// Body The poster's description of the place.
+	Body           string                 `json:"body"`
+	CommuteMinutes nullable.Nullable[int] `json:"commute_minutes,omitempty"`
+	CommuteMode    ListingCommuteMode     `json:"commute_mode"`
+
+	// Conditions The poster's own terms, shown as a list.
+	Conditions   []string               `json:"conditions"`
+	CreatedAt    time.Time              `json:"created_at"`
+	DepositCents nullable.Nullable[int] `json:"deposit_cents,omitempty"`
+
+	// DistanceM Straight-line metres to campus.
+	DistanceM        nullable.Nullable[int]     `json:"distance_m,omitempty"`
+	EndDate          openapi_types.Date         `json:"end_date"`
+	Furnished        bool                       `json:"furnished"`
+	Id               openapi_types.UUID         `json:"id"`
+	Lat              nullable.Nullable[float32] `json:"lat,omitempty"`
+	Laundry          bool                       `json:"laundry"`
+	LeaseMonths      int                        `json:"lease_months"`
+	Lng              nullable.Nullable[float32] `json:"lng,omitempty"`
+	MinutesToGrocery nullable.Nullable[int]     `json:"minutes_to_grocery,omitempty"`
+	MinutesToTransit nullable.Nullable[int]     `json:"minutes_to_transit,omitempty"`
+	Neighbourhood    string                     `json:"neighbourhood"`
+
+	// Owner Just enough about the poster to render a listing. Never their email -
+	// contact details stay private until both sides agree to talk.
+	Owner   ListingOwner   `json:"owner"`
+	Parking bool           `json:"parking"`
+	Pets    bool           `json:"pets"`
+	Photos  []ListingPhoto `json:"photos"`
+
+	// PriceCents Monthly rent in cents of CAD.
+	PriceCents int                `json:"price_cents"`
+	Replies    int                `json:"replies"`
+	Saves      int                `json:"saves"`
+	StartDate  openapi_types.Date `json:"start_date"`
+	Status     ListingStatus      `json:"status"`
+
+	// TermTag Display label for the term, e.g. "Winter term".
+	TermTag  string          `json:"term_tag"`
+	Title    string          `json:"title"`
+	UnitType ListingUnitType `json:"unit_type"`
+
+	// Utilities Which bills are included in the rent.
+	Utilities []ListingUtilities `json:"utilities"`
+	Views     int                `json:"views"`
+}
+
+// ListingBathType defines model for Listing.BathType.
+type ListingBathType string
+
+// ListingCommuteMode defines model for Listing.CommuteMode.
+type ListingCommuteMode string
+
+// ListingStatus defines model for Listing.Status.
+type ListingStatus string
+
+// ListingUnitType defines model for Listing.UnitType.
+type ListingUnitType string
+
+// ListingUtilities defines model for Listing.Utilities.
+type ListingUtilities string
+
+// ListingOwner Just enough about the poster to render a listing. Never their email -
+// contact details stay private until both sides agree to talk.
+type ListingOwner struct {
+	AvatarUrl nullable.Nullable[string] `json:"avatar_url,omitempty"`
+	Id        openapi_types.UUID        `json:"id"`
+	Username  string                    `json:"username"`
+	Verified  bool                      `json:"verified"`
+}
+
+// ListingPage defines model for ListingPage.
+type ListingPage struct {
+	Data []Listing `json:"data"`
+
+	// Meta Pagination metadata accompanying every list response.
+	//
+	// Example: {"page":1,"per_page":20,"total":6,"total_pages":1}
+	Meta PageMeta `json:"meta"`
+}
+
+// ListingPhoto defines model for ListingPhoto.
+type ListingPhoto struct {
+	Id       openapi_types.UUID `json:"id"`
+	Position int                `json:"position"`
+	Url      string             `json:"url"`
+}
+
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
 	Email    openapi_types.Email `json:"email"`
 	Password string              `json:"password"`
+}
+
+// PageMeta Pagination metadata accompanying every list response.
+//
+// Example: {"page":1,"per_page":20,"total":6,"total_pages":1}
+type PageMeta struct {
+	// Page Current page, 1-based.
+	Page int `json:"page"`
+
+	// PerPage Items per page, after the server's maximum is applied.
+	PerPage int `json:"per_page"`
+
+	// Total Total items matching the query across all pages.
+	Total int `json:"total"`
+
+	// TotalPages Total pages available at this page size.
+	TotalPages int `json:"total_pages"`
 }
 
 // PasswordResetConfirmRequest defines model for PasswordResetConfirmRequest.
@@ -226,6 +458,12 @@ type User struct {
 // UserRole defines model for User.Role.
 type UserRole string
 
+// Page defines model for Page.
+type Page = int
+
+// PerPage defines model for PerPage.
+type PerPage = int
+
 // BadRequest The single error envelope. Every failing request in this API returns this
 // shape, so the frontend has exactly one error contract to handle.
 //
@@ -238,11 +476,26 @@ type BadRequest = Error
 // Example: {"code":"not_found","message":"No listing with that id.","request_id":"9f1c2f7a-6f2e-4d2a-9a1b-2c3d4e5f6a7b"}
 type InternalError = Error
 
+// NotFound The single error envelope. Every failing request in this API returns this
+// shape, so the frontend has exactly one error contract to handle.
+//
+// Example: {"code":"not_found","message":"No listing with that id.","request_id":"9f1c2f7a-6f2e-4d2a-9a1b-2c3d4e5f6a7b"}
+type NotFound = Error
+
 // Unauthorized The single error envelope. Every failing request in this API returns this
 // shape, so the frontend has exactly one error contract to handle.
 //
 // Example: {"code":"not_found","message":"No listing with that id.","request_id":"9f1c2f7a-6f2e-4d2a-9a1b-2c3d4e5f6a7b"}
 type Unauthorized = Error
+
+// ListListingsParams defines parameters for ListListings.
+type ListListingsParams struct {
+	// Page Page number, 1-based.
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PerPage Items per page. Values above the server maximum are clamped.
+	PerPage *PerPage `form:"per_page,omitempty" json:"per_page,omitempty"`
+}
 
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
@@ -285,6 +538,12 @@ type ServerInterface interface {
 	// GetHealth Service and database health
 	// (GET /healthz)
 	GetHealth(c *gin.Context)
+	// ListListings Browse Housing Available
+	// (GET /listings)
+	ListListings(c *gin.Context, params ListListingsParams)
+	// GetListing One listing in full
+	// (GET /listings/{id})
+	GetListing(c *gin.Context, id openapi_types.UUID)
 	// GetMe The signed-in user
 	// (GET /me)
 	GetMe(c *gin.Context)
@@ -403,6 +662,66 @@ func (siw *ServerInterfaceWrapper) GetHealth(c *gin.Context) {
 	siw.Handler.GetHealth(c)
 }
 
+// ListListings operation middleware
+func (siw *ServerInterfaceWrapper) ListListings(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListListingsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", c.Request.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "per_page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "per_page", c.Request.URL.Query(), &params.PerPage, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter per_page: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListListings(c, params)
+}
+
+// GetListing operation middleware
+func (siw *ServerInterfaceWrapper) GetListing(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetListing(c, id)
+}
+
 // GetMe operation middleware
 func (siw *ServerInterfaceWrapper) GetMe(c *gin.Context) {
 
@@ -452,11 +771,15 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.POST(options.BaseURL+"/auth/password-reset", wrapper.RequestPasswordReset)
 	router.POST(options.BaseURL+"/auth/password-reset/confirm", wrapper.ConfirmPasswordReset)
 	router.GET(options.BaseURL+"/me", wrapper.GetMe)
+	router.GET(options.BaseURL+"/listings", wrapper.ListListings)
+	router.GET(options.BaseURL+"/listings/:id", wrapper.GetListing)
 }
 
 type BadRequestJSONResponse Error
 
 type InternalErrorJSONResponse Error
+
+type NotFoundJSONResponse Error
 
 type UnauthorizedJSONResponse Error
 
@@ -839,6 +1162,120 @@ func (response GetHealth503JSONResponse) VisitGetHealthResponse(w http.ResponseW
 	return err
 }
 
+type ListListingsRequestObject struct {
+	Params ListListingsParams
+}
+
+type ListListingsResponseObject interface {
+	VisitListListingsResponse(w http.ResponseWriter) error
+}
+
+type ListListings200JSONResponse ListingPage
+
+func (response ListListings200JSONResponse) VisitListListingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListListings400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ListListings400JSONResponse) VisitListListingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListListings500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response ListListings500JSONResponse) VisitListListingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetListingRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type GetListingResponseObject interface {
+	VisitGetListingResponse(w http.ResponseWriter) error
+}
+
+type GetListing200JSONResponse Listing
+
+func (response GetListing200JSONResponse) VisitGetListingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetListing400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response GetListing400JSONResponse) VisitGetListingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetListing404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetListing404JSONResponse) VisitGetListingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetListing500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response GetListing500JSONResponse) VisitGetListingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetMeRequestObject struct {
 }
 
@@ -914,6 +1351,12 @@ type StrictServerInterface interface {
 	// GetHealth Service and database health
 	// (GET /healthz)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
+	// ListListings Browse Housing Available
+	// (GET /listings)
+	ListListings(ctx context.Context, request ListListingsRequestObject) (ListListingsResponseObject, error)
+	// GetListing One listing in full
+	// (GET /listings/{id})
+	GetListing(ctx context.Context, request GetListingRequestObject) (GetListingResponseObject, error)
 	// GetMe The signed-in user
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
@@ -1203,6 +1646,58 @@ func (sh *strictHandler) GetHealth(ctx *gin.Context) {
 	}
 }
 
+// ListListings operation middleware
+func (sh *strictHandler) ListListings(ctx *gin.Context, params ListListingsParams) {
+	var request ListListingsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListListings(ctx, request.(ListListingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListListings")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(ListListingsResponseObject); ok {
+		if err := validResponse.VisitListListingsResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetListing operation middleware
+func (sh *strictHandler) GetListing(ctx *gin.Context, id openapi_types.UUID) {
+	var request GetListingRequestObject
+
+	request.Id = id
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetListing(ctx, request.(GetListingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetListing")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(GetListingResponseObject); ok {
+		if err := validResponse.VisitGetListingResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetMe operation middleware
 func (sh *strictHandler) GetMe(ctx *gin.Context) {
 	var request GetMeRequestObject
@@ -1232,67 +1727,94 @@ func (sh *strictHandler) GetMe(ctx *gin.Context) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

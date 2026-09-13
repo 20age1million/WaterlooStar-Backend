@@ -18,6 +18,53 @@ type EmailVerificationToken struct {
 	CreatedAt  time.Time
 }
 
+type Listing struct {
+	ID               uuid.UUID
+	OwnerID          uuid.UUID
+	Title            string
+	Body             string
+	Conditions       []string
+	PriceCents       int32
+	DepositCents     *int32
+	StartDate        time.Time
+	EndDate          time.Time
+	LeaseMonths      int32
+	TermTag          string
+	UnitType         string
+	BedroomsTotal    int32
+	BedroomOf        *int32
+	Bathrooms        float64
+	BathType         string
+	Furnished        bool
+	Utilities        []string
+	Parking          bool
+	Pets             bool
+	Laundry          bool
+	AddressLine      string
+	Neighbourhood    string
+	Lat              *float64
+	Lng              *float64
+	DistanceM        *int32
+	CommuteMinutes   *int32
+	CommuteMode      string
+	MinutesToTransit *int32
+	MinutesToGrocery *int32
+	Status           string
+	Views            int32
+	Replies          int32
+	Saves            int32
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}
+
+type ListingPhoto struct {
+	ID        uuid.UUID
+	ListingID uuid.UUID
+	Url       string
+	Position  int32
+	CreatedAt time.Time
+}
+
 type PasswordResetToken struct {
 	TokenHash  []byte
 	UserID     uuid.UUID

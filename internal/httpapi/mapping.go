@@ -59,3 +59,96 @@ const (
 	statusUnauthorized = http.StatusUnauthorized
 	statusConflict     = http.StatusConflict
 )
+
+// toListing maps a listing row, its owner and its photos to the contract shape.
+//
+// Nothing is formatted here: no date range string, no "1 of 4 bed", no price
+// label. Those are the frontend's business, and inventing them server-side is
+// what the prototype's type layer did wrong.
+func toListing(row sqlcgen.Listing, owner gen.ListingOwner, photos []sqlcgen.ListingPhoto) gen.Listing {
+	out := gen.Listing{
+		Id:            openapi_types.UUID(row.ID),
+		Title:         row.Title,
+		Body:          row.Body,
+		Conditions:    row.Conditions,
+		PriceCents:    int(row.PriceCents),
+		DepositCents:  nullableInt(row.DepositCents),
+		StartDate:     openapi_types.Date{Time: row.StartDate},
+		EndDate:       openapi_types.Date{Time: row.EndDate},
+		LeaseMonths:   int(row.LeaseMonths),
+		TermTag:       row.TermTag,
+		UnitType:      gen.ListingUnitType(row.UnitType),
+		BedroomsTotal: int(row.BedroomsTotal),
+		BedroomOf:     nullableInt(row.BedroomOf),
+		Bathrooms:     float32(row.Bathrooms),
+		BathType:      gen.ListingBathType(row.BathType),
+		Furnished:     row.Furnished,
+		Utilities:     toUtilities(row.Utilities),
+		Parking:       row.Parking,
+		Pets:          row.Pets,
+		Laundry:       row.Laundry,
+		AddressLine:   row.AddressLine,
+		Neighbourhood: row.Neighbourhood,
+
+		Lat:              nullableFloat(row.Lat),
+		Lng:              nullableFloat(row.Lng),
+		DistanceM:        nullableInt(row.DistanceM),
+		CommuteMinutes:   nullableInt(row.CommuteMinutes),
+		CommuteMode:      gen.ListingCommuteMode(row.CommuteMode),
+		MinutesToTransit: nullableInt(row.MinutesToTransit),
+		MinutesToGrocery: nullableInt(row.MinutesToGrocery),
+
+		Status:    gen.ListingStatus(row.Status),
+		Views:     int(row.Views),
+		Replies:   int(row.Replies),
+		Saves:     int(row.Saves),
+		CreatedAt: row.CreatedAt,
+
+		Owner: owner,
+		// An empty array, never null: the client should not have to guard a
+		// field that is always a list.
+		Photos: make([]gen.ListingPhoto, 0, len(photos)),
+	}
+
+	for _, photo := range photos {
+		out.Photos = append(out.Photos, gen.ListingPhoto{
+			Id:       openapi_types.UUID(photo.ID),
+			Url:      photo.Url,
+			Position: int(photo.Position),
+		})
+	}
+
+	return out
+}
+
+func toUtilities(values []string) []gen.ListingUtilities {
+	out := make([]gen.ListingUtilities, 0, len(values))
+	for _, v := range values {
+		out = append(out, gen.ListingUtilities(v))
+	}
+	return out
+}
+
+// The generated types use nullable.Nullable to tell "absent" from "null", so
+// each optional column needs an explicit conversion rather than a bare pointer.
+
+func nullableInt(value *int32) nullable.Nullable[int] {
+	if value == nil {
+		return nullable.NewNullNullable[int]()
+	}
+	return nullable.NewNullableWithValue(int(*value))
+}
+
+func nullableFloat(value *float64) nullable.Nullable[float32] {
+	if value == nil {
+		return nullable.NewNullNullable[float32]()
+	}
+	return nullable.NewNullableWithValue(float32(*value))
+}
+
+func nullableString(value *string) nullable.Nullable[string] {
+	if value == nil {
+		return nullable.NewNullNullable[string]()
+	}
+	return nullable.NewNullableWithValue(*value)
+}

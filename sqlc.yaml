@@ -31,3 +31,19 @@ sql:
             go_type:
               type: "time.Time"
               pointer: true
+          # Dates and numerics as Go primitives rather than pgtype wrappers, so
+          # the mapping to the contract stays readable. pgx scans both directly.
+          - db_type: "date"
+            go_type: "time.Time"
+          - db_type: "date"
+            nullable: true
+            go_type:
+              type: "time.Time"
+              pointer: true
+          - db_type: "pg_catalog.numeric"
+            go_type: "float64"
+          - db_type: "pg_catalog.numeric"
+            nullable: true
+            go_type:
+              type: "float64"
+              pointer: true

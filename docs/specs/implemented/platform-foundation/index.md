@@ -1,6 +1,6 @@
 # Platform Foundation — API
 
-**Status:** Ready
+**Status:** Complete
 **Branch:** `feature/platform-foundation`
 **Ticket / Work Item:** N/A
 **Owner(s):** WaterlooStar backend
@@ -98,9 +98,9 @@ double-submit CSRF token.
 
 | Phase | Title | Status | Location |
 |---|---|---|---|
-| [0 — Contract and scaffolding](../../implemented/platform-foundation/phase-0-contract-and-scaffolding.md) | Running service, migration harness, codegen chain, health endpoint | Complete | `docs/specs/implemented/platform-foundation/` |
-| [1 — Accounts and verified students](../../implemented/platform-foundation/phase-1-accounts-and-verification.md) | Registration restricted to uwaterloo.ca, email verification, login, sessions | Complete | `docs/specs/implemented/platform-foundation/` |
-| [2 — Listings read path](./phase-2-listings-read-path.md) | Structured listing schema, seed data, list and detail endpoints | Ready | `docs/specs/active/platform-foundation/` |
+| [0 — Contract and scaffolding](./phase-0-contract-and-scaffolding.md) | Running service, migration harness, codegen chain, health endpoint | Complete | `docs/specs/implemented/platform-foundation/` |
+| [1 — Accounts and verified students](./phase-1-accounts-and-verification.md) | Registration restricted to uwaterloo.ca, email verification, login, sessions | Complete | `docs/specs/implemented/platform-foundation/` |
+| [2 — Listings read path](./phase-2-listings-read-path.md) | Structured listing schema, seed data, list and detail endpoints | Complete | `docs/specs/implemented/platform-foundation/` |
 
 ---
 

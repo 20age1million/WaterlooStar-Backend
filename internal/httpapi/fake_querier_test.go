@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"context"
 	"encoding/hex"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -28,6 +29,7 @@ type fakeQuerier struct {
 	verificationToken map[string]sqlcgen.EmailVerificationToken
 	resetToken        map[string]sqlcgen.PasswordResetToken
 	refreshToken      map[string]sqlcgen.RefreshToken
+	listings          []sqlcgen.Listing
 
 	pingErr error
 }
@@ -321,3 +323,110 @@ func (f *fakeQuerier) liveRefreshTokenCount(userID uuid.UUID) int {
 }
 
 var _ sqlcgen.Querier = (*fakeQuerier)(nil)
+
+// ------------------------------------------------------------------ listings
+
+func (f *fakeQuerier) CreateListing(_ context.Context, arg sqlcgen.CreateListingParams) (sqlcgen.Listing, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	l := sqlcgen.Listing{
+		ID: uuid.New(), OwnerID: arg.OwnerID, Title: arg.Title, Body: arg.Body,
+		Conditions: arg.Conditions, PriceCents: arg.PriceCents, DepositCents: arg.DepositCents,
+		StartDate: arg.StartDate, EndDate: arg.EndDate, LeaseMonths: arg.LeaseMonths,
+		TermTag: arg.TermTag, UnitType: arg.UnitType, BedroomsTotal: arg.BedroomsTotal,
+		BedroomOf: arg.BedroomOf, Bathrooms: arg.Bathrooms, BathType: arg.BathType,
+		Furnished: arg.Furnished, Utilities: arg.Utilities, Parking: arg.Parking,
+		Pets: arg.Pets, Laundry: arg.Laundry, AddressLine: arg.AddressLine,
+		Neighbourhood: arg.Neighbourhood, Lat: arg.Lat, Lng: arg.Lng, DistanceM: arg.DistanceM,
+		CommuteMinutes: arg.CommuteMinutes, CommuteMode: arg.CommuteMode,
+		MinutesToTransit: arg.MinutesToTransit, MinutesToGrocery: arg.MinutesToGrocery,
+		Status: arg.Status, Views: arg.Views, Replies: arg.Replies,
+		CreatedAt: arg.CreatedAt, UpdatedAt: arg.CreatedAt,
+	}
+	if l.Conditions == nil {
+		l.Conditions = []string{}
+	}
+	if l.Utilities == nil {
+		l.Utilities = []string{}
+	}
+	f.listings = append(f.listings, l)
+	return l, nil
+}
+
+func (f *fakeQuerier) DeleteAllListings(context.Context) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.listings = nil
+	return nil
+}
+
+// published mirrors the SQL: only published rows, newest first.
+func (f *fakeQuerier) published() []sqlcgen.Listing {
+	out := []sqlcgen.Listing{}
+	for _, l := range f.listings {
+		if l.Status == "published" {
+			out = append(out, l)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
+	return out
+}
+
+func (f *fakeQuerier) CountPublishedListings(context.Context) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return int64(len(f.published())), nil
+}
+
+func (f *fakeQuerier) ListPublishedListings(_ context.Context, arg sqlcgen.ListPublishedListingsParams) ([]sqlcgen.ListPublishedListingsRow, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	all := f.published()
+	start := int(arg.Offset)
+	if start > len(all) {
+		start = len(all)
+	}
+	end := start + int(arg.Limit)
+	if end > len(all) {
+		end = len(all)
+	}
+
+	rows := []sqlcgen.ListPublishedListingsRow{}
+	for _, l := range all[start:end] {
+		owner := f.users[l.OwnerID]
+		rows = append(rows, sqlcgen.ListPublishedListingsRow{
+			Listing:        l,
+			OwnerUsername:  owner.Username,
+			OwnerAvatarUrl: owner.AvatarUrl,
+			OwnerVerified:  owner.Verified,
+		})
+	}
+	return rows, nil
+}
+
+func (f *fakeQuerier) GetPublishedListing(_ context.Context, id uuid.UUID) (sqlcgen.GetPublishedListingRow, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, l := range f.listings {
+		if l.ID == id && l.Status == "published" {
+			owner := f.users[l.OwnerID]
+			return sqlcgen.GetPublishedListingRow{
+				Listing:        l,
+				OwnerUsername:  owner.Username,
+				OwnerAvatarUrl: owner.AvatarUrl,
+				OwnerVerified:  owner.Verified,
+			}, nil
+		}
+	}
+	return sqlcgen.GetPublishedListingRow{}, pgx.ErrNoRows
+}
+
+func (f *fakeQuerier) ListPhotosForListing(context.Context, uuid.UUID) ([]sqlcgen.ListingPhoto, error) {
+	return []sqlcgen.ListingPhoto{}, nil
+}
+
+func (f *fakeQuerier) ListPhotosForListings(context.Context, []uuid.UUID) ([]sqlcgen.ListingPhoto, error) {
+	return []sqlcgen.ListingPhoto{}, nil
+}

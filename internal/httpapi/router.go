@@ -122,8 +122,33 @@ func NewRouter(cfg config.Config, log *slog.Logger, srv *Server) *gin.Engine {
 		},
 	})
 
-	gen.RegisterHandlers(r, handler)
+	// Path and query parameter binding fails through GinServerOptions.ErrorHandler,
+	// which is a different hook from the strict handler's RequestErrorHandlerFunc
+	// above — that one only covers the request *body*. Both have to be replaced
+	// or a malformed path parameter escapes the documented envelope.
+	gen.RegisterHandlersWithOptions(r, handler, gen.GinServerOptions{
+		ErrorHandler: func(c *gin.Context, err error, status int) {
+			if status == 0 {
+				status = http.StatusBadRequest
+			}
+			apierror.Write(c, status, apierror.CodeBadRequest, parameterErrorMessage(err))
+		},
+	})
 	return r
+}
+
+// parameterErrorMessage explains a bad path or query parameter without echoing
+// Go type names at the caller.
+func parameterErrorMessage(err error) string {
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "uuid") || strings.Contains(msg, "UUID"):
+		return "That id is not a valid UUID."
+	case strings.Contains(msg, "Invalid format for parameter"):
+		return "A parameter in the request has the wrong format."
+	default:
+		return "The request parameters could not be read. Check them against the API contract."
+	}
 }
 
 // requestErrorMessage turns a binding failure into something a person can act

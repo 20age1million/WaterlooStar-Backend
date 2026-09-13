@@ -17,23 +17,35 @@ type Querier interface {
 	ConsumeAllPasswordResetTokensForUser(ctx context.Context, userID uuid.UUID) error
 	ConsumeEmailVerificationToken(ctx context.Context, tokenHash []byte) error
 	ConsumePasswordResetToken(ctx context.Context, tokenHash []byte) error
+	CountPublishedListings(ctx context.Context) (int64, error)
 	// Used to tell a duplicate email from a duplicate username *internally*, without
 	// the response revealing which one collided.
 	CountUsersByEmailOrUsername(ctx context.Context, arg CountUsersByEmailOrUsernameParams) (CountUsersByEmailOrUsernameRow, error)
 	// Every lookup here filters on consumed/revoked and expiry in SQL rather than in
 	// Go, so a caller cannot forget the check and accept a spent token.
 	CreateEmailVerificationToken(ctx context.Context, arg CreateEmailVerificationTokenParams) error
+	CreateListing(ctx context.Context, arg CreateListingParams) (Listing, error)
 	CreatePasswordResetToken(ctx context.Context, arg CreatePasswordResetTokenParams) error
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) error
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteAllListings(ctx context.Context) error
 	DeleteExpiredTokens(ctx context.Context) error
 	GetLiveEmailVerificationToken(ctx context.Context, tokenHash []byte) (EmailVerificationToken, error)
 	GetLivePasswordResetToken(ctx context.Context, tokenHash []byte) (PasswordResetToken, error)
 	GetLiveRefreshToken(ctx context.Context, tokenHash []byte) (RefreshToken, error)
+	GetPublishedListing(ctx context.Context, id uuid.UUID) (GetPublishedListingRow, error)
 	// Addresses are compared case-insensitively, matching the unique index.
 	GetUserByEmail(ctx context.Context, lower string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, lower string) (User, error)
+	ListPhotosForListing(ctx context.Context, listingID uuid.UUID) ([]ListingPhoto, error)
+	// Photos for a page of listings in one round-trip, rather than one query per
+	// listing. Nothing populates the table yet, but the shape is what the list
+	// endpoint needs the moment it does.
+	ListPhotosForListings(ctx context.Context, dollar_1 []uuid.UUID) ([]ListingPhoto, error)
+	// Only published rows are ever served. Filtering here rather than in Go means a
+	// handler cannot forget and expose somebody's draft.
+	ListPublishedListings(ctx context.Context, arg ListPublishedListingsParams) ([]ListPublishedListingsRow, error)
 	MarkUserVerified(ctx context.Context, id uuid.UUID) (User, error)
 	// Health check. Trivial on purpose: it exists to prove the whole chain — pool,
 	// sqlc codegen, generated method, real round-trip — works end to end, before any
