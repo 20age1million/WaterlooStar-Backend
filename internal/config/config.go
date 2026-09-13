@@ -25,6 +25,11 @@ const (
 	Production  Environment = "production"
 )
 
+// minJWTSecretBytes is the shortest secret accepted. HS256 keys shorter than the
+// hash output add nothing, and a short one here is usually a placeholder that
+// reached production by accident.
+const minJWTSecretBytes = 32
+
 // Config is the validated configuration for one process.
 type Config struct {
 	DatabaseURL string
@@ -32,6 +37,11 @@ type Config struct {
 	CORSOrigin  string
 	LogLevel    slog.Level
 	Environment Environment
+	// JWTSecret signs access tokens. Rotating it invalidates every live session.
+	JWTSecret string
+	// AppURL is the frontend's public origin, used to build the links that go
+	// into verification and password-reset emails.
+	AppURL string
 }
 
 // IsDevelopment reports whether the service is running locally.
@@ -92,6 +102,22 @@ func Load() (Config, error) {
 			problems = append(problems, fmt.Sprintf("ENVIRONMENT %q must be development or production", raw))
 		}
 	}
+
+	cfg.JWTSecret = strings.TrimSpace(os.Getenv("JWT_SECRET"))
+	switch {
+	case cfg.JWTSecret == "":
+		problems = append(problems, `JWT_SECRET is not set — generate one:
+    openssl rand -base64 48`)
+	case len(cfg.JWTSecret) < minJWTSecretBytes:
+		problems = append(problems, fmt.Sprintf(
+			"JWT_SECRET is %d bytes; at least %d are required", len(cfg.JWTSecret), minJWTSecretBytes))
+	}
+
+	cfg.AppURL = strings.TrimSpace(os.Getenv("APP_URL"))
+	if cfg.AppURL == "" {
+		cfg.AppURL = cfg.CORSOrigin
+	}
+	cfg.AppURL = strings.TrimRight(cfg.AppURL, "/")
 
 	if len(problems) > 0 {
 		return Config{}, fmt.Errorf("invalid configuration:\n  - %s", strings.Join(problems, "\n  - "))

@@ -3,3 +3,48 @@
 //   sqlc v1.31.1
 
 package sqlcgen
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+type EmailVerificationToken struct {
+	TokenHash  []byte
+	UserID     uuid.UUID
+	ExpiresAt  time.Time
+	ConsumedAt *time.Time
+	CreatedAt  time.Time
+}
+
+type PasswordResetToken struct {
+	TokenHash  []byte
+	UserID     uuid.UUID
+	ExpiresAt  time.Time
+	ConsumedAt *time.Time
+	CreatedAt  time.Time
+}
+
+type RefreshToken struct {
+	TokenHash []byte
+	UserID    uuid.UUID
+	ExpiresAt time.Time
+	RevokedAt *time.Time
+	UserAgent *string
+	CreatedAt time.Time
+}
+
+type User struct {
+	ID           uuid.UUID
+	Email        string
+	Username     string
+	PasswordHash string
+	Role         string
+	Verified     bool
+	AvatarUrl    *string
+	Level        int32
+	StarPoints   int32
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}

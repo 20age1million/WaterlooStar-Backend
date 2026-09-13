@@ -23,6 +23,10 @@ servers:
 tags:
   - name: system
     description: Service health and operational endpoints.
+  - name: auth
+    description: Registration, address verification, and session lifecycle.
+  - name: me
+    description: The signed-in user.
 
 paths:
   /healthz:
@@ -50,6 +54,211 @@ paths:
               schema:
                 $ref: "#/components/schemas/Health"
 
+  /auth/register:
+    post:
+      tags: [auth]
+      operationId: register
+      summary: Create an account
+      description: |
+        Creates an unverified account and emails a confirmation link. The address
+        must be a `uwaterloo.ca` one - that restriction is the basis of the
+        "verified student" badge the product is built on.
+
+        Registering does not sign you in. Confirm the address first, then log in.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Account created; a confirmation email has been sent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409":
+          description: |
+            That address or username is already taken. The response does not say
+            which, so this endpoint cannot be used to enumerate accounts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /auth/verify:
+    post:
+      tags: [auth]
+      operationId: verifyEmail
+      summary: Confirm an email address
+      description: |
+        Redeems the token from a confirmation email and marks the account
+        verified. Tokens are single-use and expire after 24 hours.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TokenRequest"
+      responses:
+        "200":
+          description: Address confirmed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: The token is unknown, already used, or expired.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Start a session
+      description: |
+        On success, sets three cookies: an httpOnly session cookie holding a
+        short-lived access token, an httpOnly refresh cookie scoped to
+        `/auth/refresh`, and a readable CSRF cookie whose value must be echoed in
+        the `X-CSRF-Token` header on later unsafe requests.
+
+        An unverified account may log in - it simply cannot do anything that
+        requires verification yet.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Signed in. Session cookies are set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401":
+          description: |
+            The address and password do not match. Deliberately identical whether
+            or not the address exists.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      operationId: refreshSession
+      summary: Exchange the refresh cookie for a new session
+      description: |
+        Rotates the refresh token: the presented one is revoked as the
+        replacement is issued, so a stolen token stops working as soon as the
+        real user refreshes.
+      security: []
+      responses:
+        "200":
+          description: New session cookies set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: The refresh cookie is missing, expired or already revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: End the session
+      description: |
+        Revokes the refresh token and clears the cookies. Succeeds even when no
+        session is present, so a client can always reach a signed-out state.
+      security: []
+      responses:
+        "204":
+          description: Signed out; cookies cleared.
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /auth/password-reset:
+    post:
+      tags: [auth]
+      operationId: requestPasswordReset
+      summary: Request a password-reset email
+      description: |
+        Always answers 202, whether or not the address is registered - otherwise
+        this endpoint would reveal which addresses have accounts.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailRequest"
+      responses:
+        "202":
+          description: If that address has an account, an email is on its way.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /auth/password-reset/confirm:
+    post:
+      tags: [auth]
+      operationId: confirmPasswordReset
+      summary: Set a new password using a reset token
+      description: |
+        Redeems a reset token and replaces the password. Every existing session
+        for that account is revoked, so a reset actually evicts whoever prompted it.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordResetConfirmRequest"
+      responses:
+        "204":
+          description: Password changed; all sessions revoked.
+        "400":
+          description: The token is unknown, used, or expired; or the password is too weak.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /me:
+    get:
+      tags: [me]
+      operationId: getMe
+      summary: The signed-in user
+      responses:
+        "200":
+          description: The authenticated user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
 components:
   schemas:
     Health:
@@ -70,6 +279,118 @@ components:
       example:
         status: ok
         database: ok
+
+    User:
+      type: object
+      description: |
+        A user as exposed by the API. Never carries a password hash. `email` is
+        present only when the user is looking at their own record.
+      required: [id, username, role, verified, level, star_points, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+          description: Only returned to the user themselves.
+        role:
+          type: string
+          enum: [user, moderator, admin]
+        verified:
+          type: boolean
+          description: Whether the uwaterloo.ca address has been confirmed.
+        avatar_url:
+          type: string
+          nullable: true
+        level:
+          type: integer
+        star_points:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+      example:
+        id: 3f7c1b2a-9d4e-4c8a-8f1b-2e3d4c5b6a70
+        username: meil
+        email: meil@uwaterloo.ca
+        role: user
+        verified: true
+        level: 4
+        star_points: 120
+        created_at: "2026-09-01T14:03:00Z"
+
+    RegisterRequest:
+      type: object
+      required: [email, username, password]
+      properties:
+        email:
+          type: string
+          format: email
+          description: Must end in `uwaterloo.ca`.
+        username:
+          type: string
+          minLength: 3
+          maxLength: 32
+          pattern: "^[A-Za-z0-9_.-]+$"
+        password:
+          type: string
+          minLength: 10
+          maxLength: 72
+          description: At least 10 characters. Capped at 72 bytes, which is bcrypt's limit.
+      example:
+        email: meil@uwaterloo.ca
+        username: meil
+        password: correct horse battery
+
+    RegisterResponse:
+      type: object
+      required: [user, verification_required]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        verification_required:
+          type: boolean
+          description: Always true - confirm the address before logging in.
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    TokenRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: The token from the emailed link.
+
+    EmailRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    PasswordResetConfirmRequest:
+      type: object
+      required: [token, password]
+      properties:
+        token:
+          type: string
+        password:
+          type: string
+          minLength: 10
+          maxLength: 72
 
     Error:
       type: object

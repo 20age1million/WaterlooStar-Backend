@@ -1,7 +1,6 @@
 package httpapi_test
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -18,20 +17,10 @@ import (
 	"github.com/20age1million/waterloostar-api/internal/middleware"
 )
 
-// stubQuerier stands in for the generated Querier so the handler's failure path
-// can be exercised without a database.
-type stubQuerier struct {
-	pingErr error
-}
-
-func (s stubQuerier) Ping(context.Context) (int32, error) {
-	if s.pingErr != nil {
-		return 0, s.pingErr
-	}
-	return 1, nil
-}
-
-func newTestServer(t *testing.T, q stubQuerier) *httptest.Server {
+// newTestServer builds a server over the in-memory fake defined in
+// fake_querier_test.go, so the health handler's failure path can be exercised
+// without standing up PostgreSQL.
+func newTestServer(t *testing.T, q *fakeQuerier) *httptest.Server {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 
@@ -39,11 +28,13 @@ func newTestServer(t *testing.T, q stubQuerier) *httptest.Server {
 		Port:        8080,
 		CORSOrigin:  "http://localhost:3000",
 		Environment: config.Development,
+		JWTSecret:   "a-test-secret-that-is-long-enough-to-pass",
 	}
 	// Discard log output so a deliberately failing case does not litter test output.
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	srv := httptest.NewServer(httpapi.NewRouter(cfg, log, httpapi.NewServerWithQuerier(cfg, log, q, "")))
+	srv := httptest.NewServer(httpapi.NewRouter(cfg, log,
+		httpapi.NewServerWithQuerier(cfg, log, q, &capturingMailer{}, "")))
 	t.Cleanup(srv.Close)
 	return srv
 }
@@ -55,7 +46,7 @@ type healthBody struct {
 }
 
 func TestHealthReportsOKWhenDatabaseResponds(t *testing.T) {
-	srv := newTestServer(t, stubQuerier{})
+	srv := newTestServer(t, newFakeQuerier())
 
 	res, err := http.Get(srv.URL + "/healthz")
 	if err != nil {
@@ -83,7 +74,7 @@ func TestHealthReportsOKWhenDatabaseResponds(t *testing.T) {
 }
 
 func TestHealthReports503WhenDatabaseUnreachable(t *testing.T) {
-	srv := newTestServer(t, stubQuerier{pingErr: errors.New("connection refused")})
+	srv := newTestServer(t, &fakeQuerier{pingErr: errors.New("connection refused")})
 
 	res, err := http.Get(srv.URL + "/healthz")
 	if err != nil {
@@ -110,7 +101,7 @@ func TestHealthReports503WhenDatabaseUnreachable(t *testing.T) {
 }
 
 func TestUnknownPathReturnsStandardErrorEnvelope(t *testing.T) {
-	srv := newTestServer(t, stubQuerier{})
+	srv := newTestServer(t, newFakeQuerier())
 
 	res, err := http.Get(srv.URL + "/no-such-endpoint")
 	if err != nil {
@@ -140,7 +131,7 @@ func TestUnknownPathReturnsStandardErrorEnvelope(t *testing.T) {
 }
 
 func TestResponseCarriesRequestID(t *testing.T) {
-	srv := newTestServer(t, stubQuerier{})
+	srv := newTestServer(t, newFakeQuerier())
 
 	t.Run("generated when absent", func(t *testing.T) {
 		res, err := http.Get(srv.URL + "/healthz")
@@ -175,7 +166,7 @@ func TestResponseCarriesRequestID(t *testing.T) {
 }
 
 func TestCORSAllowsConfiguredOriginWithCredentials(t *testing.T) {
-	srv := newTestServer(t, stubQuerier{})
+	srv := newTestServer(t, newFakeQuerier())
 
 	req, err := http.NewRequest(http.MethodOptions, srv.URL+"/healthz", nil)
 	if err != nil {
@@ -200,7 +191,7 @@ func TestCORSAllowsConfiguredOriginWithCredentials(t *testing.T) {
 }
 
 func TestCORSIgnoresUnknownOrigin(t *testing.T) {
-	srv := newTestServer(t, stubQuerier{})
+	srv := newTestServer(t, newFakeQuerier())
 
 	req, err := http.NewRequest(http.MethodGet, srv.URL+"/healthz", nil)
 	if err != nil {

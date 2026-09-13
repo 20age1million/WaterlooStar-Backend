@@ -5,13 +5,16 @@ package httpapi
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/20age1million/waterloostar-api/internal/apierror"
+	"github.com/20age1million/waterloostar-api/internal/auth"
 	"github.com/20age1million/waterloostar-api/internal/config"
 	"github.com/20age1million/waterloostar-api/internal/db/sqlcgen"
+	"github.com/20age1million/waterloostar-api/internal/email"
 	"github.com/20age1million/waterloostar-api/internal/httpapi/gen"
 	"github.com/20age1million/waterloostar-api/internal/middleware"
 )
@@ -26,23 +29,33 @@ type Server struct {
 	cfg          config.Config
 	log          *slog.Logger
 	queries      sqlcgen.Querier
+	tokens       *auth.TokenService
+	cookies      auth.CookieWriter
+	mailer       email.Sender
 	buildVersion string
 }
 
 // NewServer wires the dependencies a handler set needs.
-func NewServer(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, buildVersion string) *Server {
-	return NewServerWithQuerier(cfg, log, sqlcgen.New(pool), buildVersion)
+func NewServer(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, mailer email.Sender, buildVersion string) *Server {
+	return NewServerWithQuerier(cfg, log, sqlcgen.New(pool), mailer, buildVersion)
 }
 
 // NewServerWithQuerier builds a Server over any Querier. Used by tests.
-func NewServerWithQuerier(cfg config.Config, log *slog.Logger, q sqlcgen.Querier, buildVersion string) *Server {
+func NewServerWithQuerier(cfg config.Config, log *slog.Logger, q sqlcgen.Querier, mailer email.Sender, buildVersion string) *Server {
 	return &Server{
 		cfg:          cfg,
 		log:          log,
 		queries:      q,
+		tokens:       auth.NewTokenService(cfg.JWTSecret),
+		cookies:      auth.NewCookieWriter(cfg.IsDevelopment()),
+		mailer:       mailer,
 		buildVersion: buildVersion,
 	}
 }
+
+// Tokens exposes the token service so the router can build the authentication
+// middleware from the same instance the handlers mint with.
+func (s *Server) Tokens() *auth.TokenService { return s.tokens }
 
 // NewRouter builds the gin engine with the middleware chain and mounts the
 // generated routes.
@@ -55,11 +68,24 @@ func NewRouter(cfg config.Config, log *slog.Logger, srv *Server) *gin.Engine {
 	// logger and recovery, which would write responses that do not match the
 	// documented error envelope.
 	r := gin.New()
+
+	// The generated strict handlers receive the *gin.Context as their
+	// context.Context. Without this, gin.Context.Value does NOT fall through to
+	// the request's context, so anything middleware attaches there — the
+	// authenticated principal, for one — is invisible to handlers and every
+	// authenticated request looks anonymous.
+	r.ContextWithFallback = true
 	r.Use(
 		middleware.RequestID(),
 		middleware.Recovery(log),
 		middleware.Logger(log),
 		middleware.CORS(cfg.CORSOrigin),
+		// Populates the principal when a valid session cookie is present, and
+		// never rejects. Handlers decide what requires a session.
+		middleware.Authenticate(srv.Tokens()),
+		// Rejects unsafe methods that carry a session cookie without a matching
+		// CSRF header. Runs before any handler sees the request.
+		middleware.CSRF(),
 	)
 
 	// An unknown path and an unknown record should look the same to a client.
@@ -71,6 +97,45 @@ func NewRouter(cfg config.Config, log *slog.Logger, srv *Server) *gin.Engine {
 			c.Request.Method+" is not allowed on "+c.Request.URL.Path)
 	})
 
-	gen.RegisterHandlers(r, gen.NewStrictHandler(srv, nil))
+	// oapi-codegen's default error handlers answer with {"msg": "..."}, which is
+	// not the documented envelope, and the handler-error default puts the raw Go
+	// error in the response body. Both are replaced here so that every failure —
+	// including one thrown by generated request binding — leaves through the one
+	// shape the contract describes.
+	handler := gen.NewStrictHandlerWithOptions(srv, nil, gen.StrictGinServerOptions{
+		RequestErrorHandlerFunc: func(c *gin.Context, err error) {
+			apierror.Write(c, http.StatusBadRequest, apierror.CodeBadRequest, requestErrorMessage(err))
+		},
+		ResponseErrorHandlerFunc: func(c *gin.Context, err error) {
+			log.Error("writing response failed",
+				slog.String("path", c.Request.URL.Path),
+				slog.String("error", err.Error()))
+		},
+		HandlerErrorFunc: func(c *gin.Context, err error) {
+			// Logged in full, never returned: an internal error can name tables
+			// and columns, and a client has no use for it.
+			log.Error("handler failed",
+				slog.String("path", c.Request.URL.Path),
+				slog.String("request_id", c.GetString(apierror.RequestIDKey)),
+				slog.String("error", err.Error()))
+			apierror.Internal(c)
+		},
+	})
+
+	gen.RegisterHandlers(r, handler)
 	return r
+}
+
+// requestErrorMessage turns a binding failure into something a person can act
+// on, without echoing Go type names back at them.
+func requestErrorMessage(err error) string {
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "EOF"):
+		return "A JSON body is required."
+	case strings.Contains(msg, "email"):
+		return "That email address is not valid."
+	default:
+		return "The request body could not be read. Check the field types against the API contract."
+	}
 }

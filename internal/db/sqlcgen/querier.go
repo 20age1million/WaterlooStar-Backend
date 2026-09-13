@@ -6,13 +6,44 @@ package sqlcgen
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
 type Querier interface {
+	// A fresh request invalidates earlier outstanding ones, so a forwarded old email
+	// cannot still be used.
+	ConsumeAllEmailVerificationTokensForUser(ctx context.Context, userID uuid.UUID) error
+	ConsumeAllPasswordResetTokensForUser(ctx context.Context, userID uuid.UUID) error
+	ConsumeEmailVerificationToken(ctx context.Context, tokenHash []byte) error
+	ConsumePasswordResetToken(ctx context.Context, tokenHash []byte) error
+	// Used to tell a duplicate email from a duplicate username *internally*, without
+	// the response revealing which one collided.
+	CountUsersByEmailOrUsername(ctx context.Context, arg CountUsersByEmailOrUsernameParams) (CountUsersByEmailOrUsernameRow, error)
+	// Every lookup here filters on consumed/revoked and expiry in SQL rather than in
+	// Go, so a caller cannot forget the check and accept a spent token.
+	CreateEmailVerificationToken(ctx context.Context, arg CreateEmailVerificationTokenParams) error
+	CreatePasswordResetToken(ctx context.Context, arg CreatePasswordResetTokenParams) error
+	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) error
+	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteExpiredTokens(ctx context.Context) error
+	GetLiveEmailVerificationToken(ctx context.Context, tokenHash []byte) (EmailVerificationToken, error)
+	GetLivePasswordResetToken(ctx context.Context, tokenHash []byte) (PasswordResetToken, error)
+	GetLiveRefreshToken(ctx context.Context, tokenHash []byte) (RefreshToken, error)
+	// Addresses are compared case-insensitively, matching the unique index.
+	GetUserByEmail(ctx context.Context, lower string) (User, error)
+	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
+	GetUserByUsername(ctx context.Context, lower string) (User, error)
+	MarkUserVerified(ctx context.Context, id uuid.UUID) (User, error)
 	// Health check. Trivial on purpose: it exists to prove the whole chain — pool,
 	// sqlc codegen, generated method, real round-trip — works end to end, before any
 	// domain table exists to query.
 	Ping(ctx context.Context) (int32, error)
+	// Used on password change: every existing session is ended, so a password reset
+	// actually evicts whoever prompted it.
+	RevokeAllRefreshTokensForUser(ctx context.Context, userID uuid.UUID) error
+	RevokeRefreshToken(ctx context.Context, tokenHash []byte) error
+	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 }
 
 var _ Querier = (*Queries)(nil)

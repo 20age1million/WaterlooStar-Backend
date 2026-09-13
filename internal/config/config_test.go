@@ -8,13 +8,15 @@ import (
 	"github.com/20age1million/waterloostar-api/internal/config"
 )
 
+const validSecret = "a-test-secret-that-is-long-enough-to-pass"
+
 const validDSN = "postgres://waterloostar:waterloostar@localhost:5433/waterloostar?sslmode=disable"
 
 // isolate clears every variable Load reads, so one test's environment cannot
 // leak into another's. t.Setenv restores the previous value when the test ends.
 func isolate(t *testing.T) {
 	t.Helper()
-	for _, key := range []string{"PG_DSN", "PORT", "CORS_ORIGIN", "LOG_LEVEL", "ENVIRONMENT"} {
+	for _, key := range []string{"PG_DSN", "PORT", "CORS_ORIGIN", "LOG_LEVEL", "ENVIRONMENT", "JWT_SECRET", "APP_URL"} {
 		t.Setenv(key, "")
 	}
 }
@@ -39,6 +41,7 @@ func TestLoadFailsWithoutDSN(t *testing.T) {
 func TestLoadAppliesDefaults(t *testing.T) {
 	isolate(t)
 	t.Setenv("PG_DSN", validDSN)
+	t.Setenv("JWT_SECRET", validSecret)
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -79,6 +82,7 @@ func TestLoadRejectsInvalidValues(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			isolate(t)
 			t.Setenv("PG_DSN", validDSN)
+			t.Setenv("JWT_SECRET", validSecret)
 			t.Setenv(tc.key, tc.value)
 
 			if _, err := config.Load(); err == nil {
@@ -110,6 +114,7 @@ func TestLoadReportsEveryProblemAtOnce(t *testing.T) {
 func TestProductionIsNotDevelopment(t *testing.T) {
 	isolate(t)
 	t.Setenv("PG_DSN", validDSN)
+	t.Setenv("JWT_SECRET", validSecret)
 	t.Setenv("ENVIRONMENT", "production")
 
 	cfg, err := config.Load()

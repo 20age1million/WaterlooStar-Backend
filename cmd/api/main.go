@@ -13,6 +13,7 @@ import (
 
 	"github.com/20age1million/waterloostar-api/internal/config"
 	"github.com/20age1million/waterloostar-api/internal/db"
+	"github.com/20age1million/waterloostar-api/internal/email"
 	"github.com/20age1million/waterloostar-api/internal/httpapi"
 )
 
@@ -56,7 +57,7 @@ func run() error {
 
 	srv := &http.Server{
 		Addr:              cfg.Addr(),
-		Handler:           httpapi.NewRouter(cfg, log, httpapi.NewServer(cfg, log, pool, buildVersion)),
+		Handler:           httpapi.NewRouter(cfg, log, httpapi.NewServer(cfg, log, pool, email.NewLogSender(log), buildVersion)),
 		ReadHeaderTimeout: readHeaderTimeout,
 	}
 
