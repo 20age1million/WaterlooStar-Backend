@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: waterloostar-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: waterloostar
+      POSTGRES_PASSWORD: waterloostar
+      POSTGRES_DB: waterloostar
+      # Deterministic collation so ordering matches across machines.
+      POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=en-CA --encoding=UTF8"
+    ports:
+      # Host port 5433: a local PostgreSQL install already occupies 5432 on the
+      # development machine, and binding it here would fail.
+      - "5433:5432"
+    volumes:
+      # postgres:18 stores data in a major-version subdirectory, so the mount
+      # goes at /var/lib/postgresql rather than the /data path used by 17 and
+      # earlier. Mounting /data here makes the image refuse to start.
+      - waterloostar-pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U waterloostar -d waterloostar"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  waterloostar-pgdata:

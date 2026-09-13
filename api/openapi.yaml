@@ -1,0 +1,216 @@
+openapi: 3.0.3
+
+info:
+  title: WaterlooStar API
+  version: 0.1.0
+  description: |
+    Backend for WaterlooStar — a housing marketplace and community forum for
+    University of Waterloo students.
+
+    This file is the contract and is authoritative. The Go server interfaces in
+    `internal/httpapi/gen` and the TypeScript types in the frontend repository
+    are both generated from it, so it is edited *before* the handler that serves
+    a new shape, never after.
+
+    Vocabulary note: the product says "Housing Available" and "Looking for
+    Housing". The internal terms *renter* and *rentee* never appear in any path,
+    field name or response body.
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: system
+    description: Service health and operational endpoints.
+
+paths:
+  /healthz:
+    get:
+      tags: [system]
+      operationId: getHealth
+      summary: Service and database health
+      description: |
+        Reports whether the service is up and whether it can reach PostgreSQL.
+        Returns 503 when the database round-trip fails, so a load balancer can
+        take the instance out of rotation rather than sending it traffic it
+        cannot serve.
+      security: []
+      responses:
+        "200":
+          description: Service is healthy and the database responded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "503":
+          description: Service is running but a dependency is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+
+components:
+  schemas:
+    Health:
+      type: object
+      required: [status, database]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+          description: Overall service state.
+        database:
+          type: string
+          enum: [ok, unreachable]
+          description: Result of a real query against PostgreSQL.
+        version:
+          type: string
+          description: Build version, when the binary was stamped with one.
+      example:
+        status: ok
+        database: ok
+
+    Error:
+      type: object
+      description: |
+        The single error envelope. Every failing request in this API returns this
+        shape, so the frontend has exactly one error contract to handle.
+      required: [code, message]
+      properties:
+        code:
+          $ref: "#/components/schemas/ErrorCode"
+        message:
+          type: string
+          description: Human-readable explanation. Safe to show to a user.
+        details:
+          type: object
+          additionalProperties:
+            type: string
+          description: |
+            Field-level problems, keyed by field name. Present on validation
+            failures, omitted otherwise.
+        request_id:
+          type: string
+          description: Correlates this response with the service's logs.
+      example:
+        code: not_found
+        message: No listing with that id.
+        request_id: 9f1c2f7a-6f2e-4d2a-9a1b-2c3d4e5f6a7b
+
+    ErrorCode:
+      type: string
+      description: |
+        Stable, machine-readable reason. Clients branch on this; `message` is for
+        humans and may be reworded without notice.
+      enum:
+        - bad_request
+        - validation_failed
+        - unauthorized
+        - forbidden
+        - not_found
+        - conflict
+        - internal_error
+        - service_unavailable
+
+    PageMeta:
+      type: object
+      description: Pagination metadata accompanying every list response.
+      required: [page, per_page, total, total_pages]
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          description: Current page, 1-based.
+        per_page:
+          type: integer
+          minimum: 1
+          description: Items per page, after the server's maximum is applied.
+        total:
+          type: integer
+          minimum: 0
+          description: Total items matching the query across all pages.
+        total_pages:
+          type: integer
+          minimum: 0
+          description: Total pages available at this page size.
+      example:
+        page: 1
+        per_page: 20
+        total: 6
+        total_pages: 1
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      required: false
+      description: Page number, 1-based.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    PerPage:
+      name: per_page
+      in: query
+      required: false
+      description: Items per page. Values above the server maximum are clamped.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  responses:
+    BadRequest:
+      description: The request was malformed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: No valid session was presented.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Authenticated, but not permitted — typically an unverified account.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: No such resource.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InternalError:
+      description: Something failed inside the service.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: waterloostar_session
+      description: |
+        JWT in an httpOnly, SameSite cookie set by the auth endpoints. Delivered
+        as a cookie rather than a bearer token so the Next.js frontend can read
+        it during server rendering. Because the credential is a cookie, unsafe
+        methods additionally require the CSRF header below.
+    csrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: |
+        Double-submit token, required on every unsafe method when authenticating
+        by cookie. Its value must match the `waterloostar_csrf` cookie.
+
+security:
+  - sessionCookie: []

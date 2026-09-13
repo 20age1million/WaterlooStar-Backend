@@ -9,3 +9,86 @@ source of truth, and both the gin server interfaces and the frontend's
 TypeScript types are generated from it.
 
 The frontend lives in a separate repository (`Waterloostar-web`).
+
+## Getting started
+
+Requires Go 1.24+ and Docker Desktop. No other tooling to install — sqlc and
+oapi-codegen are pinned as `go.mod` tool dependencies.
+
+```bash
+cp .env.example .env     # defaults match docker-compose.yml
+make up                  # start PostgreSQL 18
+make migrate-up          # apply migrations
+make run                 # start the API on :8080
+```
+
+Then:
+
+```bash
+curl localhost:8080/healthz
+# {"database":"ok","status":"ok"}
+```
+
+`make help` lists every target.
+
+## Layout
+
+```
+api/openapi.yaml         The contract. Authoritative — edit before the handler.
+cmd/api                  Service entry point.
+cmd/migrate              Migration runner (golang-migrate as a library).
+internal/apierror        The single error envelope every failure returns.
+internal/config          Environment binding and validation.
+internal/db              pgx pool; queries/ holds the .sql sqlc generates from.
+internal/db/sqlcgen      Generated. Do not edit.
+internal/httpapi         Router and handlers.
+internal/httpapi/gen     Generated from openapi.yaml. Do not edit.
+internal/middleware      Request id, logging, recovery, CORS.
+migrations               Schema source of truth; sqlc reads these too.
+docs/specs               Feature specifications.
+```
+
+## Working on it
+
+**The contract comes first.** `api/openapi.yaml` is edited *before* the handler
+that serves a new shape, never after. Then:
+
+```bash
+make generate            # regenerates the gin interfaces and the sqlc queries
+```
+
+A handler that no longer matches the contract fails to compile, which is the
+point. The frontend regenerates its TypeScript from the same file.
+
+**Schema changes are migrations.** Add a numbered `.up.sql`/`.down.sql` pair in
+`migrations/` and run `make migrate-up`. sqlc reads those files to derive its
+types, so there is no second schema definition to keep in step.
+
+**Before pushing:**
+
+```bash
+make check               # generate, vet, test, build
+```
+
+## Decisions worth knowing
+
+- **UUID primary keys** throughout, so public URLs leak no record counts.
+- **Cookie-based sessions.** The JWT is delivered in an httpOnly, SameSite
+  cookie rather than a bearer token, so the Next.js frontend can authenticate
+  during server rendering. Unsafe methods therefore also require a CSRF header.
+- **No ORM.** sqlc generates typed methods from hand-written SQL.
+- **`renter` and `rentee` are internal words only.** The product says "Housing
+  Available" and "Looking for Housing"; neither internal term may appear in a
+  path, a field name, or a response body.
+
+## Not yet chosen
+
+Deliberately deferred, with placeholders in their place:
+
+- **Email provider.** `internal/email` will define a `Sender` interface with a
+  log-only implementation. Verification links are written to the log in
+  development. Plug a real provider in behind that interface.
+- **Image hosting** and **map/geocoding provider**.
+- **Whether a listing's street address stays public.** It is public by default
+  for now; the design implies a private exact address revealed after contact.
+  See `docs/specs/*/platform-foundation/index.md`.
