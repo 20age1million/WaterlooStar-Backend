@@ -50,16 +50,39 @@ cmd/api                  Service entry point.
 cmd/migrate              Migration runner (golang-migrate as a library).
 cmd/seed                 Loads development fixtures. Refuses to run outside development.
 internal/apierror        The single error envelope every failure returns.
+internal/auth            Password hashing, JWT mint/verify, cookie shaping, tokens.
 internal/config          Environment binding and validation.
 internal/db              pgx pool; queries/ holds the .sql sqlc generates from.
 internal/db/sqlcgen      Generated. Do not edit.
 internal/httpapi         Router and handlers.
 internal/httpapi/gen     Generated from openapi.yaml. Do not edit.
 internal/db/seed         Development fixtures: the six prototype listings.
+internal/email           Sender interface; log-only implementation, no provider yet.
 internal/middleware      Request id, logging, recovery, CORS, auth, CSRF.
 migrations               Schema source of truth; sqlc reads these too.
 docs/specs               Feature specifications.
 ```
+
+## Endpoints
+
+Everything is described in `api/openapi.yaml`; this is the summary.
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET | `/healthz` | — | Service and database health |
+| POST | `/auth/register` | — | Create an account (uwaterloo.ca only) |
+| POST | `/auth/verify` | — | Redeem a confirmation token |
+| POST | `/auth/login` | — | Start a session; sets the cookies |
+| POST | `/auth/refresh` | refresh cookie | Rotate the session |
+| POST | `/auth/logout` | session | End the session |
+| POST | `/auth/password-reset` | — | Request a reset email |
+| POST | `/auth/password-reset/confirm` | — | Set a new password |
+| GET | `/me` | session | The signed-in user |
+| GET | `/listings` | — | Browse Housing Available, paginated |
+| GET | `/listings/{id}` | — | One listing in full |
+
+Browsing is public by design: an account is only needed to save a listing or
+message a poster.
 
 ## Working on it
 
@@ -98,10 +121,11 @@ make check               # generate, vet, test, build
 
 Deliberately deferred, with placeholders in their place:
 
-- **Email provider.** `internal/email` will define a `Sender` interface with a
-  log-only implementation. Verification links are written to the log in
-  development. Plug a real provider in behind that interface.
+- **Email provider.** `internal/email` defines a `Sender` interface whose only
+  implementation writes to the log. In development that is how you complete a
+  signup: the verification link is printed there. Plug a real provider in behind
+  that interface and swap it at the wiring point in `cmd/api`.
 - **Image hosting** and **map/geocoding provider**.
 - **Whether a listing's street address stays public.** It is public by default
   for now; the design implies a private exact address revealed after contact.
-  See `docs/specs/*/platform-foundation/index.md`.
+  See `docs/specs/implemented/platform-foundation/index.md`.
