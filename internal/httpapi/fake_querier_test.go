@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/20age1million/waterloostar-api/internal/db/sqlcgen"
+	"github.com/20age1million/WaterlooStar-Backend/internal/db/sqlcgen"
 )
 
 // fakeQuerier is an in-memory stand-in for the generated Querier.

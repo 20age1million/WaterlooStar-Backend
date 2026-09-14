@@ -1,3 +1,7 @@
+# Pinned so the project name does not follow the directory name. Without it,
+# renaming this folder orphans the container and creates a new empty volume.
+name: waterloostar
+
 services:
   postgres:
     image: postgres:18

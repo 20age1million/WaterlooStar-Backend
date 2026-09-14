@@ -16,11 +16,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/20age1million/waterloostar-api/internal/apierror"
-	"github.com/20age1million/waterloostar-api/internal/auth"
-	"github.com/20age1million/waterloostar-api/internal/config"
-	"github.com/20age1million/waterloostar-api/internal/email"
-	"github.com/20age1million/waterloostar-api/internal/httpapi"
+	"github.com/20age1million/WaterlooStar-Backend/internal/apierror"
+	"github.com/20age1million/WaterlooStar-Backend/internal/auth"
+	"github.com/20age1million/WaterlooStar-Backend/internal/config"
+	"github.com/20age1million/WaterlooStar-Backend/internal/email"
+	"github.com/20age1million/WaterlooStar-Backend/internal/httpapi"
 )
 
 const (

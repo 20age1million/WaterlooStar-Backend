@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/20age1million/waterloostar-api/internal/apierror"
+	"github.com/20age1million/WaterlooStar-Backend/internal/apierror"
 )
 
 // RequestIDHeader is echoed back on every response so a client can quote it.

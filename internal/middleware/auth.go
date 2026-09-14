@@ -5,8 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/20age1million/waterloostar-api/internal/apierror"
-	"github.com/20age1million/waterloostar-api/internal/auth"
+	"github.com/20age1million/WaterlooStar-Backend/internal/apierror"
+	"github.com/20age1million/WaterlooStar-Backend/internal/auth"
 )
 
 // Authenticate reads the session cookie and, when it holds a valid access token,

@@ -7,9 +7,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/20age1million/waterloostar-api/internal/config"
-	"github.com/20age1million/waterloostar-api/internal/db"
-	"github.com/20age1million/waterloostar-api/internal/db/seed"
+	"github.com/20age1million/WaterlooStar-Backend/internal/config"
+	"github.com/20age1million/WaterlooStar-Backend/internal/db"
+	"github.com/20age1million/WaterlooStar-Backend/internal/db/seed"
 )
 
 func main() {

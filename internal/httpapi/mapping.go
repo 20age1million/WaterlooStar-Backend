@@ -6,9 +6,9 @@ import (
 	"github.com/oapi-codegen/nullable"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
-	"github.com/20age1million/waterloostar-api/internal/apierror"
-	"github.com/20age1million/waterloostar-api/internal/db/sqlcgen"
-	"github.com/20age1million/waterloostar-api/internal/httpapi/gen"
+	"github.com/20age1million/WaterlooStar-Backend/internal/apierror"
+	"github.com/20age1million/WaterlooStar-Backend/internal/db/sqlcgen"
+	"github.com/20age1million/WaterlooStar-Backend/internal/httpapi/gen"
 )
 
 // toUser maps a database row to the contract's User.

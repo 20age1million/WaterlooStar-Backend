@@ -58,7 +58,7 @@
 - [x] **Seed data**
   - [x] Add `internal/db/seed/seed.go` (or a `make seed` target) inserting one verified seed user
         per distinct poster in the prototype fixtures, then the six listings from
-        `Waterloostar-web/src/data/housing.ts` with their display strings decomposed into columns
+        `waterloostar-frontend/src/fixtures/housing.ts` with their display strings decomposed into columns
   - [x] Decompose deliberately: `'Jan 1 – Apr 30 · 4-month sublet'` becomes `start_date`,
         `end_date` and `lease_months`; `'1 of 4 bed'` becomes `bedroom_of` and `bedrooms_total`;
         `'Internet incl.'` becomes an entry in `utilities`

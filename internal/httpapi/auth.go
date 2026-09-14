@@ -13,11 +13,11 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/20age1million/waterloostar-api/internal/apierror"
-	"github.com/20age1million/waterloostar-api/internal/auth"
-	"github.com/20age1million/waterloostar-api/internal/db/sqlcgen"
-	"github.com/20age1million/waterloostar-api/internal/email"
-	"github.com/20age1million/waterloostar-api/internal/httpapi/gen"
+	"github.com/20age1million/WaterlooStar-Backend/internal/apierror"
+	"github.com/20age1million/WaterlooStar-Backend/internal/auth"
+	"github.com/20age1million/WaterlooStar-Backend/internal/db/sqlcgen"
+	"github.com/20age1million/WaterlooStar-Backend/internal/email"
+	"github.com/20age1million/WaterlooStar-Backend/internal/httpapi/gen"
 )
 
 // The one rule the whole product rests on: an account belongs to a Waterloo

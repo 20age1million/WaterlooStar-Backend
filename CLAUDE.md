@@ -5,7 +5,7 @@ University of Waterloo students. Go + gin, PostgreSQL via pgx, typed queries
 from sqlc, spec-first OpenAPI.
 
 The frontend is a **separate repository**, checked out beside this one as
-`../Waterloostar-web`.
+`../waterloostar-frontend`.
 
 ---
 
@@ -28,8 +28,7 @@ Also read whichever of these the task touches:
 
 **Two skills in that folder do not apply here.** `az-pr-create` and
 `azure-devops-project-creator` came with the toolkit from another organisation's
-Azure DevOps setup. This repository has no remote at all. Ignore them unless the
-project actually moves to Azure DevOps.
+Azure DevOps setup. This project is on GitHub. Ignore them unless it moves.
 
 Invoke a skill with the `Skill` tool by name, e.g. `feature-implement`.
 
@@ -48,7 +47,14 @@ Invoke a skill with the `Skill` tool by name, e.g. `feature-implement`.
 
 ## Where things stand
 
-**Branch:** `feature/platform-foundation` · **No remote configured; nothing pushed.**
+**Branches:** `carl/reworked-waterloostar` (pushed) and `feature/platform-foundation`
+(the branch the work was done on; both point at the same commit).
+
+**Remote:** `origin` → `github.com/20age1million/WaterlooStar-Backend`. This repository
+was started fresh, so `carl/reworked-waterloostar` shares **no common ancestor** with
+that remote's `main`, `dev` or `feature/router-setup` — GitHub will report nothing to
+compare, and a normal PR against `main` cannot be opened. That is deliberate: the old
+backend was superseded, and nothing on the remote was to be overwritten.
 
 The **Platform Foundation** feature is complete — all three phases shipped and
 their specs are under `docs/specs/implemented/platform-foundation/`. See

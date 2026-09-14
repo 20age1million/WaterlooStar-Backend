@@ -10,13 +10,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/20age1million/waterloostar-api/internal/apierror"
-	"github.com/20age1million/waterloostar-api/internal/auth"
-	"github.com/20age1million/waterloostar-api/internal/config"
-	"github.com/20age1million/waterloostar-api/internal/db/sqlcgen"
-	"github.com/20age1million/waterloostar-api/internal/email"
-	"github.com/20age1million/waterloostar-api/internal/httpapi/gen"
-	"github.com/20age1million/waterloostar-api/internal/middleware"
+	"github.com/20age1million/WaterlooStar-Backend/internal/apierror"
+	"github.com/20age1million/WaterlooStar-Backend/internal/auth"
+	"github.com/20age1million/WaterlooStar-Backend/internal/config"
+	"github.com/20age1million/WaterlooStar-Backend/internal/db/sqlcgen"
+	"github.com/20age1million/WaterlooStar-Backend/internal/email"
+	"github.com/20age1million/WaterlooStar-Backend/internal/httpapi/gen"
+	"github.com/20age1million/WaterlooStar-Backend/internal/middleware"
 )
 
 // Server implements the generated StrictServerInterface. It holds everything a

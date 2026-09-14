@@ -8,7 +8,7 @@ with golang-migrate. The HTTP contract is spec-first: `api/openapi.yaml` is the
 source of truth, and both the gin server interfaces and the frontend's
 TypeScript types are generated from it.
 
-The frontend lives in a separate repository (`Waterloostar-web`).
+The frontend lives in a separate repository (`waterloostar-frontend`).
 
 ## Getting started
 

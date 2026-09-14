@@ -9,9 +9,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
-	"github.com/20age1million/waterloostar-api/internal/apierror"
-	"github.com/20age1million/waterloostar-api/internal/db/sqlcgen"
-	"github.com/20age1million/waterloostar-api/internal/httpapi/gen"
+	"github.com/20age1million/WaterlooStar-Backend/internal/apierror"
+	"github.com/20age1million/WaterlooStar-Backend/internal/db/sqlcgen"
+	"github.com/20age1million/WaterlooStar-Backend/internal/httpapi/gen"
 )
 
 // Pagination bounds. The maximum is a hard cap rather than an error: a client

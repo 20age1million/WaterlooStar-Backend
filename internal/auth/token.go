@@ -20,8 +20,8 @@ const (
 )
 
 const (
-	issuer   = "waterloostar-api"
-	audience = "waterloostar-web"
+	issuer   = "waterloostar-backend"
+	audience = "waterloostar-frontend"
 )
 
 var (

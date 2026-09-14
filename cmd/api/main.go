@@ -11,10 +11,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/20age1million/waterloostar-api/internal/config"
-	"github.com/20age1million/waterloostar-api/internal/db"
-	"github.com/20age1million/waterloostar-api/internal/email"
-	"github.com/20age1million/waterloostar-api/internal/httpapi"
+	"github.com/20age1million/WaterlooStar-Backend/internal/config"
+	"github.com/20age1million/WaterlooStar-Backend/internal/db"
+	"github.com/20age1million/WaterlooStar-Backend/internal/email"
+	"github.com/20age1million/WaterlooStar-Backend/internal/httpapi"
 )
 
 // buildVersion is stamped at link time:

@@ -1,4 +1,4 @@
-module github.com/20age1million/waterloostar-api
+module github.com/20age1million/WaterlooStar-Backend
 
 go 1.26.0
 

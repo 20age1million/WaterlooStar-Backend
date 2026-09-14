@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/20age1million/waterloostar-api/internal/httpapi/gen"
+	"github.com/20age1million/WaterlooStar-Backend/internal/httpapi/gen"
 )
 
 // healthTimeout bounds the database check so an unresponsive database produces a

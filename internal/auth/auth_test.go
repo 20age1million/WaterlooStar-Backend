@@ -7,7 +7,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 
-	"github.com/20age1million/waterloostar-api/internal/auth"
+	"github.com/20age1million/WaterlooStar-Backend/internal/auth"
 )
 
 const secret = "test-secret-that-is-at-least-32-bytes-long"

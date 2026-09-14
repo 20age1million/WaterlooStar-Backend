@@ -138,10 +138,10 @@ double-submit CSRF token.
 
 - The user-facing vocabulary is "Housing Available" and "Looking for Housing". The internal terms
   *renter* and *rentee* must never appear in any API path, field name or response body
-  *(per `Waterloostar-web/README.md`)*.
+  *(per `waterloostar-frontend/README.md`)*.
 - `SortKey` values already defined in the frontend — `match`, `new`, `priceAsc`, `priceDesc`,
   `distance` — are the intended server-side sort parameter names
-  *(per `Waterloostar-web/README.md`)*.
+  *(per `waterloostar-frontend/README.md`)*.
 - Street address is **public by default** for this feature. The design implies a private exact
   address revealed after contact; that decision is deliberately deferred and the schema must not
   make it expensive to add later.
@@ -168,5 +168,5 @@ double-submit CSRF token.
 
 ## References (internal only)
 
-- Frontend conventions: `Waterloostar-web/README.md` — prototype notes for wiring the backend
-- Mirror spec: `Waterloostar-web/docs/specs/active/platform-foundation/index.md`
+- Frontend conventions: `waterloostar-frontend/README.md` — prototype notes for wiring the backend
+- Mirror spec: `waterloostar-frontend/docs/specs/implemented/platform-foundation/index.md`

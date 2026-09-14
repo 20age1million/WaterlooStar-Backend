@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/20age1million/waterloostar-api/internal/httpapi/gen"
+	"github.com/20age1million/WaterlooStar-Backend/internal/httpapi/gen"
 )
 
 // The generated response objects write a status and a body, but the auth

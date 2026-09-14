@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/20age1million/waterloostar-api/internal/config"
+	"github.com/20age1million/WaterlooStar-Backend/internal/config"
 )
 
 const validSecret = "a-test-secret-that-is-long-enough-to-pass"

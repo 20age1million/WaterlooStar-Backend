@@ -1,6 +1,6 @@
 // Package seed loads the six prototype listings into a development database.
 //
-// These are the fixtures from Waterloostar-web/src/data/housing.ts, with their
+// These are the fixtures from waterloostar-frontend/src/fixtures/housing.ts, with their
 // display strings taken apart into columns: "Jan 1 – Apr 30 · 4-month sublet"
 // becomes start_date, end_date and lease_months; "1 of 4 bed" becomes
 // bedroom_of and bedrooms_total; "Internet incl." becomes an entry in
@@ -20,8 +20,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/20age1million/waterloostar-api/internal/auth"
-	"github.com/20age1million/waterloostar-api/internal/db/sqlcgen"
+	"github.com/20age1million/WaterlooStar-Backend/internal/auth"
+	"github.com/20age1million/WaterlooStar-Backend/internal/db/sqlcgen"
 )
 
 // seedPassword is the password every seeded account shares, so the six posters

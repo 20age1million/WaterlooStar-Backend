@@ -6,7 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/20age1million/waterloostar-api/internal/auth"
+	"github.com/20age1million/WaterlooStar-Backend/internal/auth"
 )
 
 // pgUniqueViolation is PostgreSQL's SQLSTATE for a unique constraint breach.

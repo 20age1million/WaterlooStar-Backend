@@ -17,7 +17,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
-	"github.com/20age1million/waterloostar-api/internal/config"
+	"github.com/20age1million/WaterlooStar-Backend/internal/config"
 )
 
 const usage = `usage: go run ./cmd/migrate <command>

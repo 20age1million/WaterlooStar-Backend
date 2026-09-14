@@ -11,10 +11,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/20age1million/waterloostar-api/internal/apierror"
-	"github.com/20age1million/waterloostar-api/internal/config"
-	"github.com/20age1million/waterloostar-api/internal/httpapi"
-	"github.com/20age1million/waterloostar-api/internal/middleware"
+	"github.com/20age1million/WaterlooStar-Backend/internal/apierror"
+	"github.com/20age1million/WaterlooStar-Backend/internal/config"
+	"github.com/20age1million/WaterlooStar-Backend/internal/httpapi"
+	"github.com/20age1million/WaterlooStar-Backend/internal/middleware"
 )
 
 // newTestServer builds a server over the in-memory fake defined in
