@@ -117,3 +117,68 @@ RETURNING *;
 
 -- name: DeleteAllListings :exec
 DELETE FROM listings;
+
+-- ---------------------------------------------------------------- write path
+
+-- The owner's own listings, every status. The public endpoints show only
+-- published rows, so this is the only way to see a paused or archived post.
+-- name: ListListingsByOwner :many
+SELECT
+    sqlc.embed(l),
+    u.username    AS owner_username,
+    u.avatar_url  AS owner_avatar_url,
+    u.verified    AS owner_verified
+FROM listings l
+JOIN users u ON u.id = l.owner_id
+WHERE l.owner_id = $1
+ORDER BY l.created_at DESC;
+
+-- Fetch for an ownership check. Returns the row whatever its status, so a
+-- handler can tell "not yours" from "does not exist" — and then deliberately
+-- answer 404 for both.
+-- name: GetListingForOwner :one
+SELECT * FROM listings WHERE id = $1;
+
+-- name: UpdateListing :one
+-- Every field is optional: an edit form sends what changed, and COALESCE leaves
+-- the rest alone. A PUT would make every omitted field a deletion.
+UPDATE listings SET
+    title          = coalesce(sqlc.narg('title'),          title),
+    body           = coalesce(sqlc.narg('body'),           body),
+    conditions     = coalesce(sqlc.narg('conditions'),     conditions),
+    price_cents    = coalesce(sqlc.narg('price_cents'),    price_cents),
+    deposit_cents  = coalesce(sqlc.narg('deposit_cents'),  deposit_cents),
+    start_date     = coalesce(sqlc.narg('start_date'),     start_date),
+    end_date       = coalesce(sqlc.narg('end_date'),       end_date),
+    lease_months   = coalesce(sqlc.narg('lease_months'),   lease_months),
+    term_tag       = coalesce(sqlc.narg('term_tag'),       term_tag),
+    unit_type      = coalesce(sqlc.narg('unit_type'),      unit_type),
+    bedrooms_total = coalesce(sqlc.narg('bedrooms_total'), bedrooms_total),
+    bedroom_of     = coalesce(sqlc.narg('bedroom_of'),     bedroom_of),
+    bathrooms      = coalesce(sqlc.narg('bathrooms'),      bathrooms),
+    bath_type      = coalesce(sqlc.narg('bath_type'),      bath_type),
+    furnished      = coalesce(sqlc.narg('furnished'),      furnished),
+    utilities      = coalesce(sqlc.narg('utilities'),      utilities),
+    parking        = coalesce(sqlc.narg('parking'),        parking),
+    pets           = coalesce(sqlc.narg('pets'),           pets),
+    laundry        = coalesce(sqlc.narg('laundry'),        laundry),
+    address_line   = coalesce(sqlc.narg('address_line'),   address_line),
+    neighbourhood  = coalesce(sqlc.narg('neighbourhood'),  neighbourhood),
+    distance_m     = coalesce(sqlc.narg('distance_m'),     distance_m)
+WHERE id = sqlc.arg('id')
+RETURNING *;
+
+-- published_at is set the first time a listing goes live and never moved, so
+-- re-publishing after a pause does not make an old post look new.
+-- name: SetListingStatus :one
+UPDATE listings
+-- Cast on both uses: referring to the same parameter as varchar in one place
+-- and ::text in another makes PostgreSQL refuse to deduce a type for it
+-- (SQLSTATE 42P08).
+SET status = sqlc.arg('status')::text,
+    published_at = CASE
+        WHEN sqlc.arg('status')::text = 'published' AND published_at IS NULL THEN now()
+        ELSE published_at
+    END
+WHERE id = sqlc.arg('id')
+RETURNING *;

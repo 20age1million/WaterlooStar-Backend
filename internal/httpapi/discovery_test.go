@@ -74,7 +74,7 @@ func seedVariety(t *testing.T, db *fakeQuerier) {
 			PriceCents: 129000, StartDate: date(2027, 1, 1), EndDate: date(2027, 12, 31),
 			LeaseMonths: 12, TermTag: "Full year", UnitType: "studio", BedroomsTotal: 0,
 			Bathrooms: 1, BathType: "private", Furnished: true,
-			Utilities: []string{"internet", "hydro", "water", "heat", "gas"},
+			Utilities:   []string{"internet", "hydro", "water", "heat", "gas"},
 			AddressLine: "University Ave W", Neighbourhood: "Northdale",
 			CommuteMode: "walk", Status: "published", CreatedAt: time.Now().Add(-4 * time.Hour),
 		},

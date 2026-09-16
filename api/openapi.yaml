@@ -353,6 +353,39 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+    post:
+      tags: [housing]
+      operationId: createListing
+      summary: Post a place
+      description: |
+        Creates a listing owned by the signed-in user. Only a **verified**
+        student may post — confirming a `uwaterloo.ca` address is what the badge
+        on every listing means.
+
+        The listing is published immediately unless `status` says otherwise.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListingInput"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Listing"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: Signed in, but the address has not been confirmed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /listings/{id}:
     get:
       tags: [housing]
@@ -379,6 +412,123 @@ paths:
                 $ref: "#/components/schemas/Listing"
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+    patch:
+      tags: [housing]
+      operationId: updateListing
+      summary: Edit your listing
+      description: |
+        Changes only the fields present in the body; anything omitted is left
+        alone. Someone else's listing answers 404, not 403 — a 403 would confirm
+        it exists.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListingUpdate"
+      responses:
+        "200":
+          description: The updated listing.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Listing"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+    delete:
+      tags: [housing]
+      operationId: deleteListing
+      summary: Take your listing down
+      description: |
+        Archives the listing rather than removing the row. Questions asked on it,
+        and later saves and conversations, hang off that row; deleting it would
+        rewrite other people's history. Archiving is terminal.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Archived.
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /listings/{id}/status:
+    post:
+      tags: [housing]
+      operationId: setListingStatus
+      summary: Publish, pause or archive your listing
+      description: |
+        Pausing is a different act from correcting the rent, so it is a different
+        endpoint with its own rules.
+
+        `draft -> published -> paused -> published` all move freely. `archived`
+        is terminal: a post that has been taken down stays down, and bringing one
+        back means posting again — which is honest, since the term and the price
+        will have changed.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [draft, published, paused, archived]
+      responses:
+        "200":
+          description: The listing in its new state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Listing"
+        "400":
+          description: That transition is not allowed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /me/listings:
+    get:
+      tags: [housing]
+      operationId: listMyListings
+      summary: Your own listings, whatever their state
+      description: |
+        Everything you have posted, including drafts, paused and archived
+        listings — none of which appear in public results.
+      responses:
+        "200":
+          description: Your listings, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Listing"
+        "401": { $ref: "#/components/responses/Unauthorized" }
         "500": { $ref: "#/components/responses/InternalError" }
 
 components:
@@ -656,6 +806,89 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ListingPhoto"
+
+    ListingInput:
+      type: object
+      description: A new listing. Everything the hub filters on is required.
+      required:
+        - title
+        - price_cents
+        - start_date
+        - end_date
+        - lease_months
+        - term_tag
+        - unit_type
+        - bedrooms_total
+        - bathrooms
+        - bath_type
+        - address_line
+      properties:
+        title: { type: string, minLength: 8, maxLength: 200 }
+        body: { type: string, maxLength: 8000 }
+        conditions:
+          type: array
+          items: { type: string, maxLength: 500 }
+          maxItems: 12
+        price_cents: { type: integer, minimum: 1 }
+        deposit_cents: { type: integer, minimum: 0, nullable: true }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        lease_months: { type: integer, minimum: 1, maximum: 24 }
+        term_tag: { type: string, maxLength: 40 }
+        unit_type: { type: string, enum: [room, studio, unit] }
+        bedrooms_total: { type: integer, minimum: 0, maximum: 20 }
+        bedroom_of: { type: integer, minimum: 1, nullable: true }
+        bathrooms: { type: number, minimum: 0 }
+        bath_type: { type: string, enum: [shared, private, ensuite] }
+        furnished: { type: boolean }
+        utilities:
+          type: array
+          items: { type: string, enum: [internet, hydro, water, heat, gas] }
+        parking: { type: boolean }
+        pets: { type: boolean }
+        laundry: { type: boolean }
+        address_line: { type: string, maxLength: 200 }
+        neighbourhood: { type: string, maxLength: 80 }
+        distance_m: { type: integer, minimum: 0, nullable: true }
+        status:
+          type: string
+          enum: [draft, published]
+          default: published
+          description: Post as a draft to finish it later.
+
+    ListingUpdate:
+      type: object
+      description: |
+        A partial edit. Only the fields present are changed; anything omitted is
+        left as it was. Status is not editable here — use `/listings/{id}/status`.
+      properties:
+        title: { type: string, minLength: 8, maxLength: 200 }
+        body: { type: string, maxLength: 8000 }
+        conditions:
+          type: array
+          items: { type: string, maxLength: 500 }
+          maxItems: 12
+        price_cents: { type: integer, minimum: 1 }
+        deposit_cents: { type: integer, minimum: 0, nullable: true }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        lease_months: { type: integer, minimum: 1, maximum: 24 }
+        term_tag: { type: string, maxLength: 40 }
+        unit_type: { type: string, enum: [room, studio, unit] }
+        bedrooms_total: { type: integer, minimum: 0, maximum: 20 }
+        bedroom_of: { type: integer, minimum: 1, nullable: true }
+        bathrooms: { type: number, minimum: 0 }
+        bath_type: { type: string, enum: [shared, private, ensuite] }
+        furnished: { type: boolean }
+        utilities:
+          type: array
+          items: { type: string, enum: [internet, hydro, water, heat, gas] }
+        parking: { type: boolean }
+        pets: { type: boolean }
+        laundry: { type: boolean }
+        address_line: { type: string, maxLength: 200 }
+        neighbourhood: { type: string, maxLength: 80 }
+        distance_m: { type: integer, minimum: 0, nullable: true }
 
     ListingOwner:
       type: object

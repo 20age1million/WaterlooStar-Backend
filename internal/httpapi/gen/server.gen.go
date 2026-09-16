@@ -97,19 +97,19 @@ func (e HealthStatus) Valid() bool {
 
 // Defines values for ListingBathType.
 const (
-	Ensuite ListingBathType = "ensuite"
-	Private ListingBathType = "private"
-	Shared  ListingBathType = "shared"
+	ListingBathTypeEnsuite ListingBathType = "ensuite"
+	ListingBathTypePrivate ListingBathType = "private"
+	ListingBathTypeShared  ListingBathType = "shared"
 )
 
 // Valid indicates whether the value is a known member of the ListingBathType enum.
 func (e ListingBathType) Valid() bool {
 	switch e {
-	case Ensuite:
+	case ListingBathTypeEnsuite:
 		return true
-	case Private:
+	case ListingBathTypePrivate:
 		return true
-	case Shared:
+	case ListingBathTypeShared:
 		return true
 	default:
 		return false
@@ -136,22 +136,22 @@ func (e ListingCommuteMode) Valid() bool {
 
 // Defines values for ListingStatus.
 const (
-	Archived  ListingStatus = "archived"
-	Draft     ListingStatus = "draft"
-	Paused    ListingStatus = "paused"
-	Published ListingStatus = "published"
+	ListingStatusArchived  ListingStatus = "archived"
+	ListingStatusDraft     ListingStatus = "draft"
+	ListingStatusPaused    ListingStatus = "paused"
+	ListingStatusPublished ListingStatus = "published"
 )
 
 // Valid indicates whether the value is a known member of the ListingStatus enum.
 func (e ListingStatus) Valid() bool {
 	switch e {
-	case Archived:
+	case ListingStatusArchived:
 		return true
-	case Draft:
+	case ListingStatusDraft:
 		return true
-	case Paused:
+	case ListingStatusPaused:
 		return true
-	case Published:
+	case ListingStatusPublished:
 		return true
 	default:
 		return false
@@ -160,19 +160,19 @@ func (e ListingStatus) Valid() bool {
 
 // Defines values for ListingUnitType.
 const (
-	Room   ListingUnitType = "room"
-	Studio ListingUnitType = "studio"
-	Unit   ListingUnitType = "unit"
+	ListingUnitTypeRoom   ListingUnitType = "room"
+	ListingUnitTypeStudio ListingUnitType = "studio"
+	ListingUnitTypeUnit   ListingUnitType = "unit"
 )
 
 // Valid indicates whether the value is a known member of the ListingUnitType enum.
 func (e ListingUnitType) Valid() bool {
 	switch e {
-	case Room:
+	case ListingUnitTypeRoom:
 		return true
-	case Studio:
+	case ListingUnitTypeStudio:
 		return true
-	case Unit:
+	case ListingUnitTypeUnit:
 		return true
 	default:
 		return false
@@ -200,6 +200,162 @@ func (e ListingUtilities) Valid() bool {
 	case ListingUtilitiesInternet:
 		return true
 	case ListingUtilitiesWater:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListingInputBathType.
+const (
+	ListingInputBathTypeEnsuite ListingInputBathType = "ensuite"
+	ListingInputBathTypePrivate ListingInputBathType = "private"
+	ListingInputBathTypeShared  ListingInputBathType = "shared"
+)
+
+// Valid indicates whether the value is a known member of the ListingInputBathType enum.
+func (e ListingInputBathType) Valid() bool {
+	switch e {
+	case ListingInputBathTypeEnsuite:
+		return true
+	case ListingInputBathTypePrivate:
+		return true
+	case ListingInputBathTypeShared:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListingInputStatus.
+const (
+	ListingInputStatusDraft     ListingInputStatus = "draft"
+	ListingInputStatusPublished ListingInputStatus = "published"
+)
+
+// Valid indicates whether the value is a known member of the ListingInputStatus enum.
+func (e ListingInputStatus) Valid() bool {
+	switch e {
+	case ListingInputStatusDraft:
+		return true
+	case ListingInputStatusPublished:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListingInputUnitType.
+const (
+	ListingInputUnitTypeRoom   ListingInputUnitType = "room"
+	ListingInputUnitTypeStudio ListingInputUnitType = "studio"
+	ListingInputUnitTypeUnit   ListingInputUnitType = "unit"
+)
+
+// Valid indicates whether the value is a known member of the ListingInputUnitType enum.
+func (e ListingInputUnitType) Valid() bool {
+	switch e {
+	case ListingInputUnitTypeRoom:
+		return true
+	case ListingInputUnitTypeStudio:
+		return true
+	case ListingInputUnitTypeUnit:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListingInputUtilities.
+const (
+	ListingInputUtilitiesGas      ListingInputUtilities = "gas"
+	ListingInputUtilitiesHeat     ListingInputUtilities = "heat"
+	ListingInputUtilitiesHydro    ListingInputUtilities = "hydro"
+	ListingInputUtilitiesInternet ListingInputUtilities = "internet"
+	ListingInputUtilitiesWater    ListingInputUtilities = "water"
+)
+
+// Valid indicates whether the value is a known member of the ListingInputUtilities enum.
+func (e ListingInputUtilities) Valid() bool {
+	switch e {
+	case ListingInputUtilitiesGas:
+		return true
+	case ListingInputUtilitiesHeat:
+		return true
+	case ListingInputUtilitiesHydro:
+		return true
+	case ListingInputUtilitiesInternet:
+		return true
+	case ListingInputUtilitiesWater:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListingUpdateBathType.
+const (
+	ListingUpdateBathTypeEnsuite ListingUpdateBathType = "ensuite"
+	ListingUpdateBathTypePrivate ListingUpdateBathType = "private"
+	ListingUpdateBathTypeShared  ListingUpdateBathType = "shared"
+)
+
+// Valid indicates whether the value is a known member of the ListingUpdateBathType enum.
+func (e ListingUpdateBathType) Valid() bool {
+	switch e {
+	case ListingUpdateBathTypeEnsuite:
+		return true
+	case ListingUpdateBathTypePrivate:
+		return true
+	case ListingUpdateBathTypeShared:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListingUpdateUnitType.
+const (
+	ListingUpdateUnitTypeRoom   ListingUpdateUnitType = "room"
+	ListingUpdateUnitTypeStudio ListingUpdateUnitType = "studio"
+	ListingUpdateUnitTypeUnit   ListingUpdateUnitType = "unit"
+)
+
+// Valid indicates whether the value is a known member of the ListingUpdateUnitType enum.
+func (e ListingUpdateUnitType) Valid() bool {
+	switch e {
+	case ListingUpdateUnitTypeRoom:
+		return true
+	case ListingUpdateUnitTypeStudio:
+		return true
+	case ListingUpdateUnitTypeUnit:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListingUpdateUtilities.
+const (
+	ListingUpdateUtilitiesGas      ListingUpdateUtilities = "gas"
+	ListingUpdateUtilitiesHeat     ListingUpdateUtilities = "heat"
+	ListingUpdateUtilitiesHydro    ListingUpdateUtilities = "hydro"
+	ListingUpdateUtilitiesInternet ListingUpdateUtilities = "internet"
+	ListingUpdateUtilitiesWater    ListingUpdateUtilities = "water"
+)
+
+// Valid indicates whether the value is a known member of the ListingUpdateUtilities enum.
+func (e ListingUpdateUtilities) Valid() bool {
+	switch e {
+	case ListingUpdateUtilitiesGas:
+		return true
+	case ListingUpdateUtilitiesHeat:
+		return true
+	case ListingUpdateUtilitiesHydro:
+		return true
+	case ListingUpdateUtilitiesInternet:
+		return true
+	case ListingUpdateUtilitiesWater:
 		return true
 	default:
 		return false
@@ -275,6 +431,30 @@ func (e ListListingsParamsSort) Valid() bool {
 	case PriceAsc:
 		return true
 	case PriceDesc:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SetListingStatusJSONBodyStatus.
+const (
+	SetListingStatusJSONBodyStatusArchived  SetListingStatusJSONBodyStatus = "archived"
+	SetListingStatusJSONBodyStatusDraft     SetListingStatusJSONBodyStatus = "draft"
+	SetListingStatusJSONBodyStatusPaused    SetListingStatusJSONBodyStatus = "paused"
+	SetListingStatusJSONBodyStatusPublished SetListingStatusJSONBodyStatus = "published"
+)
+
+// Valid indicates whether the value is a known member of the SetListingStatusJSONBodyStatus enum.
+func (e SetListingStatusJSONBodyStatus) Valid() bool {
+	switch e {
+	case SetListingStatusJSONBodyStatusArchived:
+		return true
+	case SetListingStatusJSONBodyStatusDraft:
+		return true
+	case SetListingStatusJSONBodyStatusPaused:
+		return true
+	case SetListingStatusJSONBodyStatusPublished:
 		return true
 	default:
 		return false
@@ -405,6 +585,47 @@ type ListingUnitType string
 // ListingUtilities defines model for Listing.Utilities.
 type ListingUtilities string
 
+// ListingInput A new listing. Everything the hub filters on is required.
+type ListingInput struct {
+	AddressLine   string                 `json:"address_line"`
+	BathType      ListingInputBathType   `json:"bath_type"`
+	Bathrooms     float32                `json:"bathrooms"`
+	BedroomOf     nullable.Nullable[int] `json:"bedroom_of,omitempty"`
+	BedroomsTotal int                    `json:"bedrooms_total"`
+	Body          *string                `json:"body,omitempty"`
+	Conditions    *[]string              `json:"conditions,omitempty"`
+	DepositCents  nullable.Nullable[int] `json:"deposit_cents,omitempty"`
+	DistanceM     nullable.Nullable[int] `json:"distance_m,omitempty"`
+	EndDate       openapi_types.Date     `json:"end_date"`
+	Furnished     *bool                  `json:"furnished,omitempty"`
+	Laundry       *bool                  `json:"laundry,omitempty"`
+	LeaseMonths   int                    `json:"lease_months"`
+	Neighbourhood *string                `json:"neighbourhood,omitempty"`
+	Parking       *bool                  `json:"parking,omitempty"`
+	Pets          *bool                  `json:"pets,omitempty"`
+	PriceCents    int                    `json:"price_cents"`
+	StartDate     openapi_types.Date     `json:"start_date"`
+
+	// Status Post as a draft to finish it later.
+	Status    *ListingInputStatus      `json:"status,omitempty"`
+	TermTag   string                   `json:"term_tag"`
+	Title     string                   `json:"title"`
+	UnitType  ListingInputUnitType     `json:"unit_type"`
+	Utilities *[]ListingInputUtilities `json:"utilities,omitempty"`
+}
+
+// ListingInputBathType defines model for ListingInput.BathType.
+type ListingInputBathType string
+
+// ListingInputStatus Post as a draft to finish it later.
+type ListingInputStatus string
+
+// ListingInputUnitType defines model for ListingInput.UnitType.
+type ListingInputUnitType string
+
+// ListingInputUtilities defines model for ListingInput.Utilities.
+type ListingInputUtilities string
+
 // ListingOwner Just enough about the poster to render a listing. Never their email -
 // contact details stay private until both sides agree to talk.
 type ListingOwner struct {
@@ -430,6 +651,42 @@ type ListingPhoto struct {
 	Position int                `json:"position"`
 	Url      string             `json:"url"`
 }
+
+// ListingUpdate A partial edit. Only the fields present are changed; anything omitted is
+// left as it was. Status is not editable here — use `/listings/{id}/status`.
+type ListingUpdate struct {
+	AddressLine   *string                   `json:"address_line,omitempty"`
+	BathType      *ListingUpdateBathType    `json:"bath_type,omitempty"`
+	Bathrooms     *float32                  `json:"bathrooms,omitempty"`
+	BedroomOf     nullable.Nullable[int]    `json:"bedroom_of,omitempty"`
+	BedroomsTotal *int                      `json:"bedrooms_total,omitempty"`
+	Body          *string                   `json:"body,omitempty"`
+	Conditions    *[]string                 `json:"conditions,omitempty"`
+	DepositCents  nullable.Nullable[int]    `json:"deposit_cents,omitempty"`
+	DistanceM     nullable.Nullable[int]    `json:"distance_m,omitempty"`
+	EndDate       *openapi_types.Date       `json:"end_date,omitempty"`
+	Furnished     *bool                     `json:"furnished,omitempty"`
+	Laundry       *bool                     `json:"laundry,omitempty"`
+	LeaseMonths   *int                      `json:"lease_months,omitempty"`
+	Neighbourhood *string                   `json:"neighbourhood,omitempty"`
+	Parking       *bool                     `json:"parking,omitempty"`
+	Pets          *bool                     `json:"pets,omitempty"`
+	PriceCents    *int                      `json:"price_cents,omitempty"`
+	StartDate     *openapi_types.Date       `json:"start_date,omitempty"`
+	TermTag       *string                   `json:"term_tag,omitempty"`
+	Title         *string                   `json:"title,omitempty"`
+	UnitType      *ListingUpdateUnitType    `json:"unit_type,omitempty"`
+	Utilities     *[]ListingUpdateUtilities `json:"utilities,omitempty"`
+}
+
+// ListingUpdateBathType defines model for ListingUpdate.BathType.
+type ListingUpdateBathType string
+
+// ListingUpdateUnitType defines model for ListingUpdate.UnitType.
+type ListingUpdateUnitType string
+
+// ListingUpdateUtilities defines model for ListingUpdate.Utilities.
+type ListingUpdateUtilities string
 
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
@@ -589,6 +846,14 @@ type ListListingsParamsUtilities string
 // ListListingsParamsSort defines parameters for ListListings.
 type ListListingsParamsSort string
 
+// SetListingStatusJSONBody defines parameters for SetListingStatus.
+type SetListingStatusJSONBody struct {
+	Status SetListingStatusJSONBodyStatus `json:"status"`
+}
+
+// SetListingStatusJSONBodyStatus defines parameters for SetListingStatus.
+type SetListingStatusJSONBodyStatus string
+
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
 
@@ -603,6 +868,15 @@ type RegisterJSONRequestBody = RegisterRequest
 
 // VerifyEmailJSONRequestBody defines body for VerifyEmail for application/json ContentType.
 type VerifyEmailJSONRequestBody = TokenRequest
+
+// CreateListingJSONRequestBody defines body for CreateListing for application/json ContentType.
+type CreateListingJSONRequestBody = ListingInput
+
+// UpdateListingJSONRequestBody defines body for UpdateListing for application/json ContentType.
+type UpdateListingJSONRequestBody = ListingUpdate
+
+// SetListingStatusJSONRequestBody defines body for SetListingStatus for application/json ContentType.
+type SetListingStatusJSONRequestBody SetListingStatusJSONBody
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -633,12 +907,27 @@ type ServerInterface interface {
 	// ListListings Browse Housing Available
 	// (GET /listings)
 	ListListings(c *gin.Context, params ListListingsParams)
+	// CreateListing Post a place
+	// (POST /listings)
+	CreateListing(c *gin.Context)
+	// DeleteListing Take your listing down
+	// (DELETE /listings/{id})
+	DeleteListing(c *gin.Context, id openapi_types.UUID)
 	// GetListing One listing in full
 	// (GET /listings/{id})
 	GetListing(c *gin.Context, id openapi_types.UUID)
+	// UpdateListing Edit your listing
+	// (PATCH /listings/{id})
+	UpdateListing(c *gin.Context, id openapi_types.UUID)
+	// SetListingStatus Publish, pause or archive your listing
+	// (POST /listings/{id}/status)
+	SetListingStatus(c *gin.Context, id openapi_types.UUID)
 	// GetMe The signed-in user
 	// (GET /me)
 	GetMe(c *gin.Context)
+	// ListMyListings Your own listings, whatever their state
+	// (GET /me/listings)
+	ListMyListings(c *gin.Context)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -901,6 +1190,44 @@ func (siw *ServerInterfaceWrapper) ListListings(c *gin.Context) {
 	siw.Handler.ListListings(c, params)
 }
 
+// CreateListing operation middleware
+func (siw *ServerInterfaceWrapper) CreateListing(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.CreateListing(c)
+}
+
+// DeleteListing operation middleware
+func (siw *ServerInterfaceWrapper) DeleteListing(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.DeleteListing(c, id)
+}
+
 // GetListing operation middleware
 func (siw *ServerInterfaceWrapper) GetListing(c *gin.Context) {
 
@@ -926,6 +1253,56 @@ func (siw *ServerInterfaceWrapper) GetListing(c *gin.Context) {
 	siw.Handler.GetListing(c, id)
 }
 
+// UpdateListing operation middleware
+func (siw *ServerInterfaceWrapper) UpdateListing(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.UpdateListing(c, id)
+}
+
+// SetListingStatus operation middleware
+func (siw *ServerInterfaceWrapper) SetListingStatus(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.SetListingStatus(c, id)
+}
+
 // GetMe operation middleware
 func (siw *ServerInterfaceWrapper) GetMe(c *gin.Context) {
 
@@ -937,6 +1314,19 @@ func (siw *ServerInterfaceWrapper) GetMe(c *gin.Context) {
 	}
 
 	siw.Handler.GetMe(c)
+}
+
+// ListMyListings operation middleware
+func (siw *ServerInterfaceWrapper) ListMyListings(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListMyListings(c)
 }
 
 // GinServerOptions provides options for the Gin server.
@@ -976,7 +1366,12 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.POST(options.BaseURL+"/auth/password-reset/confirm", wrapper.ConfirmPasswordReset)
 	router.GET(options.BaseURL+"/me", wrapper.GetMe)
 	router.GET(options.BaseURL+"/listings", wrapper.ListListings)
+	router.POST(options.BaseURL+"/listings", wrapper.CreateListing)
+	router.DELETE(options.BaseURL+"/listings/:id", wrapper.DeleteListing)
 	router.GET(options.BaseURL+"/listings/:id", wrapper.GetListing)
+	router.PATCH(options.BaseURL+"/listings/:id", wrapper.UpdateListing)
+	router.POST(options.BaseURL+"/listings/:id/status", wrapper.SetListingStatus)
+	router.GET(options.BaseURL+"/me/listings", wrapper.ListMyListings)
 }
 
 type BadRequestJSONResponse Error
@@ -1416,6 +1811,142 @@ func (response ListListings500JSONResponse) VisitListListingsResponse(w http.Res
 	return err
 }
 
+type CreateListingRequestObject struct {
+	Body *CreateListingJSONRequestBody
+}
+
+type CreateListingResponseObject interface {
+	VisitCreateListingResponse(w http.ResponseWriter) error
+}
+
+type CreateListing201JSONResponse Listing
+
+func (response CreateListing201JSONResponse) VisitCreateListingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateListing400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateListing400JSONResponse) VisitCreateListingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateListing401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateListing401JSONResponse) VisitCreateListingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateListing403JSONResponse Error
+
+func (response CreateListing403JSONResponse) VisitCreateListingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateListing500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response CreateListing500JSONResponse) VisitCreateListingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteListingRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type DeleteListingResponseObject interface {
+	VisitDeleteListingResponse(w http.ResponseWriter) error
+}
+
+type DeleteListing204Response struct {
+}
+
+func (response DeleteListing204Response) VisitDeleteListingResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteListing401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response DeleteListing401JSONResponse) VisitDeleteListingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteListing404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DeleteListing404JSONResponse) VisitDeleteListingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteListing500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response DeleteListing500JSONResponse) VisitDeleteListingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetListingRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
@@ -1480,6 +2011,164 @@ func (response GetListing500JSONResponse) VisitGetListingResponse(w http.Respons
 	return err
 }
 
+type UpdateListingRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *UpdateListingJSONRequestBody
+}
+
+type UpdateListingResponseObject interface {
+	VisitUpdateListingResponse(w http.ResponseWriter) error
+}
+
+type UpdateListing200JSONResponse Listing
+
+func (response UpdateListing200JSONResponse) VisitUpdateListingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateListing400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateListing400JSONResponse) VisitUpdateListingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateListing401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UpdateListing401JSONResponse) VisitUpdateListingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateListing404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateListing404JSONResponse) VisitUpdateListingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateListing500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response UpdateListing500JSONResponse) VisitUpdateListingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetListingStatusRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *SetListingStatusJSONRequestBody
+}
+
+type SetListingStatusResponseObject interface {
+	VisitSetListingStatusResponse(w http.ResponseWriter) error
+}
+
+type SetListingStatus200JSONResponse Listing
+
+func (response SetListingStatus200JSONResponse) VisitSetListingStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetListingStatus400JSONResponse Error
+
+func (response SetListingStatus400JSONResponse) VisitSetListingStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetListingStatus401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response SetListingStatus401JSONResponse) VisitSetListingStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetListingStatus404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response SetListingStatus404JSONResponse) VisitSetListingStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetListingStatus500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response SetListingStatus500JSONResponse) VisitSetListingStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetMeRequestObject struct {
 }
 
@@ -1529,6 +2218,55 @@ func (response GetMe500JSONResponse) VisitGetMeResponse(w http.ResponseWriter) e
 	return err
 }
 
+type ListMyListingsRequestObject struct {
+}
+
+type ListMyListingsResponseObject interface {
+	VisitListMyListingsResponse(w http.ResponseWriter) error
+}
+
+type ListMyListings200JSONResponse []Listing
+
+func (response ListMyListings200JSONResponse) VisitListMyListingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMyListings401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListMyListings401JSONResponse) VisitListMyListingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMyListings500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response ListMyListings500JSONResponse) VisitListMyListingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Login Start a session
@@ -1558,12 +2296,27 @@ type StrictServerInterface interface {
 	// ListListings Browse Housing Available
 	// (GET /listings)
 	ListListings(ctx context.Context, request ListListingsRequestObject) (ListListingsResponseObject, error)
+	// CreateListing Post a place
+	// (POST /listings)
+	CreateListing(ctx context.Context, request CreateListingRequestObject) (CreateListingResponseObject, error)
+	// DeleteListing Take your listing down
+	// (DELETE /listings/{id})
+	DeleteListing(ctx context.Context, request DeleteListingRequestObject) (DeleteListingResponseObject, error)
 	// GetListing One listing in full
 	// (GET /listings/{id})
 	GetListing(ctx context.Context, request GetListingRequestObject) (GetListingResponseObject, error)
+	// UpdateListing Edit your listing
+	// (PATCH /listings/{id})
+	UpdateListing(ctx context.Context, request UpdateListingRequestObject) (UpdateListingResponseObject, error)
+	// SetListingStatus Publish, pause or archive your listing
+	// (POST /listings/{id}/status)
+	SetListingStatus(ctx context.Context, request SetListingStatusRequestObject) (SetListingStatusResponseObject, error)
 	// GetMe The signed-in user
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// ListMyListings Your own listings, whatever their state
+	// (GET /me/listings)
+	ListMyListings(ctx context.Context, request ListMyListingsRequestObject) (ListMyListingsResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx *gin.Context, request any) (any, error)
@@ -1876,6 +2629,63 @@ func (sh *strictHandler) ListListings(ctx *gin.Context, params ListListingsParam
 	}
 }
 
+// CreateListing operation middleware
+func (sh *strictHandler) CreateListing(ctx *gin.Context) {
+	var request CreateListingRequestObject
+
+	var body CreateListingJSONRequestBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(ctx, err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateListing(ctx, request.(CreateListingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateListing")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(CreateListingResponseObject); ok {
+		if err := validResponse.VisitCreateListingResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteListing operation middleware
+func (sh *strictHandler) DeleteListing(ctx *gin.Context, id openapi_types.UUID) {
+	var request DeleteListingRequestObject
+
+	request.Id = id
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteListing(ctx, request.(DeleteListingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteListing")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(DeleteListingResponseObject); ok {
+		if err := validResponse.VisitDeleteListingResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetListing operation middleware
 func (sh *strictHandler) GetListing(ctx *gin.Context, id openapi_types.UUID) {
 	var request GetListingRequestObject
@@ -1895,6 +2705,72 @@ func (sh *strictHandler) GetListing(ctx *gin.Context, id openapi_types.UUID) {
 		sh.options.HandlerErrorFunc(ctx, err)
 	} else if validResponse, ok := response.(GetListingResponseObject); ok {
 		if err := validResponse.VisitGetListingResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateListing operation middleware
+func (sh *strictHandler) UpdateListing(ctx *gin.Context, id openapi_types.UUID) {
+	var request UpdateListingRequestObject
+
+	request.Id = id
+
+	var body UpdateListingJSONRequestBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(ctx, err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateListing(ctx, request.(UpdateListingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateListing")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(UpdateListingResponseObject); ok {
+		if err := validResponse.VisitUpdateListingResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetListingStatus operation middleware
+func (sh *strictHandler) SetListingStatus(ctx *gin.Context, id openapi_types.UUID) {
+	var request SetListingStatusRequestObject
+
+	request.Id = id
+
+	var body SetListingStatusJSONRequestBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(ctx, err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.SetListingStatus(ctx, request.(SetListingStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetListingStatus")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(SetListingStatusResponseObject); ok {
+		if err := validResponse.VisitSetListingStatusResponse(ctx.Writer); err != nil {
 			sh.options.ResponseErrorHandlerFunc(ctx, err)
 		}
 	} else if response != nil {
@@ -1926,106 +2802,147 @@ func (sh *strictHandler) GetMe(ctx *gin.Context) {
 	}
 }
 
+// ListMyListings operation middleware
+func (sh *strictHandler) ListMyListings(ctx *gin.Context) {
+	var request ListMyListingsRequestObject
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMyListings(ctx, request.(ListMyListingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMyListings")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(ListMyListingsResponseObject); ok {
+		if err := validResponse.VisitListMyListingsResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, compressed with deflate, json marshaled OpenAPI spec.
 // Stored as a slice of fixed-width chunks rather than one concatenated
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

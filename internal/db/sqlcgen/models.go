@@ -56,6 +56,7 @@ type Listing struct {
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	Search           interface{}
+	PublishedAt      *time.Time
 }
 
 type ListingPhoto struct {

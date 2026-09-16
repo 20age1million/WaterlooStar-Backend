@@ -516,3 +516,145 @@ func (f *fakeQuerier) ListPhotosForListing(context.Context, uuid.UUID) ([]sqlcge
 func (f *fakeQuerier) ListPhotosForListings(context.Context, []uuid.UUID) ([]sqlcgen.ListingPhoto, error) {
 	return []sqlcgen.ListingPhoto{}, nil
 }
+
+// -------------------------------------------------------------- write path
+
+func (f *fakeQuerier) ListListingsByOwner(_ context.Context, ownerID uuid.UUID) ([]sqlcgen.ListListingsByOwnerRow, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	// Every status, not just published — that is the point of this query.
+	mine := []sqlcgen.Listing{}
+	for _, l := range f.listings {
+		if l.OwnerID == ownerID {
+			mine = append(mine, l)
+		}
+	}
+	sort.SliceStable(mine, func(i, j int) bool { return mine[i].CreatedAt.After(mine[j].CreatedAt) })
+
+	rows := []sqlcgen.ListListingsByOwnerRow{}
+	for _, l := range mine {
+		owner := f.users[l.OwnerID]
+		rows = append(rows, sqlcgen.ListListingsByOwnerRow{
+			Listing:        l,
+			OwnerUsername:  owner.Username,
+			OwnerAvatarUrl: owner.AvatarUrl,
+			OwnerVerified:  owner.Verified,
+		})
+	}
+	return rows, nil
+}
+
+func (f *fakeQuerier) GetListingForOwner(_ context.Context, id uuid.UUID) (sqlcgen.Listing, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, l := range f.listings {
+		if l.ID == id {
+			return l, nil
+		}
+	}
+	return sqlcgen.Listing{}, pgx.ErrNoRows
+}
+
+func (f *fakeQuerier) UpdateListing(_ context.Context, arg sqlcgen.UpdateListingParams) (sqlcgen.Listing, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	for i, l := range f.listings {
+		if l.ID != arg.ID {
+			continue
+		}
+		// Mirrors the SQL's COALESCE: nil leaves the column alone.
+		if arg.Title != nil {
+			l.Title = *arg.Title
+		}
+		if arg.Body != nil {
+			l.Body = *arg.Body
+		}
+		if arg.Conditions != nil {
+			l.Conditions = arg.Conditions
+		}
+		if arg.PriceCents != nil {
+			l.PriceCents = *arg.PriceCents
+		}
+		if arg.DepositCents != nil {
+			l.DepositCents = arg.DepositCents
+		}
+		if arg.StartDate != nil {
+			l.StartDate = *arg.StartDate
+		}
+		if arg.EndDate != nil {
+			l.EndDate = *arg.EndDate
+		}
+		if arg.LeaseMonths != nil {
+			l.LeaseMonths = *arg.LeaseMonths
+		}
+		if arg.TermTag != nil {
+			l.TermTag = *arg.TermTag
+		}
+		if arg.UnitType != nil {
+			l.UnitType = *arg.UnitType
+		}
+		if arg.BedroomsTotal != nil {
+			l.BedroomsTotal = *arg.BedroomsTotal
+		}
+		if arg.BedroomOf != nil {
+			l.BedroomOf = arg.BedroomOf
+		}
+		if arg.Bathrooms != nil {
+			l.Bathrooms = *arg.Bathrooms
+		}
+		if arg.BathType != nil {
+			l.BathType = *arg.BathType
+		}
+		if arg.Furnished != nil {
+			l.Furnished = *arg.Furnished
+		}
+		if arg.Utilities != nil {
+			l.Utilities = arg.Utilities
+		}
+		if arg.Parking != nil {
+			l.Parking = *arg.Parking
+		}
+		if arg.Pets != nil {
+			l.Pets = *arg.Pets
+		}
+		if arg.Laundry != nil {
+			l.Laundry = *arg.Laundry
+		}
+		if arg.AddressLine != nil {
+			l.AddressLine = *arg.AddressLine
+		}
+		if arg.Neighbourhood != nil {
+			l.Neighbourhood = *arg.Neighbourhood
+		}
+		if arg.DistanceM != nil {
+			l.DistanceM = arg.DistanceM
+		}
+		l.UpdatedAt = time.Now()
+		f.listings[i] = l
+		return l, nil
+	}
+	return sqlcgen.Listing{}, pgx.ErrNoRows
+}
+
+func (f *fakeQuerier) SetListingStatus(_ context.Context, arg sqlcgen.SetListingStatusParams) (sqlcgen.Listing, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	for i, l := range f.listings {
+		if l.ID != arg.ID {
+			continue
+		}
+		l.Status = arg.Status
+		// Set once and never moved, so re-publishing does not make an old post
+		// look new.
+		if arg.Status == "published" && l.PublishedAt == nil {
+			now := time.Now()
+			l.PublishedAt = &now
+		}
+		f.listings[i] = l
+		return l, nil
+	}
+	return sqlcgen.Listing{}, pgx.ErrNoRows
+}

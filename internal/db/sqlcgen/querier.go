@@ -30,6 +30,10 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteAllListings(ctx context.Context) error
 	DeleteExpiredTokens(ctx context.Context) error
+	// Fetch for an ownership check. Returns the row whatever its status, so a
+	// handler can tell "not yours" from "does not exist" — and then deliberately
+	// answer 404 for both.
+	GetListingForOwner(ctx context.Context, id uuid.UUID) (Listing, error)
 	GetLiveEmailVerificationToken(ctx context.Context, tokenHash []byte) (EmailVerificationToken, error)
 	GetLivePasswordResetToken(ctx context.Context, tokenHash []byte) (PasswordResetToken, error)
 	GetLiveRefreshToken(ctx context.Context, tokenHash []byte) (RefreshToken, error)
@@ -47,6 +51,10 @@ type Querier interface {
 	// Only published rows are ever returned, and that stays here in the SQL so a
 	// handler cannot forget it.
 	ListListings(ctx context.Context, arg ListListingsParams) ([]ListListingsRow, error)
+	// ---------------------------------------------------------------- write path
+	// The owner's own listings, every status. The public endpoints show only
+	// published rows, so this is the only way to see a paused or archived post.
+	ListListingsByOwner(ctx context.Context, ownerID uuid.UUID) ([]ListListingsByOwnerRow, error)
 	ListPhotosForListing(ctx context.Context, listingID uuid.UUID) ([]ListingPhoto, error)
 	// Photos for a page of listings in one round-trip, rather than one query per
 	// listing. Nothing populates the table yet, but the shape is what the list
@@ -61,6 +69,15 @@ type Querier interface {
 	// actually evicts whoever prompted it.
 	RevokeAllRefreshTokensForUser(ctx context.Context, userID uuid.UUID) error
 	RevokeRefreshToken(ctx context.Context, tokenHash []byte) error
+	// published_at is set the first time a listing goes live and never moved, so
+	// re-publishing after a pause does not make an old post look new.
+	// Cast on both uses: referring to the same parameter as varchar in one place
+	// and ::text in another makes PostgreSQL refuse to deduce a type for it
+	// (SQLSTATE 42P08).
+	SetListingStatus(ctx context.Context, arg SetListingStatusParams) (Listing, error)
+	// Every field is optional: an edit form sends what changed, and COALESCE leaves
+	// the rest alone. A PUT would make every omitted field a deletion.
+	UpdateListing(ctx context.Context, arg UpdateListingParams) (Listing, error)
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 }
 
