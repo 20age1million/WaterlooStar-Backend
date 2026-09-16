@@ -5,7 +5,7 @@ University of Waterloo students. Go + gin, PostgreSQL via pgx, typed queries
 from sqlc, spec-first OpenAPI.
 
 The frontend is a **separate repository**, checked out beside this one as
-`../waterloostar-frontend`.
+`../WaterlooStar-Frontend`.
 
 ---
 

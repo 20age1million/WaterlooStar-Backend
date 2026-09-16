@@ -1,6 +1,6 @@
 // Package seed loads the six prototype listings into a development database.
 //
-// These are the fixtures from waterloostar-frontend/src/fixtures/housing.ts, with their
+// These are the fixtures from WaterlooStar-Frontend/src/fixtures/housing.ts, with their
 // display strings taken apart into columns: "Jan 1 – Apr 30 · 4-month sublet"
 // becomes start_date, end_date and lease_months; "1 of 4 bed" becomes
 // bedroom_of and bedrooms_total; "Internet incl." becomes an entry in
