@@ -1,6 +1,6 @@
 # Discovery — API
 
-**Status:** Ready
+**Status:** Complete
 **Branch:** `feature/discovery`
 **Ticket / Work Item:** N/A
 **Owner(s):** WaterlooStar backend
@@ -123,42 +123,80 @@ an index and would match inside words.
 
 ## Implementation Steps
 
-- [ ] **Preparation**
-  - [ ] Confirm Phase 2 is complete and the database is seeded
+- [x] **Preparation**
+  - [x] Confirm Phase 2 is complete and the database is seeded
 
-- [ ] **Schema**
-  - [ ] `migrations/000004_listing_search.up.sql` / `.down.sql`: a generated
+- [x] **Schema**
+  - [x] `migrations/000004_listing_search.up.sql` / `.down.sql`: a generated
         `search tsvector` column over title, body, neighbourhood, address_line;
         a GIN index on it; btree indexes on `price_cents`, `start_date`, `distance_m`
-  - [ ] Verify: migrate up and down both succeed
+  - [x] Verify: migrate up and down both succeed
 
-- [ ] **Queries**
-  - [ ] Rewrite the list and count queries in `internal/db/queries/listings.sql`
+- [x] **Queries**
+  - [x] Rewrite the list and count queries in `internal/db/queries/listings.sql`
         to take every filter as a nullable parameter
-  - [ ] Order by a `CASE` over the sort parameter; nulls last for distance
-  - [ ] Verify: `sqlc generate` produces compiling Go
+  - [x] Order by a `CASE` over the sort parameter; nulls last for distance
+  - [x] Verify: `sqlc generate` produces compiling Go
 
-- [ ] **Contract**
-  - [ ] Add every parameter to `GET /listings` in `api/openapi.yaml`, with enums
+- [x] **Contract**
+  - [x] Add every parameter to `GET /listings` in `api/openapi.yaml`, with enums
         and bounds
-  - [ ] Verify: `oapi-codegen` regenerates and the interface compiles
+  - [x] Verify: `oapi-codegen` regenerates and the interface compiles
 
-- [ ] **Handler**
-  - [ ] Parse and validate parameters; clamp `per_page`; reject a malformed range
+- [x] **Handler**
+  - [x] Parse and validate parameters; clamp `per_page`; reject a malformed range
         with the standard envelope
-  - [ ] Verify: by hand against the seeded data
+  - [x] Verify: by hand against the seeded data
 
-- [ ] **Tests**
-  - [ ] `internal/httpapi/listings_test.go`: one test per filter, one per sort,
+- [x] **Tests**
+  - [x] `internal/httpapi/listings_test.go`: one test per filter, one per sort,
         one combining several, one for an empty result, one for a bad range
-  - [ ] Verify: `go test ./...` passes
+  - [x] Verify: `go test ./...` passes
 
-- [ ] **Final verification**
-  - [ ] Build, vet, test, generators idempotent
-  - [ ] Move this file to `docs/specs/implemented/discovery/`
+- [x] **Final verification**
+  - [x] Build, vet, test, generators idempotent
+  - [x] Move this file to `docs/specs/implemented/discovery/`
 
 ---
 
 ## Implementation Notes
 
-> *Added after completion.*
+**Key files changed:**
+
+- `migrations/000004_listing_search.*` — generated `search` tsvector (weighted:
+  title A, neighbourhood/address B, body C), GIN index, and partial btree indexes
+  on price, distance and dates scoped to `status = 'published'`.
+- `internal/db/queries/listings.sql` — `ListListings` and `CountListings`
+  replace the unfiltered pair. Every filter is `sqlc.narg(...) IS NULL OR ...`,
+  so one prepared statement serves every combination.
+- `internal/httpapi/listings.go` — `filtersFrom` parses and validates; a
+  `listingFilters` wrapper hands the same set to both list and count.
+- `internal/httpapi/discovery_test.go` — 10 tests.
+- `internal/httpapi/fake_querier_test.go` — the fake mirrors the new WHERE clause
+  faithfully, so a handler test cannot pass against behaviour PostgreSQL rejects.
+
+**Divergences from plan:** none. The two constraints named in the spec held:
+`distance_max_m` against the populated column rather than radius search, and
+`sort=match` accepted but ordering by newest.
+
+**Decisions worth recording:**
+
+- **A listing with no recorded distance is excluded when `distance_max_m` is
+  set.** "Within 2 km" cannot honestly include "distance unknown". Tested.
+- **`utilities` is conjunctive** — `@>` containment, so asking for internet and
+  gas means a listing must include both. Tested, because "either" would be the
+  easy mistake.
+- **`verified_only=false` is not a filter for unverified listings**; it simply
+  does not filter. Tested.
+- **Whitespace-only `q` is no search**, not a search for the empty string.
+
+**Verification run:**
+
+- `go build`, `go vet`, `go test ./...` pass; generators idempotent.
+- Migration up, down-one, up — clean.
+- Against the six seeded listings: `q=basement` → 1; `q=quiet` → 3;
+  `price_max_cents=80000` → 2; `distance_max_m=1000` → 3;
+  `utilities=internet&utilities=gas` → 1; `furnished=true&pets=true` → 0;
+  `sort=priceAsc` leads with the $700 room; `sort=distance` leads with the 500 m
+  one; the Winter window → 4.
+- Impossible ranges (max below min, end before start) → 400 in the standard envelope.

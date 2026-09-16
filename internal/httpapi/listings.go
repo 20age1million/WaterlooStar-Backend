@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -22,23 +23,33 @@ const (
 	maxPerPage     = 100
 )
 
-// ListListings returns a page of published listings, newest first.
+// ListListings returns a page of published listings matching the filters.
 //
 // Public: browsing is the first thing a prospective user does, and requiring an
 // account to look would defeat the point of the housing hub.
 func (s *Server) ListListings(ctx context.Context, request gen.ListListingsRequestObject) (gen.ListListingsResponseObject, error) {
 	page, perPage := paginationFrom(request.Params.Page, request.Params.PerPage)
 
-	total, err := s.queries.CountPublishedListings(ctx)
+	filters, problem := filtersFrom(request.Params)
+	if problem != "" {
+		return gen.ListListings400JSONResponse{
+			BadRequestJSONResponse: gen.BadRequestJSONResponse(
+				errorBody(apierror.CodeValidation, problem)),
+		}, nil
+	}
+
+	// The count applies the same filters, so the total is the number to show a
+	// user rather than the size of the table.
+	total, err := s.queries.CountListings(ctx, filters.count())
 	if err != nil {
 		s.log.Error("count listings", slog.String("error", err.Error()))
 		return nil, err
 	}
 
-	rows, err := s.queries.ListPublishedListings(ctx, sqlcgen.ListPublishedListingsParams{
-		Limit:  int32(perPage),
-		Offset: int32((page - 1) * perPage),
-	})
+	filters.Limit = int32(perPage)
+	filters.Offset = int32((page - 1) * perPage)
+
+	rows, err := s.queries.ListListings(ctx, filters.ListListingsParams)
 	if err != nil {
 		s.log.Error("list listings", slog.String("error", err.Error()))
 		return nil, err
@@ -73,6 +84,93 @@ func (s *Server) ListListings(ctx context.Context, request gen.ListListingsReque
 		Data: data,
 		Meta: pageMeta(page, perPage, total),
 	}, nil
+}
+
+// listingFilters wraps the generated parameters so the same set can be handed to
+// both the list and the count without restating it.
+type listingFilters struct {
+	sqlcgen.ListListingsParams
+}
+
+func (f listingFilters) count() sqlcgen.CountListingsParams {
+	return sqlcgen.CountListingsParams{
+		Search:       f.Search,
+		StartAfter:   f.StartAfter,
+		EndBefore:    f.EndBefore,
+		PriceMin:     f.PriceMin,
+		PriceMax:     f.PriceMax,
+		DistanceMax:  f.DistanceMax,
+		BedroomsMin:  f.BedroomsMin,
+		Furnished:    f.Furnished,
+		Parking:      f.Parking,
+		Pets:         f.Pets,
+		Laundry:      f.Laundry,
+		Utilities:    f.Utilities,
+		VerifiedOnly: f.VerifiedOnly,
+	}
+}
+
+// filtersFrom maps query parameters onto the query's, returning a message when
+// the request asks for something impossible.
+func filtersFrom(p gen.ListListingsParams) (listingFilters, string) {
+	var f listingFilters
+
+	// An empty or whitespace-only q is no search at all, not a search for "".
+	if p.Q != nil {
+		if trimmed := strings.TrimSpace(*p.Q); trimmed != "" {
+			f.Search = &trimmed
+		}
+	}
+
+	if p.StartAfter != nil {
+		d := p.StartAfter.Time
+		f.StartAfter = &d
+	}
+	if p.EndBefore != nil {
+		d := p.EndBefore.Time
+		f.EndBefore = &d
+	}
+	if f.StartAfter != nil && f.EndBefore != nil && f.EndBefore.Before(*f.StartAfter) {
+		return f, "The end of the term cannot fall before its start."
+	}
+
+	f.PriceMin = int32Ptr(p.PriceMinCents)
+	f.PriceMax = int32Ptr(p.PriceMaxCents)
+	if f.PriceMin != nil && f.PriceMax != nil && *f.PriceMax < *f.PriceMin {
+		return f, "The maximum rent cannot be below the minimum."
+	}
+
+	f.DistanceMax = int32Ptr(p.DistanceMaxM)
+	f.BedroomsMin = int32Ptr(p.BedroomsMin)
+	f.Furnished = p.Furnished
+	f.Parking = p.Parking
+	f.Pets = p.Pets
+	f.Laundry = p.Laundry
+	f.VerifiedOnly = p.VerifiedOnly
+
+	if p.Utilities != nil && len(*p.Utilities) > 0 {
+		utilities := make([]string, 0, len(*p.Utilities))
+		for _, u := range *p.Utilities {
+			utilities = append(utilities, string(u))
+		}
+		f.Utilities = utilities
+	}
+
+	// The generated type already constrains this to the enum; default when absent.
+	f.Sort = string(gen.New)
+	if p.Sort != nil {
+		f.Sort = string(*p.Sort)
+	}
+
+	return f, ""
+}
+
+func int32Ptr(v *int) *int32 {
+	if v == nil {
+		return nil
+	}
+	n := int32(*v)
+	return &n
 }
 
 // GetListing returns one published listing in full.

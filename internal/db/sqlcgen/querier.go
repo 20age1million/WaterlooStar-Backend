@@ -17,7 +17,7 @@ type Querier interface {
 	ConsumeAllPasswordResetTokensForUser(ctx context.Context, userID uuid.UUID) error
 	ConsumeEmailVerificationToken(ctx context.Context, tokenHash []byte) error
 	ConsumePasswordResetToken(ctx context.Context, tokenHash []byte) error
-	CountPublishedListings(ctx context.Context) (int64, error)
+	CountListings(ctx context.Context, arg CountListingsParams) (int64, error)
 	// Used to tell a duplicate email from a duplicate username *internally*, without
 	// the response revealing which one collided.
 	CountUsersByEmailOrUsername(ctx context.Context, arg CountUsersByEmailOrUsernameParams) (CountUsersByEmailOrUsernameRow, error)
@@ -38,14 +38,20 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, lower string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, lower string) (User, error)
+	// Only published rows are ever served. Filtering here rather than in Go means a
+	// handler cannot forget and expose somebody's draft.
+	// Filtered browse. Every parameter is optional and they compose: the
+	// "@param IS NULL OR ..." shape means one prepared statement serves every
+	// combination, with no string building anywhere near user input.
+	//
+	// Only published rows are ever returned, and that stays here in the SQL so a
+	// handler cannot forget it.
+	ListListings(ctx context.Context, arg ListListingsParams) ([]ListListingsRow, error)
 	ListPhotosForListing(ctx context.Context, listingID uuid.UUID) ([]ListingPhoto, error)
 	// Photos for a page of listings in one round-trip, rather than one query per
 	// listing. Nothing populates the table yet, but the shape is what the list
 	// endpoint needs the moment it does.
 	ListPhotosForListings(ctx context.Context, dollar_1 []uuid.UUID) ([]ListingPhoto, error)
-	// Only published rows are ever served. Filtering here rather than in Go means a
-	// handler cannot forget and expose somebody's draft.
-	ListPublishedListings(ctx context.Context, arg ListPublishedListingsParams) ([]ListPublishedListingsRow, error)
 	MarkUserVerified(ctx context.Context, id uuid.UUID) (User, error)
 	// Health check. Trivial on purpose: it exists to prove the whole chain — pool,
 	// sqlc codegen, generated method, real round-trip — works end to end, before any

@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"context"
 	"encoding/hex"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -361,29 +362,114 @@ func (f *fakeQuerier) DeleteAllListings(context.Context) error {
 	return nil
 }
 
-// published mirrors the SQL: only published rows, newest first.
-func (f *fakeQuerier) published() []sqlcgen.Listing {
+// matches mirrors the WHERE clause of ListListings. Kept faithful on purpose:
+// a fake that filtered more loosely than the database would let a handler test
+// pass against behaviour PostgreSQL would reject.
+func (f *fakeQuerier) matches(l sqlcgen.Listing, p sqlcgen.ListListingsParams) bool {
+	if l.Status != "published" {
+		return false
+	}
+	owner := f.users[l.OwnerID]
+
+	if p.Search != nil {
+		haystack := strings.ToLower(strings.Join(
+			[]string{l.Title, l.Body, l.Neighbourhood, l.AddressLine}, " "))
+		for _, word := range strings.Fields(strings.ToLower(*p.Search)) {
+			if !strings.Contains(haystack, strings.Trim(word, `"`)) {
+				return false
+			}
+		}
+	}
+	if p.StartAfter != nil && l.StartDate.After(*p.StartAfter) {
+		return false
+	}
+	if p.EndBefore != nil && l.EndDate.Before(*p.EndBefore) {
+		return false
+	}
+	if p.PriceMin != nil && l.PriceCents < *p.PriceMin {
+		return false
+	}
+	if p.PriceMax != nil && l.PriceCents > *p.PriceMax {
+		return false
+	}
+	if p.DistanceMax != nil {
+		// An unknown distance cannot satisfy "within N metres".
+		if l.DistanceM == nil || *l.DistanceM > *p.DistanceMax {
+			return false
+		}
+	}
+	if p.BedroomsMin != nil && l.BedroomsTotal < *p.BedroomsMin {
+		return false
+	}
+	if p.Furnished != nil && l.Furnished != *p.Furnished {
+		return false
+	}
+	if p.Parking != nil && l.Parking != *p.Parking {
+		return false
+	}
+	if p.Pets != nil && l.Pets != *p.Pets {
+		return false
+	}
+	if p.Laundry != nil && l.Laundry != *p.Laundry {
+		return false
+	}
+	for _, want := range p.Utilities {
+		if !slices.Contains(l.Utilities, want) {
+			return false
+		}
+	}
+	if p.VerifiedOnly != nil && *p.VerifiedOnly && !owner.Verified {
+		return false
+	}
+	return true
+}
+
+func (f *fakeQuerier) filtered(p sqlcgen.ListListingsParams) []sqlcgen.Listing {
 	out := []sqlcgen.Listing{}
 	for _, l := range f.listings {
-		if l.Status == "published" {
+		if f.matches(l, p) {
 			out = append(out, l)
 		}
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
+
+	switch p.Sort {
+	case "priceAsc":
+		sort.SliceStable(out, func(i, j int) bool { return out[i].PriceCents < out[j].PriceCents })
+	case "priceDesc":
+		sort.SliceStable(out, func(i, j int) bool { return out[i].PriceCents > out[j].PriceCents })
+	case "distance":
+		sort.SliceStable(out, func(i, j int) bool {
+			if out[i].DistanceM == nil {
+				return false
+			}
+			if out[j].DistanceM == nil {
+				return true
+			}
+			return *out[i].DistanceM < *out[j].DistanceM
+		})
+	default: // new, match
+		sort.SliceStable(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
+	}
 	return out
 }
 
-func (f *fakeQuerier) CountPublishedListings(context.Context) (int64, error) {
+func (f *fakeQuerier) CountListings(_ context.Context, arg sqlcgen.CountListingsParams) (int64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return int64(len(f.published())), nil
+	return int64(len(f.filtered(sqlcgen.ListListingsParams{
+		Search: arg.Search, StartAfter: arg.StartAfter, EndBefore: arg.EndBefore,
+		PriceMin: arg.PriceMin, PriceMax: arg.PriceMax, DistanceMax: arg.DistanceMax,
+		BedroomsMin: arg.BedroomsMin, Furnished: arg.Furnished, Parking: arg.Parking,
+		Pets: arg.Pets, Laundry: arg.Laundry, Utilities: arg.Utilities,
+		VerifiedOnly: arg.VerifiedOnly,
+	}))), nil
 }
 
-func (f *fakeQuerier) ListPublishedListings(_ context.Context, arg sqlcgen.ListPublishedListingsParams) ([]sqlcgen.ListPublishedListingsRow, error) {
+func (f *fakeQuerier) ListListings(_ context.Context, arg sqlcgen.ListListingsParams) ([]sqlcgen.ListListingsRow, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	all := f.published()
+	all := f.filtered(arg)
 	start := int(arg.Offset)
 	if start > len(all) {
 		start = len(all)
@@ -393,10 +479,10 @@ func (f *fakeQuerier) ListPublishedListings(_ context.Context, arg sqlcgen.ListP
 		end = len(all)
 	}
 
-	rows := []sqlcgen.ListPublishedListingsRow{}
+	rows := []sqlcgen.ListListingsRow{}
 	for _, l := range all[start:end] {
 		owner := f.users[l.OwnerID]
-		rows = append(rows, sqlcgen.ListPublishedListingsRow{
+		rows = append(rows, sqlcgen.ListListingsRow{
 			Listing:        l,
 			OwnerUsername:  owner.Username,
 			OwnerAvatarUrl: owner.AvatarUrl,

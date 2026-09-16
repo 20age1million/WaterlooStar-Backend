@@ -1,7 +1,14 @@
 -- Only published rows are ever served. Filtering here rather than in Go means a
 -- handler cannot forget and expose somebody's draft.
 
--- name: ListPublishedListings :many
+-- Filtered browse. Every parameter is optional and they compose: the
+-- "@param IS NULL OR ..." shape means one prepared statement serves every
+-- combination, with no string building anywhere near user input.
+--
+-- Only published rows are ever returned, and that stays here in the SQL so a
+-- handler cannot forget it.
+
+-- name: ListListings :many
 SELECT
     sqlc.embed(l),
     u.username    AS owner_username,
@@ -10,11 +17,58 @@ SELECT
 FROM listings l
 JOIN users u ON u.id = l.owner_id
 WHERE l.status = 'published'
-ORDER BY l.created_at DESC
-LIMIT $1 OFFSET $2;
+  AND (sqlc.narg('search')::text IS NULL
+       OR l.search @@ websearch_to_tsquery('english', sqlc.narg('search')::text))
+  -- A listing is available for a wanted window if it starts by then and runs
+  -- to at least the end of it.
+  AND (sqlc.narg('start_after')::date  IS NULL OR l.start_date <= sqlc.narg('start_after')::date)
+  AND (sqlc.narg('end_before')::date   IS NULL OR l.end_date   >= sqlc.narg('end_before')::date)
+  AND (sqlc.narg('price_min')::int     IS NULL OR l.price_cents >= sqlc.narg('price_min')::int)
+  AND (sqlc.narg('price_max')::int     IS NULL OR l.price_cents <= sqlc.narg('price_max')::int)
+  -- A listing with no recorded distance is excluded when a limit is asked for:
+  -- "within 2 km" cannot honestly include "distance unknown".
+  AND (sqlc.narg('distance_max')::int  IS NULL OR l.distance_m <= sqlc.narg('distance_max')::int)
+  AND (sqlc.narg('bedrooms_min')::int  IS NULL OR l.bedrooms_total >= sqlc.narg('bedrooms_min')::int)
+  AND (sqlc.narg('furnished')::bool    IS NULL OR l.furnished = sqlc.narg('furnished')::bool)
+  AND (sqlc.narg('parking')::bool      IS NULL OR l.parking   = sqlc.narg('parking')::bool)
+  AND (sqlc.narg('pets')::bool         IS NULL OR l.pets      = sqlc.narg('pets')::bool)
+  AND (sqlc.narg('laundry')::bool      IS NULL OR l.laundry   = sqlc.narg('laundry')::bool)
+  -- Every requested utility must be included, not just one of them.
+  AND (sqlc.narg('utilities')::text[]  IS NULL OR l.utilities @> sqlc.narg('utilities')::text[])
+  AND (sqlc.narg('verified_only')::bool IS NULL
+       OR sqlc.narg('verified_only')::bool = false
+       OR u.verified = true)
+ORDER BY
+    CASE WHEN sqlc.arg('sort')::text = 'priceAsc'  THEN l.price_cents END ASC,
+    CASE WHEN sqlc.arg('sort')::text = 'priceDesc' THEN l.price_cents END DESC,
+    -- NULLS LAST: a listing with no distance should not lead a distance sort.
+    CASE WHEN sqlc.arg('sort')::text = 'distance'  THEN l.distance_m END ASC NULLS LAST,
+    -- 'new' and 'match' both fall through to newest first. Real match scoring
+    -- needs the viewer's own request, which does not exist yet.
+    l.created_at DESC
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
--- name: CountPublishedListings :one
-SELECT count(*) FROM listings WHERE status = 'published';
+-- name: CountListings :one
+SELECT count(*)
+FROM listings l
+JOIN users u ON u.id = l.owner_id
+WHERE l.status = 'published'
+  AND (sqlc.narg('search')::text IS NULL
+       OR l.search @@ websearch_to_tsquery('english', sqlc.narg('search')::text))
+  AND (sqlc.narg('start_after')::date  IS NULL OR l.start_date <= sqlc.narg('start_after')::date)
+  AND (sqlc.narg('end_before')::date   IS NULL OR l.end_date   >= sqlc.narg('end_before')::date)
+  AND (sqlc.narg('price_min')::int     IS NULL OR l.price_cents >= sqlc.narg('price_min')::int)
+  AND (sqlc.narg('price_max')::int     IS NULL OR l.price_cents <= sqlc.narg('price_max')::int)
+  AND (sqlc.narg('distance_max')::int  IS NULL OR l.distance_m <= sqlc.narg('distance_max')::int)
+  AND (sqlc.narg('bedrooms_min')::int  IS NULL OR l.bedrooms_total >= sqlc.narg('bedrooms_min')::int)
+  AND (sqlc.narg('furnished')::bool    IS NULL OR l.furnished = sqlc.narg('furnished')::bool)
+  AND (sqlc.narg('parking')::bool      IS NULL OR l.parking   = sqlc.narg('parking')::bool)
+  AND (sqlc.narg('pets')::bool         IS NULL OR l.pets      = sqlc.narg('pets')::bool)
+  AND (sqlc.narg('laundry')::bool      IS NULL OR l.laundry   = sqlc.narg('laundry')::bool)
+  AND (sqlc.narg('utilities')::text[]  IS NULL OR l.utilities @> sqlc.narg('utilities')::text[])
+  AND (sqlc.narg('verified_only')::bool IS NULL
+       OR sqlc.narg('verified_only')::bool = false
+       OR u.verified = true);
 
 -- name: GetPublishedListing :one
 SELECT

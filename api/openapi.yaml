@@ -272,15 +272,80 @@ paths:
         Published listings, newest first. Public - anyone can browse; an account
         is only needed to save one or message the poster.
 
-        Filtering, searching and sorting arrive in the next feature; this
-        endpoint currently returns everything published, one page at a time.
+        Every filter is optional and they compose. The total in `meta` reflects
+        the filters, so it is the number to show a user.
       security: []
       parameters:
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PerPage"
+        - name: q
+          in: query
+          description: |
+            Full-text search over title, neighbourhood, address and description.
+            Supports quoted phrases and `-exclusion`.
+          schema: { type: string }
+        - name: start_after
+          in: query
+          description: Only listings available by this date.
+          schema: { type: string, format: date }
+        - name: end_before
+          in: query
+          description: Only listings that run at least until this date.
+          schema: { type: string, format: date }
+        - name: price_min_cents
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: price_max_cents
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: distance_max_m
+          in: query
+          description: |
+            Maximum straight-line metres to campus. Listings with no recorded
+            distance are excluded when this is set.
+          schema: { type: integer, minimum: 0 }
+        - name: bedrooms_min
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: furnished
+          in: query
+          schema: { type: boolean }
+        - name: parking
+          in: query
+          schema: { type: boolean }
+        - name: pets
+          in: query
+          schema: { type: boolean }
+        - name: laundry
+          in: query
+          schema: { type: boolean }
+        - name: utilities
+          in: query
+          description: Repeatable. A listing must include *every* one requested.
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [internet, hydro, water, heat, gas]
+          style: form
+          explode: true
+        - name: verified_only
+          in: query
+          description: Only listings posted by a verified student.
+          schema: { type: boolean }
+        - name: sort
+          in: query
+          description: |
+            `match` is accepted and currently orders by newest — real match
+            scoring compares against the viewer's own housing request, which
+            does not exist yet.
+          schema:
+            type: string
+            enum: [match, new, priceAsc, priceDesc, distance]
+            default: new
       responses:
         "200":
-          description: A page of listings.
+          description: A page of listings matching the filters.
           content:
             application/json:
               schema:

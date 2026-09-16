@@ -12,12 +12,61 @@ import (
 	"github.com/google/uuid"
 )
 
-const countPublishedListings = `-- name: CountPublishedListings :one
-SELECT count(*) FROM listings WHERE status = 'published'
+const countListings = `-- name: CountListings :one
+SELECT count(*)
+FROM listings l
+JOIN users u ON u.id = l.owner_id
+WHERE l.status = 'published'
+  AND ($1::text IS NULL
+       OR l.search @@ websearch_to_tsquery('english', $1::text))
+  AND ($2::date  IS NULL OR l.start_date <= $2::date)
+  AND ($3::date   IS NULL OR l.end_date   >= $3::date)
+  AND ($4::int     IS NULL OR l.price_cents >= $4::int)
+  AND ($5::int     IS NULL OR l.price_cents <= $5::int)
+  AND ($6::int  IS NULL OR l.distance_m <= $6::int)
+  AND ($7::int  IS NULL OR l.bedrooms_total >= $7::int)
+  AND ($8::bool    IS NULL OR l.furnished = $8::bool)
+  AND ($9::bool      IS NULL OR l.parking   = $9::bool)
+  AND ($10::bool         IS NULL OR l.pets      = $10::bool)
+  AND ($11::bool      IS NULL OR l.laundry   = $11::bool)
+  AND ($12::text[]  IS NULL OR l.utilities @> $12::text[])
+  AND ($13::bool IS NULL
+       OR $13::bool = false
+       OR u.verified = true)
 `
 
-func (q *Queries) CountPublishedListings(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countPublishedListings)
+type CountListingsParams struct {
+	Search       *string
+	StartAfter   *time.Time
+	EndBefore    *time.Time
+	PriceMin     *int32
+	PriceMax     *int32
+	DistanceMax  *int32
+	BedroomsMin  *int32
+	Furnished    *bool
+	Parking      *bool
+	Pets         *bool
+	Laundry      *bool
+	Utilities    []string
+	VerifiedOnly *bool
+}
+
+func (q *Queries) CountListings(ctx context.Context, arg CountListingsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countListings,
+		arg.Search,
+		arg.StartAfter,
+		arg.EndBefore,
+		arg.PriceMin,
+		arg.PriceMax,
+		arg.DistanceMax,
+		arg.BedroomsMin,
+		arg.Furnished,
+		arg.Parking,
+		arg.Pets,
+		arg.Laundry,
+		arg.Utilities,
+		arg.VerifiedOnly,
+	)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -43,7 +92,7 @@ INSERT INTO listings (
     $26, $27, $28, $29,
     $30, $31, $32, $33
 )
-RETURNING id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at
+RETURNING id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at, search
 `
 
 type CreateListingParams struct {
@@ -156,6 +205,7 @@ func (q *Queries) CreateListing(ctx context.Context, arg CreateListingParams) (L
 		&i.Saves,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Search,
 	)
 	return i, err
 }
@@ -171,7 +221,7 @@ func (q *Queries) DeleteAllListings(ctx context.Context) error {
 
 const getPublishedListing = `-- name: GetPublishedListing :one
 SELECT
-    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at,
+    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.search,
     u.username    AS owner_username,
     u.avatar_url  AS owner_avatar_url,
     u.verified    AS owner_verified
@@ -227,11 +277,167 @@ func (q *Queries) GetPublishedListing(ctx context.Context, id uuid.UUID) (GetPub
 		&i.Listing.Saves,
 		&i.Listing.CreatedAt,
 		&i.Listing.UpdatedAt,
+		&i.Listing.Search,
 		&i.OwnerUsername,
 		&i.OwnerAvatarUrl,
 		&i.OwnerVerified,
 	)
 	return i, err
+}
+
+const listListings = `-- name: ListListings :many
+
+
+SELECT
+    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.search,
+    u.username    AS owner_username,
+    u.avatar_url  AS owner_avatar_url,
+    u.verified    AS owner_verified
+FROM listings l
+JOIN users u ON u.id = l.owner_id
+WHERE l.status = 'published'
+  AND ($1::text IS NULL
+       OR l.search @@ websearch_to_tsquery('english', $1::text))
+  -- A listing is available for a wanted window if it starts by then and runs
+  -- to at least the end of it.
+  AND ($2::date  IS NULL OR l.start_date <= $2::date)
+  AND ($3::date   IS NULL OR l.end_date   >= $3::date)
+  AND ($4::int     IS NULL OR l.price_cents >= $4::int)
+  AND ($5::int     IS NULL OR l.price_cents <= $5::int)
+  -- A listing with no recorded distance is excluded when a limit is asked for:
+  -- "within 2 km" cannot honestly include "distance unknown".
+  AND ($6::int  IS NULL OR l.distance_m <= $6::int)
+  AND ($7::int  IS NULL OR l.bedrooms_total >= $7::int)
+  AND ($8::bool    IS NULL OR l.furnished = $8::bool)
+  AND ($9::bool      IS NULL OR l.parking   = $9::bool)
+  AND ($10::bool         IS NULL OR l.pets      = $10::bool)
+  AND ($11::bool      IS NULL OR l.laundry   = $11::bool)
+  -- Every requested utility must be included, not just one of them.
+  AND ($12::text[]  IS NULL OR l.utilities @> $12::text[])
+  AND ($13::bool IS NULL
+       OR $13::bool = false
+       OR u.verified = true)
+ORDER BY
+    CASE WHEN $14::text = 'priceAsc'  THEN l.price_cents END ASC,
+    CASE WHEN $14::text = 'priceDesc' THEN l.price_cents END DESC,
+    -- NULLS LAST: a listing with no distance should not lead a distance sort.
+    CASE WHEN $14::text = 'distance'  THEN l.distance_m END ASC NULLS LAST,
+    -- 'new' and 'match' both fall through to newest first. Real match scoring
+    -- needs the viewer's own request, which does not exist yet.
+    l.created_at DESC
+LIMIT $16 OFFSET $15
+`
+
+type ListListingsParams struct {
+	Search       *string
+	StartAfter   *time.Time
+	EndBefore    *time.Time
+	PriceMin     *int32
+	PriceMax     *int32
+	DistanceMax  *int32
+	BedroomsMin  *int32
+	Furnished    *bool
+	Parking      *bool
+	Pets         *bool
+	Laundry      *bool
+	Utilities    []string
+	VerifiedOnly *bool
+	Sort         string
+	Offset       int32
+	Limit        int32
+}
+
+type ListListingsRow struct {
+	Listing        Listing
+	OwnerUsername  string
+	OwnerAvatarUrl *string
+	OwnerVerified  bool
+}
+
+// Only published rows are ever served. Filtering here rather than in Go means a
+// handler cannot forget and expose somebody's draft.
+// Filtered browse. Every parameter is optional and they compose: the
+// "@param IS NULL OR ..." shape means one prepared statement serves every
+// combination, with no string building anywhere near user input.
+//
+// Only published rows are ever returned, and that stays here in the SQL so a
+// handler cannot forget it.
+func (q *Queries) ListListings(ctx context.Context, arg ListListingsParams) ([]ListListingsRow, error) {
+	rows, err := q.db.Query(ctx, listListings,
+		arg.Search,
+		arg.StartAfter,
+		arg.EndBefore,
+		arg.PriceMin,
+		arg.PriceMax,
+		arg.DistanceMax,
+		arg.BedroomsMin,
+		arg.Furnished,
+		arg.Parking,
+		arg.Pets,
+		arg.Laundry,
+		arg.Utilities,
+		arg.VerifiedOnly,
+		arg.Sort,
+		arg.Offset,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListListingsRow{}
+	for rows.Next() {
+		var i ListListingsRow
+		if err := rows.Scan(
+			&i.Listing.ID,
+			&i.Listing.OwnerID,
+			&i.Listing.Title,
+			&i.Listing.Body,
+			&i.Listing.Conditions,
+			&i.Listing.PriceCents,
+			&i.Listing.DepositCents,
+			&i.Listing.StartDate,
+			&i.Listing.EndDate,
+			&i.Listing.LeaseMonths,
+			&i.Listing.TermTag,
+			&i.Listing.UnitType,
+			&i.Listing.BedroomsTotal,
+			&i.Listing.BedroomOf,
+			&i.Listing.Bathrooms,
+			&i.Listing.BathType,
+			&i.Listing.Furnished,
+			&i.Listing.Utilities,
+			&i.Listing.Parking,
+			&i.Listing.Pets,
+			&i.Listing.Laundry,
+			&i.Listing.AddressLine,
+			&i.Listing.Neighbourhood,
+			&i.Listing.Lat,
+			&i.Listing.Lng,
+			&i.Listing.DistanceM,
+			&i.Listing.CommuteMinutes,
+			&i.Listing.CommuteMode,
+			&i.Listing.MinutesToTransit,
+			&i.Listing.MinutesToGrocery,
+			&i.Listing.Status,
+			&i.Listing.Views,
+			&i.Listing.Replies,
+			&i.Listing.Saves,
+			&i.Listing.CreatedAt,
+			&i.Listing.UpdatedAt,
+			&i.Listing.Search,
+			&i.OwnerUsername,
+			&i.OwnerAvatarUrl,
+			&i.OwnerVerified,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listPhotosForListing = `-- name: ListPhotosForListing :many
@@ -290,94 +496,6 @@ func (q *Queries) ListPhotosForListings(ctx context.Context, dollar_1 []uuid.UUI
 			&i.Url,
 			&i.Position,
 			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listPublishedListings = `-- name: ListPublishedListings :many
-
-SELECT
-    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at,
-    u.username    AS owner_username,
-    u.avatar_url  AS owner_avatar_url,
-    u.verified    AS owner_verified
-FROM listings l
-JOIN users u ON u.id = l.owner_id
-WHERE l.status = 'published'
-ORDER BY l.created_at DESC
-LIMIT $1 OFFSET $2
-`
-
-type ListPublishedListingsParams struct {
-	Limit  int32
-	Offset int32
-}
-
-type ListPublishedListingsRow struct {
-	Listing        Listing
-	OwnerUsername  string
-	OwnerAvatarUrl *string
-	OwnerVerified  bool
-}
-
-// Only published rows are ever served. Filtering here rather than in Go means a
-// handler cannot forget and expose somebody's draft.
-func (q *Queries) ListPublishedListings(ctx context.Context, arg ListPublishedListingsParams) ([]ListPublishedListingsRow, error) {
-	rows, err := q.db.Query(ctx, listPublishedListings, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListPublishedListingsRow{}
-	for rows.Next() {
-		var i ListPublishedListingsRow
-		if err := rows.Scan(
-			&i.Listing.ID,
-			&i.Listing.OwnerID,
-			&i.Listing.Title,
-			&i.Listing.Body,
-			&i.Listing.Conditions,
-			&i.Listing.PriceCents,
-			&i.Listing.DepositCents,
-			&i.Listing.StartDate,
-			&i.Listing.EndDate,
-			&i.Listing.LeaseMonths,
-			&i.Listing.TermTag,
-			&i.Listing.UnitType,
-			&i.Listing.BedroomsTotal,
-			&i.Listing.BedroomOf,
-			&i.Listing.Bathrooms,
-			&i.Listing.BathType,
-			&i.Listing.Furnished,
-			&i.Listing.Utilities,
-			&i.Listing.Parking,
-			&i.Listing.Pets,
-			&i.Listing.Laundry,
-			&i.Listing.AddressLine,
-			&i.Listing.Neighbourhood,
-			&i.Listing.Lat,
-			&i.Listing.Lng,
-			&i.Listing.DistanceM,
-			&i.Listing.CommuteMinutes,
-			&i.Listing.CommuteMode,
-			&i.Listing.MinutesToTransit,
-			&i.Listing.MinutesToGrocery,
-			&i.Listing.Status,
-			&i.Listing.Views,
-			&i.Listing.Replies,
-			&i.Listing.Saves,
-			&i.Listing.CreatedAt,
-			&i.Listing.UpdatedAt,
-			&i.OwnerUsername,
-			&i.OwnerAvatarUrl,
-			&i.OwnerVerified,
 		); err != nil {
 			return nil, err
 		}
