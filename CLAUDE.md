@@ -32,6 +32,21 @@ Azure DevOps setup. This project is on GitHub. Ignore them unless it moves.
 
 Invoke a skill with the `Skill` tool by name, e.g. `feature-implement`.
 
+### Backend and frontend are separate services
+
+**Each repository has its own phases and its own specs.** They are not two halves
+of one feature: the backend's Phase 4 and the frontend's Phase 4 are independent
+pieces of work, specified separately, numbered per repository, and landing on
+their own schedules.
+
+What ties them together is `api/openapi.yaml` and nothing else. The backend
+publishes a contract; the frontend consumes it. A contract change is coordinated
+through that file, not through a shared spec.
+
+This replaces the earlier convention, where one feature carried mirrored specs in
+both repositories with phases aligned one-to-one. Platform Foundation was built
+that way; everything from Phase 4 onward is not.
+
 ### The short version of the workflow
 
 - Never work on `main`. Branch as `feature/<slug>`.

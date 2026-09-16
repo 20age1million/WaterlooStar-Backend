@@ -7,6 +7,11 @@ as the first meaningful commit on its branch. `active/` holds work in progress;
 Each feature is a folder: `index.md` for the whole feature, `phase-N-*.md` for
 each independently committable phase.
 
+**This repository is specified on its own.** The frontend is a separate service with
+its own phases and its own specs; the two are coordinated through
+`api/openapi.yaml` alone. Platform Foundation predates this and was mirrored
+across both; everything from Phase 4 onward is not.
+
 ## Active
 
 *None.*
