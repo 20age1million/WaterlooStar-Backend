@@ -1,0 +1,1076 @@
+openapi: 3.0.3
+
+info:
+  title: WaterlooStar API
+  version: 0.1.0
+  description: |
+    Backend for WaterlooStar — a housing marketplace and community forum for
+    University of Waterloo students.
+
+    This file is the contract and is authoritative. The Go server interfaces in
+    `internal/httpapi/gen` and the TypeScript types in the frontend repository
+    are both generated from it, so it is edited *before* the handler that serves
+    a new shape, never after.
+
+    Vocabulary note: the product says "Housing Available" and "Looking for
+    Housing". The internal terms *renter* and *rentee* never appear in any path,
+    field name or response body.
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: system
+    description: Service health and operational endpoints.
+  - name: auth
+    description: Registration, address verification, and session lifecycle.
+  - name: me
+    description: The signed-in user.
+  - name: housing
+    description: |
+      Housing Available - places students are offering. Public: browsing does
+      not require an account.
+
+paths:
+  /healthz:
+    get:
+      tags: [system]
+      operationId: getHealth
+      summary: Service and database health
+      description: |
+        Reports whether the service is up and whether it can reach PostgreSQL.
+        Returns 503 when the database round-trip fails, so a load balancer can
+        take the instance out of rotation rather than sending it traffic it
+        cannot serve.
+      security: []
+      responses:
+        "200":
+          description: Service is healthy and the database responded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "503":
+          description: Service is running but a dependency is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+
+  /auth/register:
+    post:
+      tags: [auth]
+      operationId: register
+      summary: Create an account
+      description: |
+        Creates an unverified account and emails a confirmation link. The address
+        must be a `uwaterloo.ca` one - that restriction is the basis of the
+        "verified student" badge the product is built on.
+
+        Registering does not sign you in. Confirm the address first, then log in.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Account created; a confirmation email has been sent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409":
+          description: |
+            That address or username is already taken. The response does not say
+            which, so this endpoint cannot be used to enumerate accounts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /auth/verify:
+    post:
+      tags: [auth]
+      operationId: verifyEmail
+      summary: Confirm an email address
+      description: |
+        Redeems the token from a confirmation email and marks the account
+        verified. Tokens are single-use and expire after 24 hours.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TokenRequest"
+      responses:
+        "200":
+          description: Address confirmed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: The token is unknown, already used, or expired.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Start a session
+      description: |
+        On success, sets three cookies: an httpOnly session cookie holding a
+        short-lived access token, an httpOnly refresh cookie scoped to
+        `/auth/refresh`, and a readable CSRF cookie whose value must be echoed in
+        the `X-CSRF-Token` header on later unsafe requests.
+
+        An unverified account may log in - it simply cannot do anything that
+        requires verification yet.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Signed in. Session cookies are set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401":
+          description: |
+            The address and password do not match. Deliberately identical whether
+            or not the address exists.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      operationId: refreshSession
+      summary: Exchange the refresh cookie for a new session
+      description: |
+        Rotates the refresh token: the presented one is revoked as the
+        replacement is issued, so a stolen token stops working as soon as the
+        real user refreshes.
+      security: []
+      responses:
+        "200":
+          description: New session cookies set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: The refresh cookie is missing, expired or already revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: End the session
+      description: |
+        Revokes the refresh token and clears the cookies. Succeeds even when no
+        session is present, so a client can always reach a signed-out state.
+      security: []
+      responses:
+        "204":
+          description: Signed out; cookies cleared.
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /auth/password-reset:
+    post:
+      tags: [auth]
+      operationId: requestPasswordReset
+      summary: Request a password-reset email
+      description: |
+        Always answers 202, whether or not the address is registered - otherwise
+        this endpoint would reveal which addresses have accounts.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailRequest"
+      responses:
+        "202":
+          description: If that address has an account, an email is on its way.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /auth/password-reset/confirm:
+    post:
+      tags: [auth]
+      operationId: confirmPasswordReset
+      summary: Set a new password using a reset token
+      description: |
+        Redeems a reset token and replaces the password. Every existing session
+        for that account is revoked, so a reset actually evicts whoever prompted it.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordResetConfirmRequest"
+      responses:
+        "204":
+          description: Password changed; all sessions revoked.
+        "400":
+          description: The token is unknown, used, or expired; or the password is too weak.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /me:
+    get:
+      tags: [me]
+      operationId: getMe
+      summary: The signed-in user
+      responses:
+        "200":
+          description: The authenticated user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /listings:
+    get:
+      tags: [housing]
+      operationId: listListings
+      summary: Browse Housing Available
+      description: |
+        Published listings, newest first. Public - anyone can browse; an account
+        is only needed to save one or message the poster.
+
+        Every filter is optional and they compose. The total in `meta` reflects
+        the filters, so it is the number to show a user.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - name: q
+          in: query
+          description: |
+            Full-text search over title, neighbourhood, address and description.
+            Supports quoted phrases and `-exclusion`.
+          schema: { type: string }
+        - name: start_after
+          in: query
+          description: Only listings available by this date.
+          schema: { type: string, format: date }
+        - name: end_before
+          in: query
+          description: Only listings that run at least until this date.
+          schema: { type: string, format: date }
+        - name: price_min_cents
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: price_max_cents
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: distance_max_m
+          in: query
+          description: |
+            Maximum straight-line metres to campus. Listings with no recorded
+            distance are excluded when this is set.
+          schema: { type: integer, minimum: 0 }
+        - name: bedrooms_min
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: furnished
+          in: query
+          schema: { type: boolean }
+        - name: parking
+          in: query
+          schema: { type: boolean }
+        - name: pets
+          in: query
+          schema: { type: boolean }
+        - name: laundry
+          in: query
+          schema: { type: boolean }
+        - name: utilities
+          in: query
+          description: Repeatable. A listing must include *every* one requested.
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [internet, hydro, water, heat, gas]
+          style: form
+          explode: true
+        - name: verified_only
+          in: query
+          description: Only listings posted by a verified student.
+          schema: { type: boolean }
+        - name: sort
+          in: query
+          description: |
+            `match` is accepted and currently orders by newest — real match
+            scoring compares against the viewer's own housing request, which
+            does not exist yet.
+          schema:
+            type: string
+            enum: [match, new, priceAsc, priceDesc, distance]
+            default: new
+      responses:
+        "200":
+          description: A page of listings matching the filters.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListingPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+    post:
+      tags: [housing]
+      operationId: createListing
+      summary: Post a place
+      description: |
+        Creates a listing owned by the signed-in user. Only a **verified**
+        student may post — confirming a `uwaterloo.ca` address is what the badge
+        on every listing means.
+
+        The listing is published immediately unless `status` says otherwise.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListingInput"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Listing"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: Signed in, but the address has not been confirmed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /listings/{id}:
+    get:
+      tags: [housing]
+      operationId: getListing
+      summary: One listing in full
+      description: |
+        A published listing with everything the detail screen shows. A listing
+        that does not exist, or is not published, returns 404 - a paused or
+        archived post must not be distinguishable from one that never existed.
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The listing.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Listing"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+    patch:
+      tags: [housing]
+      operationId: updateListing
+      summary: Edit your listing
+      description: |
+        Changes only the fields present in the body; anything omitted is left
+        alone. Someone else's listing answers 404, not 403 — a 403 would confirm
+        it exists.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListingUpdate"
+      responses:
+        "200":
+          description: The updated listing.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Listing"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+    delete:
+      tags: [housing]
+      operationId: deleteListing
+      summary: Take your listing down
+      description: |
+        Archives the listing rather than removing the row. Questions asked on it,
+        and later saves and conversations, hang off that row; deleting it would
+        rewrite other people's history. Archiving is terminal.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Archived.
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /listings/{id}/status:
+    post:
+      tags: [housing]
+      operationId: setListingStatus
+      summary: Publish, pause or archive your listing
+      description: |
+        Pausing is a different act from correcting the rent, so it is a different
+        endpoint with its own rules.
+
+        `draft -> published -> paused -> published` all move freely. `archived`
+        is terminal: a post that has been taken down stays down, and bringing one
+        back means posting again — which is honest, since the term and the price
+        will have changed.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [draft, published, paused, archived]
+      responses:
+        "200":
+          description: The listing in its new state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Listing"
+        "400":
+          description: That transition is not allowed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /me/listings:
+    get:
+      tags: [housing]
+      operationId: listMyListings
+      summary: Your own listings, whatever their state
+      description: |
+        Everything you have posted, including drafts, paused and archived
+        listings — none of which appear in public results.
+      responses:
+        "200":
+          description: Your listings, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Listing"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+components:
+  schemas:
+    Health:
+      type: object
+      required: [status, database]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+          description: Overall service state.
+        database:
+          type: string
+          enum: [ok, unreachable]
+          description: Result of a real query against PostgreSQL.
+        version:
+          type: string
+          description: Build version, when the binary was stamped with one.
+      example:
+        status: ok
+        database: ok
+
+    User:
+      type: object
+      description: |
+        A user as exposed by the API. Never carries a password hash. `email` is
+        present only when the user is looking at their own record.
+      required: [id, username, role, verified, level, star_points, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+          description: Only returned to the user themselves.
+        role:
+          type: string
+          enum: [user, moderator, admin]
+        verified:
+          type: boolean
+          description: Whether the uwaterloo.ca address has been confirmed.
+        avatar_url:
+          type: string
+          nullable: true
+        level:
+          type: integer
+        star_points:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+      example:
+        id: 3f7c1b2a-9d4e-4c8a-8f1b-2e3d4c5b6a70
+        username: meil
+        email: meil@uwaterloo.ca
+        role: user
+        verified: true
+        level: 4
+        star_points: 120
+        created_at: "2026-09-01T14:03:00Z"
+
+    RegisterRequest:
+      type: object
+      required: [email, username, password]
+      properties:
+        email:
+          type: string
+          format: email
+          description: Must end in `uwaterloo.ca`.
+        username:
+          type: string
+          minLength: 3
+          maxLength: 32
+          pattern: "^[A-Za-z0-9_.-]+$"
+        password:
+          type: string
+          minLength: 10
+          maxLength: 72
+          description: At least 10 characters. Capped at 72 bytes, which is bcrypt's limit.
+      example:
+        email: meil@uwaterloo.ca
+        username: meil
+        password: correct horse battery
+
+    RegisterResponse:
+      type: object
+      required: [user, verification_required]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        verification_required:
+          type: boolean
+          description: Always true - confirm the address before logging in.
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    TokenRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: The token from the emailed link.
+
+    EmailRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    PasswordResetConfirmRequest:
+      type: object
+      required: [token, password]
+      properties:
+        token:
+          type: string
+        password:
+          type: string
+          minLength: 10
+          maxLength: 72
+
+    Listing:
+      type: object
+      description: |
+        A "Housing Available" post. Every fact the interface displays is a
+        field here rather than a sentence to be parsed: the filters in the next
+        feature depend on it, and the frontend formats these into display text
+        at the point of display.
+      required:
+        - id
+        - title
+        - body
+        - conditions
+        - price_cents
+        - start_date
+        - end_date
+        - lease_months
+        - term_tag
+        - unit_type
+        - bedrooms_total
+        - bathrooms
+        - bath_type
+        - furnished
+        - utilities
+        - parking
+        - pets
+        - laundry
+        - address_line
+        - neighbourhood
+        - commute_mode
+        - status
+        - views
+        - replies
+        - saves
+        - created_at
+        - owner
+        - photos
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        body:
+          type: string
+          description: The poster's description of the place.
+        conditions:
+          type: array
+          items:
+            type: string
+          description: The poster's own terms, shown as a list.
+        price_cents:
+          type: integer
+          description: Monthly rent in cents of CAD.
+        deposit_cents:
+          type: integer
+          nullable: true
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        lease_months:
+          type: integer
+        term_tag:
+          type: string
+          description: Display label for the term, e.g. "Winter term".
+        unit_type:
+          type: string
+          enum: [room, studio, unit]
+        bedrooms_total:
+          type: integer
+        bedroom_of:
+          type: integer
+          nullable: true
+          description: Which bedroom of bedrooms_total is offered. Null for a whole unit.
+        bathrooms:
+          type: number
+        bath_type:
+          type: string
+          enum: [shared, private, ensuite]
+        furnished:
+          type: boolean
+        utilities:
+          type: array
+          items:
+            type: string
+            enum: [internet, hydro, water, heat, gas]
+          description: Which bills are included in the rent.
+        parking:
+          type: boolean
+        pets:
+          type: boolean
+        laundry:
+          type: boolean
+        address_line:
+          type: string
+          description: |
+            Street address. Public for now; whether the exact address should
+            instead be revealed only after contact is an open product decision.
+        neighbourhood:
+          type: string
+        lat:
+          type: number
+          nullable: true
+        lng:
+          type: number
+          nullable: true
+        distance_m:
+          type: integer
+          nullable: true
+          description: Straight-line metres to campus.
+        commute_minutes:
+          type: integer
+          nullable: true
+        commute_mode:
+          type: string
+          enum: [walk, bus]
+        minutes_to_transit:
+          type: integer
+          nullable: true
+        minutes_to_grocery:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum: [draft, published, paused, archived]
+        views:
+          type: integer
+        replies:
+          type: integer
+        saves:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        owner:
+          $ref: "#/components/schemas/ListingOwner"
+        photos:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListingPhoto"
+
+    ListingInput:
+      type: object
+      description: A new listing. Everything the hub filters on is required.
+      required:
+        - title
+        - price_cents
+        - start_date
+        - end_date
+        - lease_months
+        - term_tag
+        - unit_type
+        - bedrooms_total
+        - bathrooms
+        - bath_type
+        - address_line
+      properties:
+        title: { type: string, minLength: 8, maxLength: 200 }
+        body: { type: string, maxLength: 8000 }
+        conditions:
+          type: array
+          items: { type: string, maxLength: 500 }
+          maxItems: 12
+        price_cents: { type: integer, minimum: 1 }
+        deposit_cents: { type: integer, minimum: 0, nullable: true }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        lease_months: { type: integer, minimum: 1, maximum: 24 }
+        term_tag: { type: string, maxLength: 40 }
+        unit_type: { type: string, enum: [room, studio, unit] }
+        bedrooms_total: { type: integer, minimum: 0, maximum: 20 }
+        bedroom_of: { type: integer, minimum: 1, nullable: true }
+        bathrooms: { type: number, minimum: 0 }
+        bath_type: { type: string, enum: [shared, private, ensuite] }
+        furnished: { type: boolean }
+        utilities:
+          type: array
+          items: { type: string, enum: [internet, hydro, water, heat, gas] }
+        parking: { type: boolean }
+        pets: { type: boolean }
+        laundry: { type: boolean }
+        address_line: { type: string, maxLength: 200 }
+        neighbourhood: { type: string, maxLength: 80 }
+        distance_m: { type: integer, minimum: 0, nullable: true }
+        status:
+          type: string
+          enum: [draft, published]
+          default: published
+          description: Post as a draft to finish it later.
+
+    ListingUpdate:
+      type: object
+      description: |
+        A partial edit. Only the fields present are changed; anything omitted is
+        left as it was. Status is not editable here — use `/listings/{id}/status`.
+      properties:
+        title: { type: string, minLength: 8, maxLength: 200 }
+        body: { type: string, maxLength: 8000 }
+        conditions:
+          type: array
+          items: { type: string, maxLength: 500 }
+          maxItems: 12
+        price_cents: { type: integer, minimum: 1 }
+        deposit_cents: { type: integer, minimum: 0, nullable: true }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        lease_months: { type: integer, minimum: 1, maximum: 24 }
+        term_tag: { type: string, maxLength: 40 }
+        unit_type: { type: string, enum: [room, studio, unit] }
+        bedrooms_total: { type: integer, minimum: 0, maximum: 20 }
+        bedroom_of: { type: integer, minimum: 1, nullable: true }
+        bathrooms: { type: number, minimum: 0 }
+        bath_type: { type: string, enum: [shared, private, ensuite] }
+        furnished: { type: boolean }
+        utilities:
+          type: array
+          items: { type: string, enum: [internet, hydro, water, heat, gas] }
+        parking: { type: boolean }
+        pets: { type: boolean }
+        laundry: { type: boolean }
+        address_line: { type: string, maxLength: 200 }
+        neighbourhood: { type: string, maxLength: 80 }
+        distance_m: { type: integer, minimum: 0, nullable: true }
+
+    ListingOwner:
+      type: object
+      description: |
+        Just enough about the poster to render a listing. Never their email -
+        contact details stay private until both sides agree to talk.
+      required: [id, username, verified]
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        avatar_url:
+          type: string
+          nullable: true
+        verified:
+          type: boolean
+
+    ListingPhoto:
+      type: object
+      required: [id, url, position]
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+        position:
+          type: integer
+
+    ListingPage:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Listing"
+        meta:
+          $ref: "#/components/schemas/PageMeta"
+
+    Error:
+      type: object
+      description: |
+        The single error envelope. Every failing request in this API returns this
+        shape, so the frontend has exactly one error contract to handle.
+      required: [code, message]
+      properties:
+        code:
+          $ref: "#/components/schemas/ErrorCode"
+        message:
+          type: string
+          description: Human-readable explanation. Safe to show to a user.
+        details:
+          type: object
+          additionalProperties:
+            type: string
+          description: |
+            Field-level problems, keyed by field name. Present on validation
+            failures, omitted otherwise.
+        request_id:
+          type: string
+          description: Correlates this response with the service's logs.
+      example:
+        code: not_found
+        message: No listing with that id.
+        request_id: 9f1c2f7a-6f2e-4d2a-9a1b-2c3d4e5f6a7b
+
+    ErrorCode:
+      type: string
+      description: |
+        Stable, machine-readable reason. Clients branch on this; `message` is for
+        humans and may be reworded without notice.
+      enum:
+        - bad_request
+        - validation_failed
+        - unauthorized
+        - forbidden
+        - not_found
+        - conflict
+        - internal_error
+        - service_unavailable
+
+    PageMeta:
+      type: object
+      description: Pagination metadata accompanying every list response.
+      required: [page, per_page, total, total_pages]
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          description: Current page, 1-based.
+        per_page:
+          type: integer
+          minimum: 1
+          description: Items per page, after the server's maximum is applied.
+        total:
+          type: integer
+          minimum: 0
+          description: Total items matching the query across all pages.
+        total_pages:
+          type: integer
+          minimum: 0
+          description: Total pages available at this page size.
+      example:
+        page: 1
+        per_page: 20
+        total: 6
+        total_pages: 1
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      required: false
+      description: Page number, 1-based.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    PerPage:
+      name: per_page
+      in: query
+      required: false
+      description: Items per page. Values above the server maximum are clamped.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  responses:
+    BadRequest:
+      description: The request was malformed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: No valid session was presented.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Authenticated, but not permitted — typically an unverified account.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: No such resource.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InternalError:
+      description: Something failed inside the service.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: waterloostar_session
+      description: |
+        JWT in an httpOnly, SameSite cookie set by the auth endpoints. Delivered
+        as a cookie rather than a bearer token so the Next.js frontend can read
+        it during server rendering. Because the credential is a cookie, unsafe
+        methods additionally require the CSRF header below.
+    csrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: |
+        Double-submit token, required on every unsafe method when authenticating
+        by cookie. Its value must match the `waterloostar_csrf` cookie.
+
+security:
+  - sessionCookie: []

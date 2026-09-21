@@ -1,0 +1,11 @@
+package: gen
+output: internal/httpapi/gen/server.gen.go
+generate:
+  gin-server: true
+  models: true
+  strict-server: true
+  embedded-spec: true
+output-options:
+  # Handlers take and return typed values; a shape that does not match the
+  # contract fails to compile rather than failing in production.
+  nullable-type: true

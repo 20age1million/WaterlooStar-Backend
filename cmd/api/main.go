@@ -1,254 +1,94 @@
+// Command api runs the WaterlooStar HTTP service.
 package main
 
 import (
-	"golang.org/x/crypto/bcrypt"
-	"crypto/rand"
-	"database/sql"
-	"encoding/hex"
-	"log"
+	"context"
+	"errors"
+	"log/slog"
 	"net/http"
 	"os"
-	"strings"
-	"sync"
+	"os/signal"
+	"syscall"
 	"time"
-	"fmt"
 
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/20age1million/WaterlooStar-Backend/internal/config"
+	"github.com/20age1million/WaterlooStar-Backend/internal/db"
+	"github.com/20age1million/WaterlooStar-Backend/internal/email"
+	"github.com/20age1million/WaterlooStar-Backend/internal/httpapi"
 )
 
-var db *sql.DB
+// buildVersion is stamped at link time:
+//
+//	go build -ldflags "-X main.buildVersion=$(git rev-parse --short HEAD)" ./cmd/api
+var buildVersion string
 
-type dbUser struct {
-	ID           int64
-	Username     string
-	Email        string
-	PasswordHash string
-}
-
-type apiResponse struct {
-	Code    int            `json:"code"`
-	Success bool           `json:"success"`
-	Message string         `json:"message,omitempty"`
-	Data    any            `json:"data,omitempty"`
-	Meta    map[string]any `json:"meta,omitempty"`
-}
-
-type loginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
-	Remember bool   `json:"remember"`
-}
-
-type userAuth struct {
-	ID       string `json:"id"`
-	Username string `json:"username"`
-	Email    string `json:"email"`
-}
-
-type authSession struct {
-	Token     string    `json:"token"`
-	ExpiresAt time.Time `json:"expiresAt"`
-	User      userAuth  `json:"user"`
-}
-
-type sessionStore struct {
-	mu       sync.RWMutex
-	sessions map[string]authSession
-}
-
-func newSessionStore() *sessionStore {
-	return &sessionStore{
-		sessions: make(map[string]authSession),
-	}
-}
-
-func (s *sessionStore) set(session authSession) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.sessions[session.Token] = session
-}
-
-func (s *sessionStore) get(token string) (authSession, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	session, ok := s.sessions[token]
-	return session, ok
-}
-
-func (s *sessionStore) delete(token string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	delete(s.sessions, token)
-}
-
-var (
-	store        = newSessionStore()
+const (
+	readHeaderTimeout = 10 * time.Second
+	shutdownTimeout   = 15 * time.Second
 )
-// getUserByEmail retrieves a user from the database by email.
-func getUserByEmail(email string) (dbUser, bool, error) {
-	var u dbUser
-	err := db.QueryRow(`
-		SELECT id, username, email, password_hash
-		FROM public.users
-		WHERE lower(email) = lower($1)
-		LIMIT 1
-	`, email).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash)
-
-	if err == sql.ErrNoRows {
-		return dbUser{}, false, nil
-	}
-	if err != nil {
-		return dbUser{}, false, err
-	}
-	return u, true, nil
-}
 
 func main() {
-	// Initialize Postgres connection
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		log.Fatal("DATABASE_URL is not set")
+	if err := run(); err != nil {
+		// Configuration errors are multi-line and meant to be read, so they go
+		// out plainly rather than as a structured log line.
+		os.Stderr.WriteString(err.Error() + "\n")
+		os.Exit(1)
 	}
+}
 
-	var err error
-	db, err = sql.Open("pgx", dsn)
+func run() error {
+	cfg, err := config.Load()
 	if err != nil {
-		log.Fatal(err)
-	}
-	if err := db.Ping(); err != nil {
-		log.Fatal(err)
-	}
-	log.Println("Connected to Postgres successfully")
-
-	router := gin.Default()
-	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000", "http://127.0.0.1:3000"},
-		AllowMethods:     []string{"GET", "POST", "OPTIONS"},
-		AllowHeaders:     []string{"Authorization", "Content-Type"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
-	}))
-	api := router.Group("/api")
-	auth := api.Group("/auth")
-	auth.POST("/login", loginHandler)
-	auth.GET("/me", meHandler)
-	api.GET("/health/db", dbHealthHandler)
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+		return err
 	}
 
-	if err := router.Run(":" + port); err != nil {
-		panic(err)
-	}
+	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: cfg.LogLevel}))
+	slog.SetDefault(log)
 
-}
-func dbHealthHandler(c *gin.Context) {
-	if db == nil {
-		respond(c, http.StatusInternalServerError, "DB not initialized", nil)
-		return
-	}
-	if err := db.Ping(); err != nil {
-		respond(c, http.StatusInternalServerError, "DB ping failed", map[string]any{"error": err.Error()})
-		return
-	}
-	respond(c, http.StatusOK, "DB OK", nil)
-}
+	// Interrupt cancels this context, which unwinds the whole startup chain.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
-func loginHandler(c *gin.Context) {
-	var request loginRequest
-	if err := c.ShouldBindJSON(&request); err != nil {
-		respond(c, http.StatusBadRequest, "Invalid login payload", nil)
-		return
-	}
-
-	u, found, err := getUserByEmail(request.Email)
-if err != nil {
-	respond(c, http.StatusInternalServerError, "DB error", map[string]any{"error": err.Error()})
-	return
-}
-if !found {
-	respond(c, http.StatusUnauthorized, "Invalid email or password", nil)
-	return
-}
-
-if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(request.Password)); err != nil {
-	respond(c, http.StatusUnauthorized, "Invalid email or password", nil)
-	return
-}
-
-	token, err := generateToken()
+	pool, err := db.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
-		respond(c, http.StatusInternalServerError, "Unable to create session", nil)
-		return
+		return err
+	}
+	defer pool.Close()
+
+	srv := &http.Server{
+		Addr:              cfg.Addr(),
+		Handler:           httpapi.NewRouter(cfg, log, httpapi.NewServer(cfg, log, pool, email.NewLogSender(log), buildVersion)),
+		ReadHeaderTimeout: readHeaderTimeout,
 	}
 
-	sessionDuration := 24 * time.Hour
-	if request.Remember {
-		sessionDuration = 7 * 24 * time.Hour
+	serverErr := make(chan error, 1)
+	go func() {
+		log.Info("listening",
+			slog.String("addr", cfg.Addr()),
+			slog.String("environment", string(cfg.Environment)),
+			slog.String("cors_origin", cfg.CORSOrigin),
+		)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErr <- err
+		}
+	}()
+
+	select {
+	case err := <-serverErr:
+		return err
+	case <-ctx.Done():
+		log.Info("shutting down")
 	}
 
-	session := authSession{
-		Token:     token,
-		ExpiresAt: time.Now().Add(sessionDuration),
-		User:      userAuth{
-		ID:       fmt.Sprintf("%d", u.ID),
-		Username: u.Username,
-		Email:    u.Email,
-	},
-	}
-	store.set(session)
-
-	respond(c, http.StatusOK, "Login successful", session)
-}
-
-func meHandler(c *gin.Context) {
-	token := extractBearerToken(c.GetHeader("Authorization"))
-	if token == "" {
-		respond(c, http.StatusUnauthorized, "Missing bearer token", nil)
-		return
+	// Drain in-flight requests before closing the pool, so nothing is cut off
+	// mid-query.
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Error("graceful shutdown failed", slog.String("error", err.Error()))
+		return err
 	}
 
-	session, ok := store.get(token)
-	if !ok {
-		respond(c, http.StatusUnauthorized, "Invalid or expired token", nil)
-		return
-	}
-
-	if time.Now().After(session.ExpiresAt) {
-		store.delete(token)
-		respond(c, http.StatusUnauthorized, "Session expired", nil)
-		return
-	}
-
-	respond(c, http.StatusOK, "Session active", session.User)
-}
-
-func respond(c *gin.Context, status int, message string, data any) {
-	c.JSON(status, apiResponse{
-		Code:    status,
-		Success: status < http.StatusBadRequest,
-		Message: message,
-		Data:    data,
-	})
-}
-
-func generateToken() (string, error) {
-	bytes := make([]byte, 32)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(bytes), nil
-}
-
-func extractBearerToken(header string) string {
-	parts := strings.SplitN(header, " ", 2)
-	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-		return ""
-	}
-	return strings.TrimSpace(parts[1])
+	log.Info("stopped")
+	return nil
 }
