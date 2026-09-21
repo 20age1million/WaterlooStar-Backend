@@ -31,7 +31,7 @@ type: docker
 name: build_and_deploy
 
 trigger:
-  event: [ push ]
+  event: [ push, custom ]
   # main only. Every push here deploys, so a feature branch must never match.
   branch: [ main ]
 
