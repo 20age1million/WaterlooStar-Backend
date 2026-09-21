@@ -1,0 +1,75 @@
+# Production stack for the WaterlooStar API. Used by the Drone deploy step.
+#
+# NOT the file in the repository root — that one is for local development and
+# runs Postgres alone.
+#
+# The API has no public URL on purpose. Visitors reach waterloostar.com, the
+# reverse proxy hands them to the Next.js server on localhost:3000, and that
+# server — never the browser — calls this API over the shared `waterloostar`
+# Docker network at http://api:8080. Nothing here publishes a port.
+#
+# Secrets live in /opt/repo/env/waterloostar-backend.env on the host, outside
+# the git checkout, which is reset on every deploy. Create it once:
+#
+#     POSTGRES_PASSWORD=<openssl rand -hex 24>
+#     JWT_SECRET=<openssl rand -base64 48>
+#
+# The password is hex because it is embedded in a connection URL below, where
+# characters like @ / : would need escaping.
+
+name: waterloostar-backend
+
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: waterloostar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in /opt/repo/env/waterloostar-backend.env}
+      POSTGRES_DB: waterloostar
+      # Same collation as development, so ordering matches.
+      POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=en-CA --encoding=UTF8"
+    volumes:
+      # postgres:18 keeps data in a versioned subdirectory; mount the parent.
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U waterloostar -d waterloostar"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    # The database is reachable by the API and by nothing else.
+    networks: [internal]
+
+  api:
+    image: ghcr.io/20age1million/waterloostar-backend:${TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PG_DSN: postgres://waterloostar:${POSTGRES_PASSWORD}@postgres:5432/waterloostar?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in /opt/repo/env/waterloostar-backend.env}
+      PORT: "8080"
+      # Marks the session cookies Secure. The browser only ever sees them on
+      # https://waterloostar.com, re-issued by the Next.js server.
+      ENVIRONMENT: production
+      LOG_LEVEL: info
+      # Used to build the links in verification and password-reset emails.
+      APP_URL: https://waterloostar.com
+      # Only a browser calling the API directly would be checked against this,
+      # and none does. Set to the site so that stays true if one ever does.
+      CORS_ORIGIN: https://waterloostar.com
+    # `internal` to reach Postgres; `waterloostar` so the Next.js server can
+    # reach this service as http://api:8080.
+    networks: [internal, waterloostar]
+
+networks:
+  internal: {}
+  waterloostar:
+    # Shared with the frontend's stack. Created by whichever deploy runs first.
+    name: waterloostar
+    external: true
+
+volumes:
+  pgdata:
