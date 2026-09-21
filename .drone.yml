@@ -15,16 +15,16 @@
 # - Secrets set in Drone repo settings:
 #     GHCR_USERNAME = <github username or org>
 #     GHCR_TOKEN    = <PAT with read:packages, write:packages, repo>
-# - /opt/repo/waterloostar-backend/docker-compose.yml exists on the host and:
-#     * runs postgres with a persistent volume,
-#     * runs this image as a service named `api`:
-#         image: ghcr.io/20age1million/waterloostar-backend:${TAG:-latest}
-#     * supplies PG_DSN, JWT_SECRET, CORS_ORIGIN, APP_URL and
-#       ENVIRONMENT=production from the host's .env — none of which belong in
-#       this file or in the image.
+# - On the host, once: /opt/repo/env/waterloostar-backend.env with
+#     POSTGRES_PASSWORD=<openssl rand -hex 24>
+#     JWT_SECRET=<openssl rand -base64 48>
+#   It lives outside the git checkout, which is reset on every deploy.
 #
-# NOTE: the compose file in THIS repo is for local development only. It runs
-# Postgres and nothing else, and is not what deploys.
+# WHAT IS DEPLOYED: deploy/docker-compose.yml — Postgres and the API, neither
+# with a public port. waterloostar.com is served by the frontend; its Next.js
+# server calls this API over the shared `waterloostar` Docker network at
+# http://api:8080. The compose file in the repository root is for local
+# development only.
 
 kind: pipeline
 type: docker
@@ -110,22 +110,31 @@ steps:
       GHCR_TOKEN:
         from_secret: GHCR_TOKEN
       TAG: "latest"            # CHANGE to "${DRONE_COMMIT_SHA}" for pinned deploys
-      COMPOSE_SUBDIR: ""
+      COMPOSE_SUBDIR: "deploy"
+      ENV_FILE: /opt/repo/env/waterloostar-backend.env
     commands:
       - echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
       - export TAG
       - cd "$REPO_DIR/${COMPOSE_SUBDIR}"
-      - docker compose pull
+
+      # Say what is missing, rather than letting compose fail on an empty
+      # variable three steps later.
+      - test -f "$ENV_FILE" || (echo "Missing $ENV_FILE — see deploy/docker-compose.yml" && exit 1)
+
+      # Shared with the frontend's stack, and it can deploy first.
+      - docker network inspect waterloostar >/dev/null 2>&1 || docker network create waterloostar
+
+      - docker compose --env-file "$ENV_FILE" pull
 
       # Migrations run as their own step, before the new code serves traffic.
       # Doing it on container start would have every replica race the others,
       # and golang-migrate takes a lock but the losers then fail their health
       # checks. `up` is idempotent: with nothing pending it is a no-op.
-      - docker compose run --rm api migrate up
+      - docker compose --env-file "$ENV_FILE" run --rm api migrate up
 
-      - docker compose up -d
+      - docker compose --env-file "$ENV_FILE" up -d
 
       # Fail the build if the new container is not actually answering, rather
       # than reporting a green deploy over a crash loop.
       - sleep 5
-      - docker compose exec -T api wget -qO- http://127.0.0.1:8080/healthz
+      - docker compose --env-file "$ENV_FILE" exec -T api wget -qO- http://127.0.0.1:8080/healthz
