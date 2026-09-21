@@ -1,0 +1,12 @@
+# Keep the build context small and free of anything that should not ship.
+.git
+.github
+.claude
+docs
+*.md
+!README.md
+.env
+.env.*
+docker-compose.yml
+Dockerfile
+.dockerignore
