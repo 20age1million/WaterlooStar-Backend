@@ -1,0 +1,131 @@
+# ============================
+# CI/CD PIPELINE (Drone) — WaterlooStar API
+# Pattern: Host-git + Compose  (same shape as XitaOrz.com)
+# ============================
+# What this does:
+# 1) Run the Go test suite. Nothing is built or deployed if it fails.
+# 2) Sync the repo into the runner host at /opt/repo/waterloostar-backend
+# 3) Build a Docker image from this repo and push it to GHCR
+# 4) Apply database migrations, then deploy with the host's docker-compose.yml
+#
+# PREREQS (Ops):
+# - Drone runner must mount:
+#     - /var/run/docker.sock   (so steps can talk to host Docker)
+#     - /opt/repo              (where deploy copies live)
+# - Secrets set in Drone repo settings:
+#     GHCR_USERNAME = <github username or org>
+#     GHCR_TOKEN    = <PAT with read:packages, write:packages, repo>
+# - /opt/repo/waterloostar-backend/docker-compose.yml exists on the host and:
+#     * runs postgres with a persistent volume,
+#     * runs this image as a service named `api`:
+#         image: ghcr.io/20age1million/waterloostar-backend:${TAG:-latest}
+#     * supplies PG_DSN, JWT_SECRET, CORS_ORIGIN, APP_URL and
+#       ENVIRONMENT=production from the host's .env — none of which belong in
+#       this file or in the image.
+#
+# NOTE: the compose file in THIS repo is for local development only. It runs
+# Postgres and nothing else, and is not what deploys.
+
+kind: pipeline
+type: docker
+name: build_and_deploy
+
+trigger:
+  event: [ push ]
+  # main only. Every push here deploys, so a feature branch must never match.
+  branch: [ main ]
+
+volumes:
+  - name: docker_sock
+    host:
+      path: /var/run/docker.sock
+  - name: repo_root
+    host:
+      path: /opt/repo
+
+steps:
+  # 1) Tests gate everything else. They need no database: the handler suite
+  #    runs against an in-memory fake.
+  - name: test
+    image: golang:1.26-alpine
+    environment:
+      CGO_ENABLED: 0
+    commands:
+      - go vet ./...
+      - go test ./...
+
+  # 2) Sync the repo into the host folder: /opt/repo/<repo_name_lowercase>
+  - name: sync-host-repo
+    image: alpine:3.20
+    volumes:
+      - name: repo_root
+        path: /opt/repo
+    environment:
+      REPO_DIR: "/opt/repo/${DRONE_REPO_NAME,,}"
+    commands:
+      - apk add --no-cache git
+      - REMOTE_URL="$(git -C $DRONE_WORKSPACE config --get remote.origin.url)"
+      - mkdir -p "$REPO_DIR"
+      - >
+        if [ ! -d "$REPO_DIR/.git" ]; then
+          git clone --depth=1 "$REMOTE_URL" "$REPO_DIR";
+        else
+          git -C "$REPO_DIR" remote set-url origin "$REMOTE_URL" || true;
+          git -C "$REPO_DIR" fetch --all --prune;
+          git -C "$REPO_DIR" reset --hard "origin/${DRONE_BRANCH}";
+        fi
+      - git -C "$REPO_DIR" checkout -qf "${DRONE_COMMIT_SHA}" || true
+
+  # 3) Build & push image to GHCR
+  - name: build-push-ghcr
+    image: plugins/docker
+    environment:
+      DOCKER_BUILDKIT: 1
+    settings:
+      registry: ghcr.io
+      # GHCR paths must be lowercase; these vars enforce it.
+      repo: ghcr.io/${DRONE_REPO_OWNER,,}/${DRONE_REPO_NAME,,}
+      tags:
+        - latest
+        - ${DRONE_COMMIT_SHA}    # immutable tag for rollbacks
+      dockerfile: Dockerfile
+      context: .
+      username:
+        from_secret: GHCR_USERNAME
+      password:
+        from_secret: GHCR_TOKEN
+
+  # 4) Migrate, then deploy.
+  - name: deploy
+    image: docker:27-cli
+    volumes:
+      - name: docker_sock
+        path: /var/run/docker.sock
+      - name: repo_root
+        path: /opt/repo
+    environment:
+      REPO_DIR: "/opt/repo/${DRONE_REPO_NAME,,}"
+      GHCR_USERNAME:
+        from_secret: GHCR_USERNAME
+      GHCR_TOKEN:
+        from_secret: GHCR_TOKEN
+      TAG: "latest"            # CHANGE to "${DRONE_COMMIT_SHA}" for pinned deploys
+      COMPOSE_SUBDIR: ""
+    commands:
+      - echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+      - export TAG
+      - cd "$REPO_DIR/${COMPOSE_SUBDIR}"
+      - docker compose pull
+
+      # Migrations run as their own step, before the new code serves traffic.
+      # Doing it on container start would have every replica race the others,
+      # and golang-migrate takes a lock but the losers then fail their health
+      # checks. `up` is idempotent: with nothing pending it is a no-op.
+      - docker compose run --rm api migrate up
+
+      - docker compose up -d
+
+      # Fail the build if the new container is not actually answering, rather
+      # than reporting a green deploy over a crash loop.
+      - sleep 5
+      - docker compose exec -T api wget -qO- http://127.0.0.1:8080/healthz

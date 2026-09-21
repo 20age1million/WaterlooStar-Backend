@@ -12,7 +12,7 @@ The frontend lives in a separate repository (`WaterlooStar-Frontend`).
 
 ## Getting started
 
-Requires Go 1.24+ and Docker Desktop. No other tooling to install — sqlc and
+Requires Go 1.26+ and Docker Desktop. No other tooling to install — sqlc and
 oapi-codegen are pinned as `go.mod` tool dependencies.
 
 ```bash
