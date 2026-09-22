@@ -115,7 +115,15 @@ steps:
     commands:
       - echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
       - export TAG
-      - cd "$REPO_DIR/${COMPOSE_SUBDIR}"
+      # No braces here, on purpose. Drone rewrites every dollar-brace variable
+      # in this file with its own variables before the step runs, and an
+      # unknown one becomes empty. The braced form of COMPOSE_SUBDIR did, so
+      # this ran in the repo root against the local-development compose file,
+      # which has no `api` service. Written as $COMPOSE_SUBDIR, Drone leaves
+      # it for the shell.
+      - cd "$REPO_DIR/$COMPOSE_SUBDIR"
+      # Stop if that ever happens again, rather than deploying the wrong file.
+      - test -f docker-compose.yml && grep -q "^  api:" docker-compose.yml || (echo "Not the deploy compose file — check COMPOSE_SUBDIR" && exit 1)
 
       # Say what is missing, rather than letting compose fail on an empty
       # variable three steps later.
