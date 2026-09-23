@@ -1,6 +1,8 @@
 package auth_test
 
 import (
+	"encoding/base64"
+	"strings"
 	"testing"
 	"time"
 
@@ -113,16 +115,46 @@ func TestVerifyRejectsTamperedSignature(t *testing.T) {
 		t.Fatalf("MintAccessToken: %v", err)
 	}
 
-	// Flip the final character of the signature.
-	tampered := token[:len(token)-1]
-	if token[len(token)-1] == 'A' {
-		tampered += "B"
-	} else {
-		tampered += "A"
+	// Flip a bit in the signature itself, rather than in a character of its
+	// encoding. The final base64 character carries two unused bits, so changing
+	// it can leave the decoded signature byte-for-byte identical — which is how
+	// an earlier version of this test passed fifteen runs in sixteen and failed
+	// the other one.
+	dot := strings.LastIndex(token, ".")
+	signature, err := base64.RawURLEncoding.DecodeString(token[dot+1:])
+	if err != nil {
+		t.Fatalf("decode signature: %v", err)
 	}
+	signature[0] ^= 0x01
+	tampered := token[:dot+1] + base64.RawURLEncoding.EncodeToString(signature)
 
 	if _, err := svc.VerifyAccessToken(tampered); err == nil {
 		t.Error("a tampered signature must be rejected")
+	}
+}
+
+// One token, one valid string. The signature's final base64 character has two
+// bits that encode nothing, and a lenient decoder ignores them — so
+// "...signatureA" and "...signatureB" would decode alike and both verify.
+// Strict decoding is what keeps a token from having four spellings.
+func TestVerifyRejectsNonCanonicalEncoding(t *testing.T) {
+	svc := auth.NewTokenService(secret)
+
+	for i := 0; i < 64; i++ {
+		token, _, err := svc.MintAccessToken(auth.Principal{UserID: uuid.New(), Role: "user"})
+		if err != nil {
+			t.Fatalf("MintAccessToken: %v", err)
+		}
+
+		// Set a bit the signature does not use. The decoded bytes are unchanged.
+		last := token[len(token)-1]
+		alphabet := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+		respelledChar := alphabet[strings.IndexByte(alphabet, last)+1]
+		respelled := token[:len(token)-1] + string(respelledChar)
+
+		if _, err := svc.VerifyAccessToken(respelled); err == nil {
+			t.Fatalf("a re-spelled signature must be rejected: %q -> %q", last, respelledChar)
+		}
 	}
 }
 
