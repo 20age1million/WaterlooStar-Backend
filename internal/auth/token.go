@@ -110,6 +110,12 @@ func (s *TokenService) VerifyAccessToken(raw string) (Principal, error) {
 		jwt.WithAudience(audience),
 		jwt.WithExpirationRequired(),
 		jwt.WithTimeFunc(s.now),
+		// A 32-byte HMAC signature ends in a base64 character with two unused
+		// bits, which the lenient decoder ignores — so four different token
+		// strings decode to the same signature and all verify. Strict decoding
+		// rejects every encoding but the one the signer produced, leaving one
+		// valid string per token.
+		jwt.WithStrictDecoding(),
 	)
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired) {
