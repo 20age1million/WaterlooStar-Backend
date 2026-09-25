@@ -216,7 +216,7 @@ func (s *Server) ListMyRequests(ctx context.Context, _ gen.ListMyRequestsRequest
 			Username:  row.PosterUsername,
 			AvatarUrl: nullableString(row.PosterAvatarUrl),
 			Verified:  row.PosterVerified,
-		}))
+		}, row.OfferCount))
 	}
 
 	return gen.ListMyRequests200JSONResponse(out), nil
@@ -247,7 +247,9 @@ func (s *Server) ownedRequest(ctx context.Context, id uuid.UUID) (auth.Principal
 	return principal, row, nil
 }
 
-// requestResponse attaches the poster summary to a row.
+// requestResponse attaches the poster summary and the visible offer count to a
+// row. The count is queried rather than assumed zero: an edit does not change
+// how many owners have answered.
 func (s *Server) requestResponse(ctx context.Context, row sqlcgen.HousingRequest) gen.HousingRequest {
 	poster := gen.ListingOwner{Id: openapi_types.UUID(row.PosterID)}
 	if u, err := s.queries.GetUserByID(ctx, row.PosterID); err == nil {
@@ -255,7 +257,15 @@ func (s *Server) requestResponse(ctx context.Context, row sqlcgen.HousingRequest
 		poster.Verified = u.Verified
 		poster.AvatarUrl = nullableString(u.AvatarUrl)
 	}
-	return toRequest(row, poster)
+
+	offers, err := s.queries.CountOffersForRequest(ctx, row.ID)
+	if err != nil {
+		// The request itself is fine; report it with no offers rather than
+		// failing the write that just succeeded.
+		s.log.Error("count offers for request", slog.String("error", err.Error()))
+	}
+
+	return toRequest(row, poster, offers)
 }
 
 // Each operation has its own generated response types, so the same refusal has

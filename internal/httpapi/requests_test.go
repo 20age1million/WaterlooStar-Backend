@@ -21,6 +21,7 @@ type requestBody struct {
 	BudgetCents   int    `json:"budget_cents"`
 	Occupants     int    `json:"occupants"`
 	Status        string `json:"status"`
+	Offers        int    `json:"offers"`
 	MaxDistanceM  *int   `json:"max_distance_m"`
 	Neighbourhood string `json:"neighbourhood"`
 	Poster        struct {

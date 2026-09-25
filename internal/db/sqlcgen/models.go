@@ -38,7 +38,6 @@ type HousingRequest struct {
 	Status             string
 	PublishedAt        *time.Time
 	Views              int32
-	Offers             int32
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 	Search             interface{}
@@ -108,6 +107,17 @@ type RefreshToken struct {
 	RevokedAt *time.Time
 	UserAgent *string
 	CreatedAt time.Time
+}
+
+type RequestOffer struct {
+	ID          uuid.UUID
+	RequestID   uuid.UUID
+	ListingID   uuid.UUID
+	OwnerID     uuid.UUID
+	Note        string
+	WithdrawnAt *time.Time
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type User struct {

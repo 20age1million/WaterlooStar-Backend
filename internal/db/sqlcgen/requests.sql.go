@@ -92,7 +92,7 @@ INSERT INTO housing_requests (
     CASE WHEN $17::text = 'published' THEN now() END,
     $18
 )
-RETURNING id, poster_id, title, body, budget_cents, start_date, end_date, lease_months, term_tag, occupants, pets, furnished_preferred, parking_needed, laundry_needed, max_distance_m, neighbourhood, status, published_at, views, offers, created_at, updated_at, search
+RETURNING id, poster_id, title, body, budget_cents, start_date, end_date, lease_months, term_tag, occupants, pets, furnished_preferred, parking_needed, laundry_needed, max_distance_m, neighbourhood, status, published_at, views, created_at, updated_at, search
 `
 
 type CreateRequestParams struct {
@@ -161,7 +161,6 @@ func (q *Queries) CreateRequest(ctx context.Context, arg CreateRequestParams) (H
 		&i.Status,
 		&i.PublishedAt,
 		&i.Views,
-		&i.Offers,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Search,
@@ -181,10 +180,16 @@ func (q *Queries) DeleteAllRequests(ctx context.Context) error {
 
 const getPublishedRequest = `-- name: GetPublishedRequest :one
 SELECT
-    r.id, r.poster_id, r.title, r.body, r.budget_cents, r.start_date, r.end_date, r.lease_months, r.term_tag, r.occupants, r.pets, r.furnished_preferred, r.parking_needed, r.laundry_needed, r.max_distance_m, r.neighbourhood, r.status, r.published_at, r.views, r.offers, r.created_at, r.updated_at, r.search,
+    r.id, r.poster_id, r.title, r.body, r.budget_cents, r.start_date, r.end_date, r.lease_months, r.term_tag, r.occupants, r.pets, r.furnished_preferred, r.parking_needed, r.laundry_needed, r.max_distance_m, r.neighbourhood, r.status, r.published_at, r.views, r.created_at, r.updated_at, r.search,
     u.username   AS poster_username,
     u.avatar_url AS poster_avatar_url,
-    u.verified   AS poster_verified
+    u.verified   AS poster_verified,
+    (SELECT count(*)
+       FROM request_offers o
+       JOIN listings ol ON ol.id = o.listing_id
+      WHERE o.request_id = r.id
+        AND o.withdrawn_at IS NULL
+        AND ol.status = 'published') AS offer_count
 FROM housing_requests r
 JOIN users u ON u.id = r.poster_id
 WHERE r.id = $1 AND r.status = 'published'
@@ -195,6 +200,7 @@ type GetPublishedRequestRow struct {
 	PosterUsername  string
 	PosterAvatarUrl *string
 	PosterVerified  bool
+	OfferCount      int64
 }
 
 func (q *Queries) GetPublishedRequest(ctx context.Context, id uuid.UUID) (GetPublishedRequestRow, error) {
@@ -220,19 +226,19 @@ func (q *Queries) GetPublishedRequest(ctx context.Context, id uuid.UUID) (GetPub
 		&i.HousingRequest.Status,
 		&i.HousingRequest.PublishedAt,
 		&i.HousingRequest.Views,
-		&i.HousingRequest.Offers,
 		&i.HousingRequest.CreatedAt,
 		&i.HousingRequest.UpdatedAt,
 		&i.HousingRequest.Search,
 		&i.PosterUsername,
 		&i.PosterAvatarUrl,
 		&i.PosterVerified,
+		&i.OfferCount,
 	)
 	return i, err
 }
 
 const getRequestForOwner = `-- name: GetRequestForOwner :one
-SELECT id, poster_id, title, body, budget_cents, start_date, end_date, lease_months, term_tag, occupants, pets, furnished_preferred, parking_needed, laundry_needed, max_distance_m, neighbourhood, status, published_at, views, offers, created_at, updated_at, search FROM housing_requests WHERE id = $1
+SELECT id, poster_id, title, body, budget_cents, start_date, end_date, lease_months, term_tag, occupants, pets, furnished_preferred, parking_needed, laundry_needed, max_distance_m, neighbourhood, status, published_at, views, created_at, updated_at, search FROM housing_requests WHERE id = $1
 `
 
 // Any status, so ownership can be checked before an edit. "Not yours" and "does
@@ -260,7 +266,6 @@ func (q *Queries) GetRequestForOwner(ctx context.Context, id uuid.UUID) (Housing
 		&i.Status,
 		&i.PublishedAt,
 		&i.Views,
-		&i.Offers,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Search,
@@ -271,10 +276,16 @@ func (q *Queries) GetRequestForOwner(ctx context.Context, id uuid.UUID) (Housing
 const listRequests = `-- name: ListRequests :many
 
 SELECT
-    r.id, r.poster_id, r.title, r.body, r.budget_cents, r.start_date, r.end_date, r.lease_months, r.term_tag, r.occupants, r.pets, r.furnished_preferred, r.parking_needed, r.laundry_needed, r.max_distance_m, r.neighbourhood, r.status, r.published_at, r.views, r.offers, r.created_at, r.updated_at, r.search,
+    r.id, r.poster_id, r.title, r.body, r.budget_cents, r.start_date, r.end_date, r.lease_months, r.term_tag, r.occupants, r.pets, r.furnished_preferred, r.parking_needed, r.laundry_needed, r.max_distance_m, r.neighbourhood, r.status, r.published_at, r.views, r.created_at, r.updated_at, r.search,
     u.username   AS poster_username,
     u.avatar_url AS poster_avatar_url,
-    u.verified   AS poster_verified
+    u.verified   AS poster_verified,
+    (SELECT count(*)
+       FROM request_offers o
+       JOIN listings ol ON ol.id = o.listing_id
+      WHERE o.request_id = r.id
+        AND o.withdrawn_at IS NULL
+        AND ol.status = 'published') AS offer_count
 FROM housing_requests r
 JOIN users u ON u.id = r.poster_id
 WHERE r.status = 'published'
@@ -334,6 +345,7 @@ type ListRequestsRow struct {
 	PosterUsername  string
 	PosterAvatarUrl *string
 	PosterVerified  bool
+	OfferCount      int64
 }
 
 // "Looking for Housing" posts. Only published rows are ever served, and that
@@ -342,6 +354,9 @@ type ListRequestsRow struct {
 // The filters read from the owner's side: a request's budget is a ceiling, so
 // "budget_min" asks who can afford at least this much, and its distance is a
 // radius, so "distance_max" asks who would accept a place this far out.
+// The offer count is computed, never stored. An offer stops counting when its
+// listing is taken down — which happens in another table — so any stored number
+// would drift from what the student can actually see.
 func (q *Queries) ListRequests(ctx context.Context, arg ListRequestsParams) ([]ListRequestsRow, error) {
 	rows, err := q.db.Query(ctx, listRequests,
 		arg.Search,
@@ -387,13 +402,13 @@ func (q *Queries) ListRequests(ctx context.Context, arg ListRequestsParams) ([]L
 			&i.HousingRequest.Status,
 			&i.HousingRequest.PublishedAt,
 			&i.HousingRequest.Views,
-			&i.HousingRequest.Offers,
 			&i.HousingRequest.CreatedAt,
 			&i.HousingRequest.UpdatedAt,
 			&i.HousingRequest.Search,
 			&i.PosterUsername,
 			&i.PosterAvatarUrl,
 			&i.PosterVerified,
+			&i.OfferCount,
 		); err != nil {
 			return nil, err
 		}
@@ -408,10 +423,16 @@ func (q *Queries) ListRequests(ctx context.Context, arg ListRequestsParams) ([]L
 const listRequestsByPoster = `-- name: ListRequestsByPoster :many
 
 SELECT
-    r.id, r.poster_id, r.title, r.body, r.budget_cents, r.start_date, r.end_date, r.lease_months, r.term_tag, r.occupants, r.pets, r.furnished_preferred, r.parking_needed, r.laundry_needed, r.max_distance_m, r.neighbourhood, r.status, r.published_at, r.views, r.offers, r.created_at, r.updated_at, r.search,
+    r.id, r.poster_id, r.title, r.body, r.budget_cents, r.start_date, r.end_date, r.lease_months, r.term_tag, r.occupants, r.pets, r.furnished_preferred, r.parking_needed, r.laundry_needed, r.max_distance_m, r.neighbourhood, r.status, r.published_at, r.views, r.created_at, r.updated_at, r.search,
     u.username   AS poster_username,
     u.avatar_url AS poster_avatar_url,
-    u.verified   AS poster_verified
+    u.verified   AS poster_verified,
+    (SELECT count(*)
+       FROM request_offers o
+       JOIN listings ol ON ol.id = o.listing_id
+      WHERE o.request_id = r.id
+        AND o.withdrawn_at IS NULL
+        AND ol.status = 'published') AS offer_count
 FROM housing_requests r
 JOIN users u ON u.id = r.poster_id
 WHERE r.poster_id = $1
@@ -423,6 +444,7 @@ type ListRequestsByPosterRow struct {
 	PosterUsername  string
 	PosterAvatarUrl *string
 	PosterVerified  bool
+	OfferCount      int64
 }
 
 // ---------------------------------------------------------------- write path
@@ -457,13 +479,13 @@ func (q *Queries) ListRequestsByPoster(ctx context.Context, posterID uuid.UUID) 
 			&i.HousingRequest.Status,
 			&i.HousingRequest.PublishedAt,
 			&i.HousingRequest.Views,
-			&i.HousingRequest.Offers,
 			&i.HousingRequest.CreatedAt,
 			&i.HousingRequest.UpdatedAt,
 			&i.HousingRequest.Search,
 			&i.PosterUsername,
 			&i.PosterAvatarUrl,
 			&i.PosterVerified,
+			&i.OfferCount,
 		); err != nil {
 			return nil, err
 		}
@@ -483,7 +505,7 @@ SET status = $1::text,
         ELSE published_at
     END
 WHERE id = $2
-RETURNING id, poster_id, title, body, budget_cents, start_date, end_date, lease_months, term_tag, occupants, pets, furnished_preferred, parking_needed, laundry_needed, max_distance_m, neighbourhood, status, published_at, views, offers, created_at, updated_at, search
+RETURNING id, poster_id, title, body, budget_cents, start_date, end_date, lease_months, term_tag, occupants, pets, furnished_preferred, parking_needed, laundry_needed, max_distance_m, neighbourhood, status, published_at, views, created_at, updated_at, search
 `
 
 type SetRequestStatusParams struct {
@@ -517,7 +539,6 @@ func (q *Queries) SetRequestStatus(ctx context.Context, arg SetRequestStatusPara
 		&i.Status,
 		&i.PublishedAt,
 		&i.Views,
-		&i.Offers,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Search,
@@ -542,7 +563,7 @@ SET title               = coalesce($1,               title),
     max_distance_m      = coalesce($13,      max_distance_m),
     neighbourhood       = coalesce($14,       neighbourhood)
 WHERE id = $15
-RETURNING id, poster_id, title, body, budget_cents, start_date, end_date, lease_months, term_tag, occupants, pets, furnished_preferred, parking_needed, laundry_needed, max_distance_m, neighbourhood, status, published_at, views, offers, created_at, updated_at, search
+RETURNING id, poster_id, title, body, budget_cents, start_date, end_date, lease_months, term_tag, occupants, pets, furnished_preferred, parking_needed, laundry_needed, max_distance_m, neighbourhood, status, published_at, views, created_at, updated_at, search
 `
 
 type UpdateRequestParams struct {
@@ -604,7 +625,6 @@ func (q *Queries) UpdateRequest(ctx context.Context, arg UpdateRequestParams) (H
 		&i.Status,
 		&i.PublishedAt,
 		&i.Views,
-		&i.Offers,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Search,
