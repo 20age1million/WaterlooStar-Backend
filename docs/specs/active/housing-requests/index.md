@@ -95,7 +95,7 @@ filter them the way a student filters listings.
 
 | Phase | Title | Status | Location |
 |---|---|---|---|
-| [5 — Query tests against a real database](./phase-5-query-test-layer.md) | The harness this feature's SQL needs before it is written | Ready | `docs/specs/active/housing-requests/` |
+| [5 — Query tests against a real database](../../implemented/housing-requests/phase-5-query-test-layer.md) | The harness this feature's SQL needs before it is written | Complete | `docs/specs/implemented/housing-requests/` |
 | [6 — Requests](./phase-6-requests.md) | Table, lifecycle, browse with filters, write path | Ready | `docs/specs/active/housing-requests/` |
 | [7 — Offers](./phase-7-offers.md) | An owner offers a listing against a request | Ready | `docs/specs/active/housing-requests/` |
 

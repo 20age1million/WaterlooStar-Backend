@@ -43,14 +43,32 @@ volumes:
     host:
       path: /opt/repo
 
+# A throwaway PostgreSQL for the query tests. It holds nothing between builds:
+# every test creates and drops a database of its own inside it.
+services:
+  - name: postgres
+    image: postgres:18
+    environment:
+      POSTGRES_USER: waterloostar
+      POSTGRES_PASSWORD: waterloostar
+      POSTGRES_DB: waterloostar
+
 steps:
-  # 1) Tests gate everything else. They need no database: the handler suite
-  #    runs against an in-memory fake.
+  # 1) Tests gate everything else.
   - name: test
     image: golang:1.26-alpine
     environment:
       CGO_ENABLED: 0
+      # Without this the query tests skip rather than fail, and a broken query
+      # would sail through CI exactly as it did before they existed.
+      PG_TEST_DSN: postgres://waterloostar:waterloostar@postgres:5432/waterloostar?sslmode=disable
     commands:
+      # The service starts alongside this step, so wait for it rather than
+      # racing it.
+      - apk add --no-cache postgresql-client
+      - for i in $(seq 1 30); do pg_isready -h postgres -U waterloostar && break; sleep 1; done
+      - pg_isready -h postgres -U waterloostar
+
       - go vet ./...
       - go test ./...
 
