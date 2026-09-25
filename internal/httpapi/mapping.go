@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/oapi-codegen/nullable"
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -116,6 +117,43 @@ func toListing(row sqlcgen.Listing, owner gen.ListingOwner, photos []sqlcgen.Lis
 			Url:      photo.Url,
 			Position: int(photo.Position),
 		})
+	}
+
+	return out
+}
+
+// toRequest maps a "Looking for Housing" row and its poster to the contract
+// shape. As with toListing, nothing is formatted here.
+func toRequest(row sqlcgen.HousingRequest, poster gen.ListingOwner) gen.HousingRequest {
+	out := gen.HousingRequest{
+		Id:                 openapi_types.UUID(row.ID),
+		Title:              row.Title,
+		Body:               row.Body,
+		BudgetCents:        int(row.BudgetCents),
+		StartDate:          openapi_types.Date{Time: row.StartDate},
+		EndDate:            openapi_types.Date{Time: row.EndDate},
+		LeaseMonths:        int(row.LeaseMonths),
+		TermTag:            row.TermTag,
+		Occupants:          int(row.Occupants),
+		Pets:               row.Pets,
+		FurnishedPreferred: row.FurnishedPreferred,
+		ParkingNeeded:      row.ParkingNeeded,
+		LaundryNeeded:      row.LaundryNeeded,
+		MaxDistanceM:       nullableInt(row.MaxDistanceM),
+		Neighbourhood:      row.Neighbourhood,
+
+		Status:    gen.HousingRequestStatus(row.Status),
+		Views:     int(row.Views),
+		Offers:    int(row.Offers),
+		CreatedAt: row.CreatedAt,
+
+		Poster: poster,
+	}
+
+	if row.PublishedAt != nil {
+		out.PublishedAt = nullable.NewNullableWithValue(*row.PublishedAt)
+	} else {
+		out.PublishedAt = nullable.NewNullNullable[time.Time]()
 	}
 
 	return out

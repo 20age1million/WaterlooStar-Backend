@@ -19,9 +19,10 @@ import (
 // statement with a dozen optional parameters, and no fake can say whether
 // PostgreSQL will accept it.
 
-func ptrBool(b bool) *bool       { return &b }
-func ptrInt32(i int32) *int32    { return &i }
-func ptrString(s string) *string { return &s }
+func ptrBool(b bool) *bool           { return &b }
+func ptrInt32(i int32) *int32        { return &i }
+func ptrString(s string) *string     { return &s }
+func ptrTime(t time.Time) *time.Time { return &t }
 
 func date(y int, m time.Month, d int) time.Time {
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)

@@ -279,5 +279,49 @@ func Run(ctx context.Context, pool *pgxpool.Pool) (int, error) {
 		}
 	}
 
-	return len(listings), nil
+	// The other side of the same market. Rewritten wholesale, as above.
+	if err := q.DeleteAllRequests(ctx); err != nil {
+		return 0, fmt.Errorf("clear requests: %w", err)
+	}
+
+	for _, r := range requests {
+		posterID, ok := owners[r.poster]
+		if !ok {
+			return 0, fmt.Errorf("request %q references unknown poster %q", r.title, r.poster)
+		}
+
+		start, err := time.Parse(time.DateOnly, r.startDate)
+		if err != nil {
+			return 0, fmt.Errorf("request %q start date: %w", r.title, err)
+		}
+		end, err := time.Parse(time.DateOnly, r.endDate)
+		if err != nil {
+			return 0, fmt.Errorf("request %q end date: %w", r.title, err)
+		}
+
+		if _, err := q.CreateRequest(ctx, sqlcgen.CreateRequestParams{
+			PosterID:           posterID,
+			Title:              r.title,
+			Body:               r.body,
+			BudgetCents:        r.budgetCents,
+			StartDate:          start,
+			EndDate:            end,
+			LeaseMonths:        r.leaseMonths,
+			TermTag:            r.termTag,
+			Occupants:          r.occupants,
+			Pets:               r.pets,
+			FurnishedPreferred: r.furnishedPreferred,
+			ParkingNeeded:      r.parkingNeeded,
+			LaundryNeeded:      r.laundryNeeded,
+			MaxDistanceM:       r.maxDistanceM,
+			Neighbourhood:      r.neighbourhood,
+			Views:              r.views,
+			Status:             "published",
+			CreatedAt:          now.AddDate(0, 0, -r.postedDaysAgo),
+		}); err != nil {
+			return 0, fmt.Errorf("create request %q: %w", r.title, err)
+		}
+	}
+
+	return len(listings) + len(requests), nil
 }

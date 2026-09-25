@@ -91,8 +91,55 @@ func Listing(t *testing.T, q *sqlcgen.Queries, owner uuid.UUID, opts ListingOpti
 	return listing
 }
 
-// Metres is a shorthand for the distance field, which is a pointer because a
-// listing may have no recorded distance at all.
+// RequestOptions is what a test might reasonably vary about a request.
+type RequestOptions struct {
+	Title        string
+	BudgetCents  int32
+	StartDate    time.Time
+	EndDate      time.Time
+	Status       string
+	Occupants    int32
+	MaxDistanceM *int32
+	Pets         bool
+	Furnished    bool
+	Parking      bool
+	Laundry      bool
+	Neighbour    string
+}
+
+// Request inserts a "Looking for Housing" post by poster.
+func Request(t *testing.T, q *sqlcgen.Queries, poster uuid.UUID, opts RequestOptions) sqlcgen.HousingRequest {
+	t.Helper()
+
+	params := sqlcgen.CreateRequestParams{
+		PosterID:           poster,
+		Title:              orString(opts.Title, "Looking for a quiet room near campus"),
+		Body:               "Written by a fixture.",
+		BudgetCents:        orInt32(opts.BudgetCents, 90000),
+		StartDate:          orTime(opts.StartDate, date(2027, 1, 1)),
+		EndDate:            orTime(opts.EndDate, date(2027, 4, 30)),
+		LeaseMonths:        4,
+		TermTag:            "Winter term",
+		Occupants:          orInt32(opts.Occupants, 1),
+		Pets:               opts.Pets,
+		FurnishedPreferred: opts.Furnished,
+		ParkingNeeded:      opts.Parking,
+		LaundryNeeded:      opts.Laundry,
+		MaxDistanceM:       opts.MaxDistanceM,
+		Neighbourhood:      orString(opts.Neighbour, "Northdale"),
+		Status:             orString(opts.Status, "published"),
+		CreatedAt:          time.Now(),
+	}
+
+	request, err := q.CreateRequest(context.Background(), params)
+	if err != nil {
+		t.Fatalf("fixture request %q: %v", params.Title, err)
+	}
+	return request
+}
+
+// Metres is a shorthand for the distance fields, which are pointers because a
+// listing may have no recorded distance and a request may state no radius.
 func Metres(m int32) *int32 { return &m }
 
 func date(year int, month time.Month, day int) time.Time {

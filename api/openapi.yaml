@@ -531,6 +531,250 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /requests:
+    get:
+      tags: [housing]
+      operationId: listRequests
+      summary: Browse Looking for Housing
+      description: |
+        Published requests, newest first. Public, like listings - a request says
+        what someone needs and carries no address.
+
+        The filters read from the owner's side: `budget_min_cents` asks who can
+        afford a given rent, and `distance_min_m` asks who would accept a place
+        that far out. Every filter is optional and they compose.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - name: q
+          in: query
+          description: Full-text search over title, neighbourhood and description.
+          schema: { type: string }
+        - name: start_after
+          in: query
+          description: Only requests that begin by this date.
+          schema: { type: string, format: date }
+        - name: end_before
+          in: query
+          description: Only requests that run at least until this date.
+          schema: { type: string, format: date }
+        - name: budget_min_cents
+          in: query
+          description: |
+            Only requests whose budget reaches at least this much - the rent you
+            are asking.
+          schema: { type: integer, minimum: 0 }
+        - name: budget_max_cents
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: distance_min_m
+          in: query
+          description: |
+            Only requests willing to be at least this far from campus - how far
+            out your place is. Requests that state no radius are included: no
+            preference is not a narrow one.
+          schema: { type: integer, minimum: 0 }
+        - name: occupants_max
+          in: query
+          description: Only requests for at most this many people.
+          schema: { type: integer, minimum: 1 }
+        - name: pets
+          in: query
+          schema: { type: boolean }
+        - name: furnished
+          in: query
+          description: Only requests that prefer a furnished place.
+          schema: { type: boolean }
+        - name: parking
+          in: query
+          schema: { type: boolean }
+        - name: laundry
+          in: query
+          schema: { type: boolean }
+        - name: verified_only
+          in: query
+          schema: { type: boolean }
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [new, match, budgetAsc, budgetDesc, soonest]
+            default: new
+      responses:
+        "200":
+          description: A page of requests.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+    post:
+      tags: [housing]
+      operationId: createRequest
+      summary: Post what you are looking for
+      description: |
+        Creates a request owned by the signed-in user. Only a **verified**
+        student may post, as with listings.
+
+        Published immediately unless `status` says otherwise.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestInput"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HousingRequest"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: Signed in, but the address has not been confirmed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /requests/{id}:
+    get:
+      tags: [housing]
+      operationId: getRequest
+      summary: One request
+      description: Public. A draft, paused or taken-down request answers 404.
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HousingRequest"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+    patch:
+      tags: [housing]
+      operationId: updateRequest
+      summary: Edit your request
+      description: |
+        Changes only the fields present in the body. Someone else's request
+        answers 404, not 403 - a 403 would confirm it exists.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestUpdate"
+      responses:
+        "200":
+          description: The updated request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HousingRequest"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+    delete:
+      tags: [housing]
+      operationId: deleteRequest
+      summary: Take your request down
+      description: |
+        Archives the request rather than removing the row, as with listings.
+        Archiving is terminal.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Archived.
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /requests/{id}/status:
+    post:
+      tags: [housing]
+      operationId: setRequestStatus
+      summary: Publish, pause or archive your request
+      description: |
+        `draft -> published -> paused -> published` all move freely. `archived`
+        is terminal: found a place, and the request is done.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [draft, published, paused, archived]
+      responses:
+        "200":
+          description: The request in its new state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HousingRequest"
+        "400":
+          description: That transition is not allowed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /me/requests:
+    get:
+      tags: [housing]
+      operationId: listMyRequests
+      summary: Your own requests, whatever their state
+      description: |
+        Everything you have posted, including drafts, paused and taken-down
+        requests - none of which appear in public results.
+      responses:
+        "200":
+          description: Your requests, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HousingRequest"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
 components:
   schemas:
     Health:
@@ -928,6 +1172,135 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Listing"
+        meta:
+          $ref: "#/components/schemas/PageMeta"
+
+    HousingRequest:
+      type: object
+      description: |
+        A "Looking for Housing" post: what a student needs, rather than what
+        they have. The mirror of a listing, and structured for the same reason -
+        an owner can filter these the way a student filters listings.
+
+        No address of any kind. `max_distance_m` is how far out they would
+        consider, not where they are.
+      required:
+        - id
+        - title
+        - body
+        - budget_cents
+        - start_date
+        - end_date
+        - lease_months
+        - term_tag
+        - occupants
+        - pets
+        - furnished_preferred
+        - parking_needed
+        - laundry_needed
+        - neighbourhood
+        - status
+        - views
+        - offers
+        - created_at
+        - poster
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        body: { type: string }
+        budget_cents:
+          type: integer
+          description: The most they will pay per month, in cents.
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        lease_months: { type: integer }
+        term_tag: { type: string }
+        occupants:
+          type: integer
+          description: How many people the place is for, including the poster.
+        pets: { type: boolean }
+        furnished_preferred: { type: boolean }
+        parking_needed: { type: boolean }
+        laundry_needed: { type: boolean }
+        max_distance_m:
+          type: integer
+          nullable: true
+          description: |
+            How far from campus they would accept, in metres. Null means no
+            stated preference, which is not the same as a large radius.
+        neighbourhood: { type: string }
+        status:
+          type: string
+          enum: [draft, published, paused, archived]
+        published_at: { type: string, format: date-time, nullable: true }
+        views: { type: integer }
+        offers:
+          type: integer
+          description: How many owners have answered. Always 0 until Phase 7.
+        created_at: { type: string, format: date-time }
+        poster:
+          $ref: "#/components/schemas/ListingOwner"
+
+    RequestInput:
+      type: object
+      description: A new request. Everything an owner filters on is required.
+      required:
+        - title
+        - budget_cents
+        - start_date
+        - end_date
+        - lease_months
+        - term_tag
+      properties:
+        title: { type: string, minLength: 8, maxLength: 200 }
+        body: { type: string, maxLength: 8000 }
+        budget_cents: { type: integer, minimum: 1 }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        lease_months: { type: integer, minimum: 1, maximum: 24 }
+        term_tag: { type: string, maxLength: 40 }
+        occupants: { type: integer, minimum: 1, maximum: 12, default: 1 }
+        pets: { type: boolean }
+        furnished_preferred: { type: boolean }
+        parking_needed: { type: boolean }
+        laundry_needed: { type: boolean }
+        max_distance_m: { type: integer, minimum: 1, nullable: true }
+        neighbourhood: { type: string, maxLength: 80 }
+        status:
+          type: string
+          enum: [draft, published]
+          default: published
+          description: Post as a draft to finish it later.
+
+    RequestUpdate:
+      type: object
+      description: |
+        A partial edit. Only the fields present are changed. Status is not
+        editable here - use `/requests/{id}/status`.
+      properties:
+        title: { type: string, minLength: 8, maxLength: 200 }
+        body: { type: string, maxLength: 8000 }
+        budget_cents: { type: integer, minimum: 1 }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        lease_months: { type: integer, minimum: 1, maximum: 24 }
+        term_tag: { type: string, maxLength: 40 }
+        occupants: { type: integer, minimum: 1, maximum: 12 }
+        pets: { type: boolean }
+        furnished_preferred: { type: boolean }
+        parking_needed: { type: boolean }
+        laundry_needed: { type: boolean }
+        max_distance_m: { type: integer, minimum: 1, nullable: true }
+        neighbourhood: { type: string, maxLength: 80 }
+
+    RequestPage:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/HousingRequest"
         meta:
           $ref: "#/components/schemas/PageMeta"
 

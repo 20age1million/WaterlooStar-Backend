@@ -31,6 +31,7 @@ type fakeQuerier struct {
 	resetToken        map[string]sqlcgen.PasswordResetToken
 	refreshToken      map[string]sqlcgen.RefreshToken
 	listings          []sqlcgen.Listing
+	requests          []sqlcgen.HousingRequest
 
 	pingErr error
 }
