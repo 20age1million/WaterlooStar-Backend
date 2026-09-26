@@ -5,12 +5,21 @@
 -- "budget_min" asks who can afford at least this much, and its distance is a
 -- radius, so "distance_max" asks who would accept a place this far out.
 
+-- The offer count is computed, never stored. An offer stops counting when its
+-- listing is taken down — which happens in another table — so any stored number
+-- would drift from what the student can actually see.
 -- name: ListRequests :many
 SELECT
     sqlc.embed(r),
     u.username   AS poster_username,
     u.avatar_url AS poster_avatar_url,
-    u.verified   AS poster_verified
+    u.verified   AS poster_verified,
+    (SELECT count(*)
+       FROM request_offers o
+       JOIN listings ol ON ol.id = o.listing_id
+      WHERE o.request_id = r.id
+        AND o.withdrawn_at IS NULL
+        AND ol.status = 'published') AS offer_count
 FROM housing_requests r
 JOIN users u ON u.id = r.poster_id
 WHERE r.status = 'published'
@@ -74,7 +83,13 @@ SELECT
     sqlc.embed(r),
     u.username   AS poster_username,
     u.avatar_url AS poster_avatar_url,
-    u.verified   AS poster_verified
+    u.verified   AS poster_verified,
+    (SELECT count(*)
+       FROM request_offers o
+       JOIN listings ol ON ol.id = o.listing_id
+      WHERE o.request_id = r.id
+        AND o.withdrawn_at IS NULL
+        AND ol.status = 'published') AS offer_count
 FROM housing_requests r
 JOIN users u ON u.id = r.poster_id
 WHERE r.id = sqlc.arg('id') AND r.status = 'published';
@@ -88,7 +103,13 @@ SELECT
     sqlc.embed(r),
     u.username   AS poster_username,
     u.avatar_url AS poster_avatar_url,
-    u.verified   AS poster_verified
+    u.verified   AS poster_verified,
+    (SELECT count(*)
+       FROM request_offers o
+       JOIN listings ol ON ol.id = o.listing_id
+      WHERE o.request_id = r.id
+        AND o.withdrawn_at IS NULL
+        AND ol.status = 'published') AS offer_count
 FROM housing_requests r
 JOIN users u ON u.id = r.poster_id
 WHERE r.poster_id = sqlc.arg('poster_id')

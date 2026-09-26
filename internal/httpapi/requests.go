@@ -57,7 +57,7 @@ func (s *Server) ListRequests(ctx context.Context, request gen.ListRequestsReque
 			Username:  row.PosterUsername,
 			AvatarUrl: nullableString(row.PosterAvatarUrl),
 			Verified:  row.PosterVerified,
-		}))
+		}, row.OfferCount))
 	}
 
 	return gen.ListRequests200JSONResponse{
@@ -157,5 +157,5 @@ func (s *Server) GetRequest(ctx context.Context, request gen.GetRequestRequestOb
 		Username:  row.PosterUsername,
 		AvatarUrl: nullableString(row.PosterAvatarUrl),
 		Verified:  row.PosterVerified,
-	})), nil
+	}, row.OfferCount)), nil
 }

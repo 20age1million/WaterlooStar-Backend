@@ -124,7 +124,11 @@ func toListing(row sqlcgen.Listing, owner gen.ListingOwner, photos []sqlcgen.Lis
 
 // toRequest maps a "Looking for Housing" row and its poster to the contract
 // shape. As with toListing, nothing is formatted here.
-func toRequest(row sqlcgen.HousingRequest, poster gen.ListingOwner) gen.HousingRequest {
+//
+// offers is passed in rather than read off the row: it is counted by the read
+// queries, because an offer stops counting when its listing is taken down and a
+// stored number would drift from what the student can see.
+func toRequest(row sqlcgen.HousingRequest, poster gen.ListingOwner, offers int64) gen.HousingRequest {
 	out := gen.HousingRequest{
 		Id:                 openapi_types.UUID(row.ID),
 		Title:              row.Title,
@@ -144,7 +148,7 @@ func toRequest(row sqlcgen.HousingRequest, poster gen.ListingOwner) gen.HousingR
 
 		Status:    gen.HousingRequestStatus(row.Status),
 		Views:     int(row.Views),
-		Offers:    int(row.Offers),
+		Offers:    int(offers),
 		CreatedAt: row.CreatedAt,
 
 		Poster: poster,

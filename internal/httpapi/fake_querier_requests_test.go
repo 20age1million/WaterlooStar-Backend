@@ -153,6 +153,9 @@ func (f *fakeQuerier) requestRow(r sqlcgen.HousingRequest) sqlcgen.ListRequestsR
 		PosterUsername:  poster.Username,
 		PosterAvatarUrl: poster.AvatarUrl,
 		PosterVerified:  poster.Verified,
+		// Counted, not stored — the same subquery the SQL runs. Leaving this
+		// zero would let a handler test agree with a number no student sees.
+		OfferCount: int64(len(f.visibleOffers(r.ID))),
 	}
 }
 

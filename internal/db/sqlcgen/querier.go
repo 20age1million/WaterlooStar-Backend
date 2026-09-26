@@ -18,6 +18,9 @@ type Querier interface {
 	ConsumeEmailVerificationToken(ctx context.Context, tokenHash []byte) error
 	ConsumePasswordResetToken(ctx context.Context, tokenHash []byte) error
 	CountListings(ctx context.Context, arg CountListingsParams) (int64, error)
+	// The same count the read queries compute inline, for the write path's
+	// responses. Visible offers only, on the same two conditions.
+	CountOffersForRequest(ctx context.Context, requestID uuid.UUID) (int64, error)
 	CountRequests(ctx context.Context, arg CountRequestsParams) (int64, error)
 	// Used to tell a duplicate email from a duplicate username *internally*, without
 	// the response revealing which one collided.
@@ -26,6 +29,13 @@ type Querier interface {
 	// Go, so a caller cannot forget the check and accept a spent token.
 	CreateEmailVerificationToken(ctx context.Context, arg CreateEmailVerificationTokenParams) error
 	CreateListing(ctx context.Context, arg CreateListingParams) (Listing, error)
+	// An owner's answer to a request: one of their own listings, with an optional
+	// note.
+	//
+	// Visibility is not symmetric. The student who posted the request sees every
+	// live offer on it; an owner sees only their own. Owners reading each other's
+	// answers would turn a request into an auction.
+	CreateOffer(ctx context.Context, arg CreateOfferParams) (RequestOffer, error)
 	CreatePasswordResetToken(ctx context.Context, arg CreatePasswordResetTokenParams) error
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) error
 	// published_at is stamped here, on creation, when the request goes straight to
@@ -44,6 +54,13 @@ type Querier interface {
 	GetLiveEmailVerificationToken(ctx context.Context, tokenHash []byte) (EmailVerificationToken, error)
 	GetLivePasswordResetToken(ctx context.Context, tokenHash []byte) (PasswordResetToken, error)
 	GetLiveRefreshToken(ctx context.Context, tokenHash []byte) (RefreshToken, error)
+	// Any offer by id, for the ownership check before a withdrawal. "Not yours" and
+	// "does not exist" answer alike in the handler.
+	GetOffer(ctx context.Context, id uuid.UUID) (RequestOffer, error)
+	// Whether this owner has already offered this listing here, withdrawn or not.
+	// The unique constraint is the real guarantee; this is so the handler can say
+	// so in words rather than returning a constraint violation.
+	GetOfferForListing(ctx context.Context, arg GetOfferForListingParams) (RequestOffer, error)
 	GetPublishedListing(ctx context.Context, id uuid.UUID) (GetPublishedListingRow, error)
 	GetPublishedRequest(ctx context.Context, id uuid.UUID) (GetPublishedRequestRow, error)
 	// Any status, so ownership can be checked before an edit. "Not yours" and "does
@@ -66,6 +83,14 @@ type Querier interface {
 	// The owner's own listings, every status. The public endpoints show only
 	// published rows, so this is the only way to see a paused or archived post.
 	ListListingsByOwner(ctx context.Context, ownerID uuid.UUID) ([]ListListingsByOwnerRow, error)
+	// An owner's own offers, whatever became of them.
+	ListOffersByOwner(ctx context.Context, ownerID uuid.UUID) ([]ListOffersByOwnerRow, error)
+	// The offers on a request, as the student sees them: the listing comes with it,
+	// so the reply shows real rent and dates rather than a pitch.
+	//
+	// An offer is live only while its listing is: taking a listing down withdraws
+	// its offers, with nothing else to remember. Same for an explicit withdrawal.
+	ListOffersForRequest(ctx context.Context, requestID uuid.UUID) ([]ListOffersForRequestRow, error)
 	ListPhotosForListing(ctx context.Context, listingID uuid.UUID) ([]ListingPhoto, error)
 	// Photos for a page of listings in one round-trip, rather than one query per
 	// listing. Nothing populates the table yet, but the shape is what the list
@@ -77,6 +102,9 @@ type Querier interface {
 	// The filters read from the owner's side: a request's budget is a ceiling, so
 	// "budget_min" asks who can afford at least this much, and its distance is a
 	// radius, so "distance_max" asks who would accept a place this far out.
+	// The offer count is computed, never stored. An offer stops counting when its
+	// listing is taken down — which happens in another table — so any stored number
+	// would drift from what the student can actually see.
 	ListRequests(ctx context.Context, arg ListRequestsParams) ([]ListRequestsRow, error)
 	// ---------------------------------------------------------------- write path
 	// The poster's own requests, every status. The public endpoints show only
@@ -108,6 +136,9 @@ type Querier interface {
 	// every omitted field a deletion.
 	UpdateRequest(ctx context.Context, arg UpdateRequestParams) (HousingRequest, error)
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
+	// Withdrawn rather than deleted: the row stays, so the same listing cannot be
+	// re-offered against the same request by working around the unique constraint.
+	WithdrawOffer(ctx context.Context, id uuid.UUID) (RequestOffer, error)
 }
 
 var _ Querier = (*Queries)(nil)

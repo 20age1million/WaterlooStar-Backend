@@ -80,9 +80,29 @@ Everything is described in `api/openapi.yaml`; this is the summary.
 | GET | `/me` | session | The signed-in user |
 | GET | `/listings` | — | Browse Housing Available, paginated |
 | GET | `/listings/{id}` | — | One listing in full |
+| POST | `/listings` | verified | Post a place |
+| PATCH | `/listings/{id}` | owner | Edit it |
+| POST | `/listings/{id}/status` | owner | Publish, pause or archive |
+| DELETE | `/listings/{id}` | owner | Take it down (archives) |
+| GET | `/me/listings` | session | Your own, any status |
+| GET | `/requests` | — | Browse Looking for Housing, paginated |
+| GET | `/requests/{id}` | — | One request in full |
+| POST | `/requests` | verified | Post what you need |
+| PATCH | `/requests/{id}` | owner | Edit it |
+| POST | `/requests/{id}/status` | owner | Publish, pause or archive |
+| DELETE | `/requests/{id}` | owner | Take it down (archives) |
+| GET | `/me/requests` | session | Your own, any status |
+| POST | `/requests/{id}/offers` | verified | Answer with one of your listings |
+| GET | `/requests/{id}/offers` | poster or offerer | The offers on a request |
+| DELETE | `/offers/{id}` | offerer | Withdraw yours |
 
-Browsing is public by design: an account is only needed to save a listing or
-message a poster.
+Browsing is public by design: an account is only needed to post, to offer, or
+to message a poster.
+
+**Offers are not public.** The student who posted a request sees every live
+offer on it; an owner sees only their own. And an offer is only as alive as the
+listing behind it — taking a place down removes its offers from view, with no
+second step.
 
 ## Working on it
 

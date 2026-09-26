@@ -755,6 +755,113 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /requests/{id}/offers:
+    get:
+      tags: [housing]
+      operationId: listOffers
+      summary: The offers on a request
+      description: |
+        Visible to the student who posted the request, and to each owner for
+        their own offer. Not public: owners reading each other's answers would
+        turn a request into an auction.
+
+        An offer disappears here when its listing stops being published, so
+        taking a place down withdraws its offers with nothing else to remember.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The live offers, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RequestOffer"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+    post:
+      tags: [housing]
+      operationId: createOffer
+      summary: Answer a request with one of your listings
+      description: |
+        Offers a listing you own against a request. The offer references the
+        listing rather than repeating it, so the student sees real rent, dates
+        and distance.
+
+        If you have nothing suitable posted, post the listing first and then
+        offer it - two calls, which a client can present as one flow.
+
+        The same listing cannot be offered twice against one request.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [listing_id]
+              properties:
+                listing_id:
+                  type: string
+                  format: uuid
+                  description: One of your own published listings.
+                note:
+                  type: string
+                  maxLength: 1000
+                  description: Optional. The listing says everything factual already.
+      responses:
+        "201":
+          description: Offered.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestOffer"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: Signed in, but the address has not been confirmed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: That listing has already been offered against this request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /offers/{id}:
+    delete:
+      tags: [housing]
+      operationId: withdrawOffer
+      summary: Withdraw your offer
+      description: |
+        Only the owner who made it. Someone else's offer answers 404, never 403.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Withdrawn.
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /me/requests:
     get:
       tags: [housing]
@@ -1303,6 +1410,23 @@ components:
             $ref: "#/components/schemas/HousingRequest"
         meta:
           $ref: "#/components/schemas/PageMeta"
+
+    RequestOffer:
+      type: object
+      description: |
+        An owner's answer to a request: one of their own listings, with an
+        optional note. The listing travels with the offer, so the student sees
+        a real place rather than a pitch.
+      required: [id, request_id, note, created_at, listing, owner]
+      properties:
+        id: { type: string, format: uuid }
+        request_id: { type: string, format: uuid }
+        note: { type: string }
+        created_at: { type: string, format: date-time }
+        listing:
+          $ref: "#/components/schemas/Listing"
+        owner:
+          $ref: "#/components/schemas/ListingOwner"
 
     Error:
       type: object

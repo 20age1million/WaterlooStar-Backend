@@ -62,37 +62,39 @@ that way; everything from Phase 4 onward is not.
 
 ## Where things stand
 
-**Branches:** `carl/reworked-waterloostar` (pushed) and `feature/platform-foundation`
-(the branch the work was done on; both point at the same commit).
+**Remote:** `origin` → `github.com/20age1million/WaterlooStar-Backend`. The rework
+was grafted onto `main`, which now holds it; branch as `<type>/<slug>` and open a
+PR into `main`. The early `carl/…` branches are history.
 
-**Remote:** `origin` → `github.com/20age1million/WaterlooStar-Backend`. This repository
-was started fresh, so `carl/reworked-waterloostar` shares **no common ancestor** with
-that remote's `main`, `dev` or `feature/router-setup` — GitHub will report nothing to
-compare, and a normal PR against `main` cannot be opened. That is deliberate: the old
-backend was superseded, and nothing on the remote was to be overwritten.
-
-The **Platform Foundation** feature is complete — all three phases shipped and
-their specs are under `docs/specs/implemented/platform-foundation/`. See
-`docs/specs/INDEX.md`.
+**Deployed.** Drone builds on a push to `main`, pushes the image to GHCR and runs
+`deploy/docker-compose.yml` on the host. The API has no public URL: it sits on a
+private Docker network and the Next.js frontend, serving waterloostar.com, is the
+only thing that calls it.
 
 | Phase | Delivered |
 |---|---|
 | 0 | gin service, golang-migrate harness, sqlc + oapi-codegen chain, `/healthz` |
 | 1 | Registration gated on `uwaterloo.ca`, verification, login, sessions, password reset |
 | 2 | Structured `listings` schema, seed data, `GET /listings` and `GET /listings/{id}` |
+| 3 | Discovery: server-side search, filters, sorts and pagination |
+| 4 | Listing write path: post, edit, status lifecycle, `/me/listings` |
+| 5 | Query tests against a real PostgreSQL, plus a guard for untested queries |
+| 6 | Housing requests: table, lifecycle, browse with filters, write path |
+| 7 | Offers: an owner answers a request with one of their own listings |
 
-Eleven endpoints are live; `README.md` has the table. `docs/specs/active/` is
-empty — **the next feature starts with `feature-start`.**
+Twenty-six endpoints are live; `README.md` has the table.
 
 ### What comes next
 
-Discovery: server-side search, filtering, sorting and pagination — what makes
-the frontend's filter rail real. Query params, a Postgres full-text index, and
-radius search. `SortKey`'s values in the frontend (`match`, `new`, `priceAsc`,
-`priceDesc`, `distance`) are the intended parameter names.
+Nothing is specified. Candidates, in the order I would take them:
 
-After that, roughly: listing write path → requests ("Looking for Housing") →
-saves/views/Q&A → messaging with contact privacy → matching and real maps.
+1. **Email delivery.** Verification and reset links only reach the log, so on the
+   live site nobody can finish signing up. The developer has chosen Clerk's
+   transactional endpoint; `internal/email` already has the `Sender` seam.
+2. **Rate limiting.** There is none anywhere — login accepts unlimited guesses
+   against guessable `uwaterloo.ca` addresses, and password reset has no cap.
+3. Saves, views and the question thread → messaging with contact privacy →
+   matching and real maps.
 
 ---
 
@@ -136,6 +138,20 @@ These were all found the hard way and will silently regress if undone.
   a one-line command; the README lists the equivalents.
 - **Docker maps PostgreSQL to host port 5433**, because a local PostgreSQL
   already occupies 5432 on that machine.
+- **Every query needs a test in `internal/db`.** `TestEveryQueryIsExercised`
+  reflects over the generated `Querier` and fails, naming them, when one has no
+  test — because Phase 4 shipped a query PostgreSQL refused to type and every
+  handler test passed anyway. Set `PG_TEST_DSN` to run them; unset, they skip.
+- **Referring to one `sqlc.arg` as both `varchar` and `::text` is SQLSTATE
+  42P08.** Cast both uses. This is the bug above.
+- **A request's filters invert a listing's.** A budget is a ceiling, so
+  `budget_min` means "who can afford this rent"; a radius is how far out they
+  would go, so `distance_min` means "who would accept a place this far out". A
+  request with *no* stated radius passes every distance filter, where a listing
+  with no recorded distance is excluded by one.
+- **Offer counts are computed, never stored.** An offer stops counting when its
+  listing is taken down — a different table — so a stored counter would drift.
+  The column added in migration 6 was dropped in migration 7 for that reason.
 
 ---
 
