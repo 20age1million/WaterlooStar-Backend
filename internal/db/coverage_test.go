@@ -116,4 +116,3 @@ func namesCalledIn(t *testing.T, sources ...source) map[string]bool {
 	}
 	return called
 }
-

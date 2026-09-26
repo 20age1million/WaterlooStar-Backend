@@ -18,6 +18,7 @@ type Querier interface {
 	ConsumeEmailVerificationToken(ctx context.Context, tokenHash []byte) error
 	ConsumePasswordResetToken(ctx context.Context, tokenHash []byte) error
 	CountListings(ctx context.Context, arg CountListingsParams) (int64, error)
+	CountRequests(ctx context.Context, arg CountRequestsParams) (int64, error)
 	// Used to tell a duplicate email from a duplicate username *internally*, without
 	// the response revealing which one collided.
 	CountUsersByEmailOrUsername(ctx context.Context, arg CountUsersByEmailOrUsernameParams) (CountUsersByEmailOrUsernameRow, error)
@@ -27,8 +28,14 @@ type Querier interface {
 	CreateListing(ctx context.Context, arg CreateListingParams) (Listing, error)
 	CreatePasswordResetToken(ctx context.Context, arg CreatePasswordResetTokenParams) error
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) error
+	// published_at is stamped here, on creation, when the request goes straight to
+	// published. listings.published_at is only set by a later status change, which
+	// leaves a listing created as published without one; that is not repeated.
+	CreateRequest(ctx context.Context, arg CreateRequestParams) (HousingRequest, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteAllListings(ctx context.Context) error
+	// What cmd/seed calls before reseeding.
+	DeleteAllRequests(ctx context.Context) error
 	DeleteExpiredTokens(ctx context.Context) error
 	// Fetch for an ownership check. Returns the row whatever its status, so a
 	// handler can tell "not yours" from "does not exist" — and then deliberately
@@ -38,6 +45,10 @@ type Querier interface {
 	GetLivePasswordResetToken(ctx context.Context, tokenHash []byte) (PasswordResetToken, error)
 	GetLiveRefreshToken(ctx context.Context, tokenHash []byte) (RefreshToken, error)
 	GetPublishedListing(ctx context.Context, id uuid.UUID) (GetPublishedListingRow, error)
+	GetPublishedRequest(ctx context.Context, id uuid.UUID) (GetPublishedRequestRow, error)
+	// Any status, so ownership can be checked before an edit. "Not yours" and "does
+	// not exist" answer alike in the handler.
+	GetRequestForOwner(ctx context.Context, id uuid.UUID) (HousingRequest, error)
 	// Addresses are compared case-insensitively, matching the unique index.
 	GetUserByEmail(ctx context.Context, lower string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
@@ -60,6 +71,17 @@ type Querier interface {
 	// listing. Nothing populates the table yet, but the shape is what the list
 	// endpoint needs the moment it does.
 	ListPhotosForListings(ctx context.Context, dollar_1 []uuid.UUID) ([]ListingPhoto, error)
+	// "Looking for Housing" posts. Only published rows are ever served, and that
+	// stays here in the SQL so a handler cannot forget it.
+	//
+	// The filters read from the owner's side: a request's budget is a ceiling, so
+	// "budget_min" asks who can afford at least this much, and its distance is a
+	// radius, so "distance_max" asks who would accept a place this far out.
+	ListRequests(ctx context.Context, arg ListRequestsParams) ([]ListRequestsRow, error)
+	// ---------------------------------------------------------------- write path
+	// The poster's own requests, every status. The public endpoints show only
+	// published ones, so this is the only way to see a draft or a paused request.
+	ListRequestsByPoster(ctx context.Context, posterID uuid.UUID) ([]ListRequestsByPosterRow, error)
 	MarkUserVerified(ctx context.Context, id uuid.UUID) (User, error)
 	// Health check. Trivial on purpose: it exists to prove the whole chain — pool,
 	// sqlc codegen, generated method, real round-trip — works end to end, before any
@@ -75,9 +97,16 @@ type Querier interface {
 	// and ::text in another makes PostgreSQL refuse to deduce a type for it
 	// (SQLSTATE 42P08).
 	SetListingStatus(ctx context.Context, arg SetListingStatusParams) (Listing, error)
+	// Cast on both uses of the parameter: referring to it as varchar in one place
+	// and ::text in another makes PostgreSQL refuse to deduce a type (SQLSTATE
+	// 42P08). That shipped once already on listings.
+	SetRequestStatus(ctx context.Context, arg SetRequestStatusParams) (HousingRequest, error)
 	// Every field is optional: an edit form sends what changed, and COALESCE leaves
 	// the rest alone. A PUT would make every omitted field a deletion.
 	UpdateListing(ctx context.Context, arg UpdateListingParams) (Listing, error)
+	// A partial edit: anything not given keeps its current value. A PUT would make
+	// every omitted field a deletion.
+	UpdateRequest(ctx context.Context, arg UpdateRequestParams) (HousingRequest, error)
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 }
 

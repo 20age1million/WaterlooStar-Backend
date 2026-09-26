@@ -157,7 +157,7 @@ func filtersFrom(p gen.ListListingsParams) (listingFilters, string) {
 	}
 
 	// The generated type already constrains this to the enum; default when absent.
-	f.Sort = string(gen.New)
+	f.Sort = string(gen.ListListingsParamsSortNew)
 	if p.Sort != nil {
 		f.Sort = string(*p.Sort)
 	}

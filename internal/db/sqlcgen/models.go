@@ -18,6 +18,32 @@ type EmailVerificationToken struct {
 	CreatedAt  time.Time
 }
 
+type HousingRequest struct {
+	ID                 uuid.UUID
+	PosterID           uuid.UUID
+	Title              string
+	Body               string
+	BudgetCents        int32
+	StartDate          time.Time
+	EndDate            time.Time
+	LeaseMonths        int32
+	TermTag            string
+	Occupants          int32
+	Pets               bool
+	FurnishedPreferred bool
+	ParkingNeeded      bool
+	LaundryNeeded      bool
+	MaxDistanceM       *int32
+	Neighbourhood      string
+	Status             string
+	PublishedAt        *time.Time
+	Views              int32
+	Offers             int32
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	Search             interface{}
+}
+
 type Listing struct {
 	ID               uuid.UUID
 	OwnerID          uuid.UUID

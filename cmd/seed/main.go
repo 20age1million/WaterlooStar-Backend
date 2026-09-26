@@ -35,5 +35,5 @@ func main() {
 	if err != nil {
 		log.Fatalf("seed: %v", err)
 	}
-	fmt.Printf("seeded %d listings\n", count)
+	fmt.Printf("seeded %d posts\n", count)
 }

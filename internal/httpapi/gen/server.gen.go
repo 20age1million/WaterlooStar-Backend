@@ -95,6 +95,30 @@ func (e HealthStatus) Valid() bool {
 	}
 }
 
+// Defines values for HousingRequestStatus.
+const (
+	HousingRequestStatusArchived  HousingRequestStatus = "archived"
+	HousingRequestStatusDraft     HousingRequestStatus = "draft"
+	HousingRequestStatusPaused    HousingRequestStatus = "paused"
+	HousingRequestStatusPublished HousingRequestStatus = "published"
+)
+
+// Valid indicates whether the value is a known member of the HousingRequestStatus enum.
+func (e HousingRequestStatus) Valid() bool {
+	switch e {
+	case HousingRequestStatusArchived:
+		return true
+	case HousingRequestStatusDraft:
+		return true
+	case HousingRequestStatusPaused:
+		return true
+	case HousingRequestStatusPublished:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListingBathType.
 const (
 	ListingBathTypeEnsuite ListingBathType = "ensuite"
@@ -362,6 +386,24 @@ func (e ListingUpdateUtilities) Valid() bool {
 	}
 }
 
+// Defines values for RequestInputStatus.
+const (
+	RequestInputStatusDraft     RequestInputStatus = "draft"
+	RequestInputStatusPublished RequestInputStatus = "published"
+)
+
+// Valid indicates whether the value is a known member of the RequestInputStatus enum.
+func (e RequestInputStatus) Valid() bool {
+	switch e {
+	case RequestInputStatusDraft:
+		return true
+	case RequestInputStatusPublished:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UserRole.
 const (
 	UserRoleAdmin     UserRole = "admin"
@@ -412,25 +454,25 @@ func (e ListListingsParamsUtilities) Valid() bool {
 
 // Defines values for ListListingsParamsSort.
 const (
-	Distance  ListListingsParamsSort = "distance"
-	Match     ListListingsParamsSort = "match"
-	New       ListListingsParamsSort = "new"
-	PriceAsc  ListListingsParamsSort = "priceAsc"
-	PriceDesc ListListingsParamsSort = "priceDesc"
+	ListListingsParamsSortDistance  ListListingsParamsSort = "distance"
+	ListListingsParamsSortMatch     ListListingsParamsSort = "match"
+	ListListingsParamsSortNew       ListListingsParamsSort = "new"
+	ListListingsParamsSortPriceAsc  ListListingsParamsSort = "priceAsc"
+	ListListingsParamsSortPriceDesc ListListingsParamsSort = "priceDesc"
 )
 
 // Valid indicates whether the value is a known member of the ListListingsParamsSort enum.
 func (e ListListingsParamsSort) Valid() bool {
 	switch e {
-	case Distance:
+	case ListListingsParamsSortDistance:
 		return true
-	case Match:
+	case ListListingsParamsSortMatch:
 		return true
-	case New:
+	case ListListingsParamsSortNew:
 		return true
-	case PriceAsc:
+	case ListListingsParamsSortPriceAsc:
 		return true
-	case PriceDesc:
+	case ListListingsParamsSortPriceDesc:
 		return true
 	default:
 		return false
@@ -455,6 +497,57 @@ func (e SetListingStatusJSONBodyStatus) Valid() bool {
 	case SetListingStatusJSONBodyStatusPaused:
 		return true
 	case SetListingStatusJSONBodyStatusPublished:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListRequestsParamsSort.
+const (
+	ListRequestsParamsSortBudgetAsc  ListRequestsParamsSort = "budgetAsc"
+	ListRequestsParamsSortBudgetDesc ListRequestsParamsSort = "budgetDesc"
+	ListRequestsParamsSortMatch      ListRequestsParamsSort = "match"
+	ListRequestsParamsSortNew        ListRequestsParamsSort = "new"
+	ListRequestsParamsSortSoonest    ListRequestsParamsSort = "soonest"
+)
+
+// Valid indicates whether the value is a known member of the ListRequestsParamsSort enum.
+func (e ListRequestsParamsSort) Valid() bool {
+	switch e {
+	case ListRequestsParamsSortBudgetAsc:
+		return true
+	case ListRequestsParamsSortBudgetDesc:
+		return true
+	case ListRequestsParamsSortMatch:
+		return true
+	case ListRequestsParamsSortNew:
+		return true
+	case ListRequestsParamsSortSoonest:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SetRequestStatusJSONBodyStatus.
+const (
+	SetRequestStatusJSONBodyStatusArchived  SetRequestStatusJSONBodyStatus = "archived"
+	SetRequestStatusJSONBodyStatusDraft     SetRequestStatusJSONBodyStatus = "draft"
+	SetRequestStatusJSONBodyStatusPaused    SetRequestStatusJSONBodyStatus = "paused"
+	SetRequestStatusJSONBodyStatusPublished SetRequestStatusJSONBodyStatus = "published"
+)
+
+// Valid indicates whether the value is a known member of the SetRequestStatusJSONBodyStatus enum.
+func (e SetRequestStatusJSONBodyStatus) Valid() bool {
+	switch e {
+	case SetRequestStatusJSONBodyStatusArchived:
+		return true
+	case SetRequestStatusJSONBodyStatusDraft:
+		return true
+	case SetRequestStatusJSONBodyStatusPaused:
+		return true
+	case SetRequestStatusJSONBodyStatusPublished:
 		return true
 	default:
 		return false
@@ -507,6 +600,51 @@ type HealthDatabase string
 
 // HealthStatus Overall service state.
 type HealthStatus string
+
+// HousingRequest A "Looking for Housing" post: what a student needs, rather than what
+// they have. The mirror of a listing, and structured for the same reason -
+// an owner can filter these the way a student filters listings.
+//
+// No address of any kind. `max_distance_m` is how far out they would
+// consider, not where they are.
+type HousingRequest struct {
+	Body string `json:"body"`
+
+	// BudgetCents The most they will pay per month, in cents.
+	BudgetCents        int                `json:"budget_cents"`
+	CreatedAt          time.Time          `json:"created_at"`
+	EndDate            openapi_types.Date `json:"end_date"`
+	FurnishedPreferred bool               `json:"furnished_preferred"`
+	Id                 openapi_types.UUID `json:"id"`
+	LaundryNeeded      bool               `json:"laundry_needed"`
+	LeaseMonths        int                `json:"lease_months"`
+
+	// MaxDistanceM How far from campus they would accept, in metres. Null means no
+	// stated preference, which is not the same as a large radius.
+	MaxDistanceM  nullable.Nullable[int] `json:"max_distance_m,omitempty"`
+	Neighbourhood string                 `json:"neighbourhood"`
+
+	// Occupants How many people the place is for, including the poster.
+	Occupants int `json:"occupants"`
+
+	// Offers How many owners have answered. Always 0 until Phase 7.
+	Offers        int  `json:"offers"`
+	ParkingNeeded bool `json:"parking_needed"`
+	Pets          bool `json:"pets"`
+
+	// Poster Just enough about the poster to render a listing. Never their email -
+	// contact details stay private until both sides agree to talk.
+	Poster      ListingOwner                 `json:"poster"`
+	PublishedAt nullable.Nullable[time.Time] `json:"published_at,omitempty"`
+	StartDate   openapi_types.Date           `json:"start_date"`
+	Status      HousingRequestStatus         `json:"status"`
+	TermTag     string                       `json:"term_tag"`
+	Title       string                       `json:"title"`
+	Views       int                          `json:"views"`
+}
+
+// HousingRequestStatus defines model for HousingRequest.Status.
+type HousingRequestStatus string
 
 // Listing A "Housing Available" post. Every fact the interface displays is a
 // field here rather than a sentence to be parsed: the filters in the next
@@ -740,6 +878,59 @@ type RegisterResponse struct {
 	VerificationRequired bool `json:"verification_required"`
 }
 
+// RequestInput A new request. Everything an owner filters on is required.
+type RequestInput struct {
+	Body               *string                `json:"body,omitempty"`
+	BudgetCents        int                    `json:"budget_cents"`
+	EndDate            openapi_types.Date     `json:"end_date"`
+	FurnishedPreferred *bool                  `json:"furnished_preferred,omitempty"`
+	LaundryNeeded      *bool                  `json:"laundry_needed,omitempty"`
+	LeaseMonths        int                    `json:"lease_months"`
+	MaxDistanceM       nullable.Nullable[int] `json:"max_distance_m,omitempty"`
+	Neighbourhood      *string                `json:"neighbourhood,omitempty"`
+	Occupants          *int                   `json:"occupants,omitempty"`
+	ParkingNeeded      *bool                  `json:"parking_needed,omitempty"`
+	Pets               *bool                  `json:"pets,omitempty"`
+	StartDate          openapi_types.Date     `json:"start_date"`
+
+	// Status Post as a draft to finish it later.
+	Status  *RequestInputStatus `json:"status,omitempty"`
+	TermTag string              `json:"term_tag"`
+	Title   string              `json:"title"`
+}
+
+// RequestInputStatus Post as a draft to finish it later.
+type RequestInputStatus string
+
+// RequestPage defines model for RequestPage.
+type RequestPage struct {
+	Data []HousingRequest `json:"data"`
+
+	// Meta Pagination metadata accompanying every list response.
+	//
+	// Example: {"page":1,"per_page":20,"total":6,"total_pages":1}
+	Meta PageMeta `json:"meta"`
+}
+
+// RequestUpdate A partial edit. Only the fields present are changed. Status is not
+// editable here - use `/requests/{id}/status`.
+type RequestUpdate struct {
+	Body               *string                `json:"body,omitempty"`
+	BudgetCents        *int                   `json:"budget_cents,omitempty"`
+	EndDate            *openapi_types.Date    `json:"end_date,omitempty"`
+	FurnishedPreferred *bool                  `json:"furnished_preferred,omitempty"`
+	LaundryNeeded      *bool                  `json:"laundry_needed,omitempty"`
+	LeaseMonths        *int                   `json:"lease_months,omitempty"`
+	MaxDistanceM       nullable.Nullable[int] `json:"max_distance_m,omitempty"`
+	Neighbourhood      *string                `json:"neighbourhood,omitempty"`
+	Occupants          *int                   `json:"occupants,omitempty"`
+	ParkingNeeded      *bool                  `json:"parking_needed,omitempty"`
+	Pets               *bool                  `json:"pets,omitempty"`
+	StartDate          *openapi_types.Date    `json:"start_date,omitempty"`
+	TermTag            *string                `json:"term_tag,omitempty"`
+	Title              *string                `json:"title,omitempty"`
+}
+
 // TokenRequest defines model for TokenRequest.
 type TokenRequest struct {
 	// Token The token from the emailed link.
@@ -854,6 +1045,56 @@ type SetListingStatusJSONBody struct {
 // SetListingStatusJSONBodyStatus defines parameters for SetListingStatus.
 type SetListingStatusJSONBodyStatus string
 
+// ListRequestsParams defines parameters for ListRequests.
+type ListRequestsParams struct {
+	// Page Page number, 1-based.
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PerPage Items per page. Values above the server maximum are clamped.
+	PerPage *PerPage `form:"per_page,omitempty" json:"per_page,omitempty"`
+
+	// Q Full-text search over title, neighbourhood and description.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// StartAfter Only requests that begin by this date.
+	StartAfter *openapi_types.Date `form:"start_after,omitempty" json:"start_after,omitempty"`
+
+	// EndBefore Only requests that run at least until this date.
+	EndBefore *openapi_types.Date `form:"end_before,omitempty" json:"end_before,omitempty"`
+
+	// BudgetMinCents Only requests whose budget reaches at least this much - the rent you
+	// are asking.
+	BudgetMinCents *int `form:"budget_min_cents,omitempty" json:"budget_min_cents,omitempty"`
+	BudgetMaxCents *int `form:"budget_max_cents,omitempty" json:"budget_max_cents,omitempty"`
+
+	// DistanceMinM Only requests willing to be at least this far from campus - how far
+	// out your place is. Requests that state no radius are included: no
+	// preference is not a narrow one.
+	DistanceMinM *int `form:"distance_min_m,omitempty" json:"distance_min_m,omitempty"`
+
+	// OccupantsMax Only requests for at most this many people.
+	OccupantsMax *int  `form:"occupants_max,omitempty" json:"occupants_max,omitempty"`
+	Pets         *bool `form:"pets,omitempty" json:"pets,omitempty"`
+
+	// Furnished Only requests that prefer a furnished place.
+	Furnished    *bool                   `form:"furnished,omitempty" json:"furnished,omitempty"`
+	Parking      *bool                   `form:"parking,omitempty" json:"parking,omitempty"`
+	Laundry      *bool                   `form:"laundry,omitempty" json:"laundry,omitempty"`
+	VerifiedOnly *bool                   `form:"verified_only,omitempty" json:"verified_only,omitempty"`
+	Sort         *ListRequestsParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
+}
+
+// ListRequestsParamsSort defines parameters for ListRequests.
+type ListRequestsParamsSort string
+
+// SetRequestStatusJSONBody defines parameters for SetRequestStatus.
+type SetRequestStatusJSONBody struct {
+	Status SetRequestStatusJSONBodyStatus `json:"status"`
+}
+
+// SetRequestStatusJSONBodyStatus defines parameters for SetRequestStatus.
+type SetRequestStatusJSONBodyStatus string
+
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
 
@@ -877,6 +1118,15 @@ type UpdateListingJSONRequestBody = ListingUpdate
 
 // SetListingStatusJSONRequestBody defines body for SetListingStatus for application/json ContentType.
 type SetListingStatusJSONRequestBody SetListingStatusJSONBody
+
+// CreateRequestJSONRequestBody defines body for CreateRequest for application/json ContentType.
+type CreateRequestJSONRequestBody = RequestInput
+
+// UpdateRequestJSONRequestBody defines body for UpdateRequest for application/json ContentType.
+type UpdateRequestJSONRequestBody = RequestUpdate
+
+// SetRequestStatusJSONRequestBody defines body for SetRequestStatus for application/json ContentType.
+type SetRequestStatusJSONRequestBody SetRequestStatusJSONBody
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -928,6 +1178,27 @@ type ServerInterface interface {
 	// ListMyListings Your own listings, whatever their state
 	// (GET /me/listings)
 	ListMyListings(c *gin.Context)
+	// ListMyRequests Your own requests, whatever their state
+	// (GET /me/requests)
+	ListMyRequests(c *gin.Context)
+	// ListRequests Browse Looking for Housing
+	// (GET /requests)
+	ListRequests(c *gin.Context, params ListRequestsParams)
+	// CreateRequest Post what you are looking for
+	// (POST /requests)
+	CreateRequest(c *gin.Context)
+	// DeleteRequest Take your request down
+	// (DELETE /requests/{id})
+	DeleteRequest(c *gin.Context, id openapi_types.UUID)
+	// GetRequest One request
+	// (GET /requests/{id})
+	GetRequest(c *gin.Context, id openapi_types.UUID)
+	// UpdateRequest Edit your request
+	// (PATCH /requests/{id})
+	UpdateRequest(c *gin.Context, id openapi_types.UUID)
+	// SetRequestStatus Publish, pause or archive your request
+	// (POST /requests/{id}/status)
+	SetRequestStatus(c *gin.Context, id openapi_types.UUID)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -1329,6 +1600,271 @@ func (siw *ServerInterfaceWrapper) ListMyListings(c *gin.Context) {
 	siw.Handler.ListMyListings(c)
 }
 
+// ListMyRequests operation middleware
+func (siw *ServerInterfaceWrapper) ListMyRequests(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListMyRequests(c)
+}
+
+// ListRequests operation middleware
+func (siw *ServerInterfaceWrapper) ListRequests(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListRequestsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", c.Request.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "per_page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "per_page", c.Request.URL.Query(), &params.PerPage, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter per_page: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", c.Request.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter q: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "start_after" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start_after", c.Request.URL.Query(), &params.StartAfter, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter start_after: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "end_before" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end_before", c.Request.URL.Query(), &params.EndBefore, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter end_before: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "budget_min_cents" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "budget_min_cents", c.Request.URL.Query(), &params.BudgetMinCents, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter budget_min_cents: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "budget_max_cents" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "budget_max_cents", c.Request.URL.Query(), &params.BudgetMaxCents, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter budget_max_cents: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "distance_min_m" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "distance_min_m", c.Request.URL.Query(), &params.DistanceMinM, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter distance_min_m: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "occupants_max" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "occupants_max", c.Request.URL.Query(), &params.OccupantsMax, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter occupants_max: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "pets" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "pets", c.Request.URL.Query(), &params.Pets, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter pets: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "furnished" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "furnished", c.Request.URL.Query(), &params.Furnished, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter furnished: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "parking" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "parking", c.Request.URL.Query(), &params.Parking, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter parking: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "laundry" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "laundry", c.Request.URL.Query(), &params.Laundry, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter laundry: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "verified_only" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "verified_only", c.Request.URL.Query(), &params.VerifiedOnly, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter verified_only: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", c.Request.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter sort: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListRequests(c, params)
+}
+
+// CreateRequest operation middleware
+func (siw *ServerInterfaceWrapper) CreateRequest(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.CreateRequest(c)
+}
+
+// DeleteRequest operation middleware
+func (siw *ServerInterfaceWrapper) DeleteRequest(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.DeleteRequest(c, id)
+}
+
+// GetRequest operation middleware
+func (siw *ServerInterfaceWrapper) GetRequest(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetRequest(c, id)
+}
+
+// UpdateRequest operation middleware
+func (siw *ServerInterfaceWrapper) UpdateRequest(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.UpdateRequest(c, id)
+}
+
+// SetRequestStatus operation middleware
+func (siw *ServerInterfaceWrapper) SetRequestStatus(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.SetRequestStatus(c, id)
+}
+
 // GinServerOptions provides options for the Gin server.
 type GinServerOptions struct {
 	BaseURL      string
@@ -1372,6 +1908,13 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.PATCH(options.BaseURL+"/listings/:id", wrapper.UpdateListing)
 	router.POST(options.BaseURL+"/listings/:id/status", wrapper.SetListingStatus)
 	router.GET(options.BaseURL+"/me/listings", wrapper.ListMyListings)
+	router.GET(options.BaseURL+"/requests", wrapper.ListRequests)
+	router.POST(options.BaseURL+"/requests", wrapper.CreateRequest)
+	router.DELETE(options.BaseURL+"/requests/:id", wrapper.DeleteRequest)
+	router.GET(options.BaseURL+"/requests/:id", wrapper.GetRequest)
+	router.PATCH(options.BaseURL+"/requests/:id", wrapper.UpdateRequest)
+	router.POST(options.BaseURL+"/requests/:id/status", wrapper.SetRequestStatus)
+	router.GET(options.BaseURL+"/me/requests", wrapper.ListMyRequests)
 }
 
 type BadRequestJSONResponse Error
@@ -2267,6 +2810,449 @@ func (response ListMyListings500JSONResponse) VisitListMyListingsResponse(w http
 	return err
 }
 
+type ListMyRequestsRequestObject struct {
+}
+
+type ListMyRequestsResponseObject interface {
+	VisitListMyRequestsResponse(w http.ResponseWriter) error
+}
+
+type ListMyRequests200JSONResponse []HousingRequest
+
+func (response ListMyRequests200JSONResponse) VisitListMyRequestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMyRequests401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListMyRequests401JSONResponse) VisitListMyRequestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMyRequests500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response ListMyRequests500JSONResponse) VisitListMyRequestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRequestsRequestObject struct {
+	Params ListRequestsParams
+}
+
+type ListRequestsResponseObject interface {
+	VisitListRequestsResponse(w http.ResponseWriter) error
+}
+
+type ListRequests200JSONResponse RequestPage
+
+func (response ListRequests200JSONResponse) VisitListRequestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRequests400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ListRequests400JSONResponse) VisitListRequestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRequests500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response ListRequests500JSONResponse) VisitListRequestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRequestRequestObject struct {
+	Body *CreateRequestJSONRequestBody
+}
+
+type CreateRequestResponseObject interface {
+	VisitCreateRequestResponse(w http.ResponseWriter) error
+}
+
+type CreateRequest201JSONResponse HousingRequest
+
+func (response CreateRequest201JSONResponse) VisitCreateRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRequest400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateRequest400JSONResponse) VisitCreateRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRequest401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateRequest401JSONResponse) VisitCreateRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRequest403JSONResponse Error
+
+func (response CreateRequest403JSONResponse) VisitCreateRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRequest500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response CreateRequest500JSONResponse) VisitCreateRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteRequestRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type DeleteRequestResponseObject interface {
+	VisitDeleteRequestResponse(w http.ResponseWriter) error
+}
+
+type DeleteRequest204Response struct {
+}
+
+func (response DeleteRequest204Response) VisitDeleteRequestResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteRequest401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response DeleteRequest401JSONResponse) VisitDeleteRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteRequest404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DeleteRequest404JSONResponse) VisitDeleteRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteRequest500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response DeleteRequest500JSONResponse) VisitDeleteRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRequestRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type GetRequestResponseObject interface {
+	VisitGetRequestResponse(w http.ResponseWriter) error
+}
+
+type GetRequest200JSONResponse HousingRequest
+
+func (response GetRequest200JSONResponse) VisitGetRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRequest404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetRequest404JSONResponse) VisitGetRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRequest500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response GetRequest500JSONResponse) VisitGetRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRequestRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *UpdateRequestJSONRequestBody
+}
+
+type UpdateRequestResponseObject interface {
+	VisitUpdateRequestResponse(w http.ResponseWriter) error
+}
+
+type UpdateRequest200JSONResponse HousingRequest
+
+func (response UpdateRequest200JSONResponse) VisitUpdateRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRequest400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateRequest400JSONResponse) VisitUpdateRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRequest401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UpdateRequest401JSONResponse) VisitUpdateRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRequest404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateRequest404JSONResponse) VisitUpdateRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRequest500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response UpdateRequest500JSONResponse) VisitUpdateRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetRequestStatusRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *SetRequestStatusJSONRequestBody
+}
+
+type SetRequestStatusResponseObject interface {
+	VisitSetRequestStatusResponse(w http.ResponseWriter) error
+}
+
+type SetRequestStatus200JSONResponse HousingRequest
+
+func (response SetRequestStatus200JSONResponse) VisitSetRequestStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetRequestStatus400JSONResponse Error
+
+func (response SetRequestStatus400JSONResponse) VisitSetRequestStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetRequestStatus401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response SetRequestStatus401JSONResponse) VisitSetRequestStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetRequestStatus404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response SetRequestStatus404JSONResponse) VisitSetRequestStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetRequestStatus500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response SetRequestStatus500JSONResponse) VisitSetRequestStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Login Start a session
@@ -2317,6 +3303,27 @@ type StrictServerInterface interface {
 	// ListMyListings Your own listings, whatever their state
 	// (GET /me/listings)
 	ListMyListings(ctx context.Context, request ListMyListingsRequestObject) (ListMyListingsResponseObject, error)
+	// ListMyRequests Your own requests, whatever their state
+	// (GET /me/requests)
+	ListMyRequests(ctx context.Context, request ListMyRequestsRequestObject) (ListMyRequestsResponseObject, error)
+	// ListRequests Browse Looking for Housing
+	// (GET /requests)
+	ListRequests(ctx context.Context, request ListRequestsRequestObject) (ListRequestsResponseObject, error)
+	// CreateRequest Post what you are looking for
+	// (POST /requests)
+	CreateRequest(ctx context.Context, request CreateRequestRequestObject) (CreateRequestResponseObject, error)
+	// DeleteRequest Take your request down
+	// (DELETE /requests/{id})
+	DeleteRequest(ctx context.Context, request DeleteRequestRequestObject) (DeleteRequestResponseObject, error)
+	// GetRequest One request
+	// (GET /requests/{id})
+	GetRequest(ctx context.Context, request GetRequestRequestObject) (GetRequestResponseObject, error)
+	// UpdateRequest Edit your request
+	// (PATCH /requests/{id})
+	UpdateRequest(ctx context.Context, request UpdateRequestRequestObject) (UpdateRequestResponseObject, error)
+	// SetRequestStatus Publish, pause or archive your request
+	// (POST /requests/{id}/status)
+	SetRequestStatus(ctx context.Context, request SetRequestStatusRequestObject) (SetRequestStatusResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx *gin.Context, request any) (any, error)
@@ -2826,123 +3833,341 @@ func (sh *strictHandler) ListMyListings(ctx *gin.Context) {
 	}
 }
 
+// ListMyRequests operation middleware
+func (sh *strictHandler) ListMyRequests(ctx *gin.Context) {
+	var request ListMyRequestsRequestObject
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMyRequests(ctx, request.(ListMyRequestsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMyRequests")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(ListMyRequestsResponseObject); ok {
+		if err := validResponse.VisitListMyRequestsResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListRequests operation middleware
+func (sh *strictHandler) ListRequests(ctx *gin.Context, params ListRequestsParams) {
+	var request ListRequestsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListRequests(ctx, request.(ListRequestsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListRequests")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(ListRequestsResponseObject); ok {
+		if err := validResponse.VisitListRequestsResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateRequest operation middleware
+func (sh *strictHandler) CreateRequest(ctx *gin.Context) {
+	var request CreateRequestRequestObject
+
+	var body CreateRequestJSONRequestBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(ctx, err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateRequest(ctx, request.(CreateRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateRequest")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(CreateRequestResponseObject); ok {
+		if err := validResponse.VisitCreateRequestResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteRequest operation middleware
+func (sh *strictHandler) DeleteRequest(ctx *gin.Context, id openapi_types.UUID) {
+	var request DeleteRequestRequestObject
+
+	request.Id = id
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteRequest(ctx, request.(DeleteRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteRequest")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(DeleteRequestResponseObject); ok {
+		if err := validResponse.VisitDeleteRequestResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetRequest operation middleware
+func (sh *strictHandler) GetRequest(ctx *gin.Context, id openapi_types.UUID) {
+	var request GetRequestRequestObject
+
+	request.Id = id
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetRequest(ctx, request.(GetRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetRequest")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(GetRequestResponseObject); ok {
+		if err := validResponse.VisitGetRequestResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateRequest operation middleware
+func (sh *strictHandler) UpdateRequest(ctx *gin.Context, id openapi_types.UUID) {
+	var request UpdateRequestRequestObject
+
+	request.Id = id
+
+	var body UpdateRequestJSONRequestBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(ctx, err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateRequest(ctx, request.(UpdateRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateRequest")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(UpdateRequestResponseObject); ok {
+		if err := validResponse.VisitUpdateRequestResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetRequestStatus operation middleware
+func (sh *strictHandler) SetRequestStatus(ctx *gin.Context, id openapi_types.UUID) {
+	var request SetRequestStatusRequestObject
+
+	request.Id = id
+
+	var body SetRequestStatusJSONRequestBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(ctx, err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.SetRequestStatus(ctx, request.(SetRequestStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetRequestStatus")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(SetRequestStatusResponseObject); ok {
+		if err := validResponse.VisitSetRequestStatusResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, compressed with deflate, json marshaled OpenAPI spec.
 // Stored as a slice of fixed-width chunks rather than one concatenated
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,
