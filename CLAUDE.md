@@ -81,19 +81,23 @@ only thing that calls it.
 | 5 | Query tests against a real PostgreSQL, plus a guard for untested queries |
 | 6 | Housing requests: table, lifecycle, browse with filters, write path |
 | 7 | Offers: an owner answers a request with one of their own listings |
+| 8 | Rate limiting on the auth and write endpoints, keyed on identity |
 
 Twenty-six endpoints are live; `README.md` has the table.
 
 ### What comes next
 
-Nothing is specified. Candidates, in the order I would take them:
+**Specified and accepted:** Admin and Moderation, phases 9–11, in
+`docs/specs/active/admin-moderation/`. The admin portal is a separate feature in
+the frontend repository.
+
+Unspecified, in the order I would take it:
 
 1. **Email delivery.** Verification and reset links only reach the log, so on the
    live site nobody can finish signing up. The developer has chosen Clerk's
-   transactional endpoint; `internal/email` already has the `Sender` seam.
-2. **Rate limiting.** There is none anywhere — login accepts unlimited guesses
-   against guessable `uwaterloo.ca` addresses, and password reset has no cap.
-3. Saves, views and the question thread → messaging with contact privacy →
+   transactional endpoint; `internal/email` already has the `Sender` seam. Until
+   it lands, an admin verifying accounts by hand is how a real student gets in.
+2. Saves, views and the question thread → messaging with contact privacy →
    matching and real maps.
 
 ---
@@ -152,6 +156,23 @@ These were all found the hard way and will silently regress if undone.
 - **Offer counts are computed, never stored.** An offer stops counting when its
   listing is taken down — a different table — so a stored counter would drift.
   The column added in migration 6 was dropped in migration 7 for that reason.
+- **The rate limiter cannot see client IP addresses.** This service has no public
+  URL and the Next.js server is its only client, so every request arrives from one
+  address. Limits are keyed on identity — the email, the token, the user — and
+  per-IP limiting lives at the reverse proxy (`deploy/RATE-LIMITING.md`). A
+  per-IP limiter added here would throttle the entire site as one client.
+- **Only a *failed* login is charged to the limiter.** `RateLimit` peeks on the
+  login route and `chargeFailedLogin` spends afterwards. Make login spend up
+  front and the Playwright suite — which signs in repeatedly on purpose — starts
+  failing, along with anyone who signs in several times a day.
+- **`internal/ratelimit` runs on an injected clock, and no test may sleep.** A
+  suite that waits for real seconds flakes in CI and then gets deleted. The
+  race detector needs a C toolchain the development machine does not have, so CI
+  runs `-race` over that package instead.
+- **The limited routes are an allowlist** in `internal/httpapi/ratelimit_mw.go`,
+  matched on `c.FullPath()`. Its failure mode is silence: a path that matches no
+  route limits nothing and nothing complains, which is why
+  `TestEveryLimitedRouteExists` checks them against the registered routes.
 
 ---
 

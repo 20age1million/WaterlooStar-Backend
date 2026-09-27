@@ -8,7 +8,10 @@
 package apierror
 
 import (
+	"math"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,6 +27,7 @@ const (
 	CodeForbidden    Code = "forbidden"
 	CodeNotFound     Code = "not_found"
 	CodeConflict     Code = "conflict"
+	CodeRateLimited  Code = "rate_limited"
 	CodeInternal     Code = "internal_error"
 	CodeUnavailable  Code = "service_unavailable"
 )
@@ -58,6 +62,17 @@ func writeEnvelope(c *gin.Context, status int, env Envelope) {
 		}
 	}
 	c.AbortWithStatusJSON(status, env)
+}
+
+// TooManyRequests writes the standard 429, with the wait both as a header a
+// client can act on automatically and in a message a person can read.
+func TooManyRequests(c *gin.Context, message string, retryAfter time.Duration) {
+	seconds := int(math.Ceil(retryAfter.Seconds()))
+	if seconds < 1 {
+		seconds = 1
+	}
+	c.Header("Retry-After", strconv.Itoa(seconds))
+	Write(c, http.StatusTooManyRequests, CodeRateLimited, message)
 }
 
 // NotFound writes the standard 404. Used both by handlers and by the router's

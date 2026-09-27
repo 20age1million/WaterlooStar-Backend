@@ -14,9 +14,7 @@ across both; everything from Phase 4 onward is not.
 
 ## Active
 
-| Feature | Phases | Status | Location |
-|---|---|---|---|
-| [Rate Limiting](./active/rate-limiting/index.md) | 1 (Phase 8) | Ready | `docs/specs/active/rate-limiting/` |
+*None.*
 
 ## Implemented
 
@@ -26,6 +24,7 @@ across both; everything from Phase 4 onward is not.
 | [Discovery](./implemented/discovery/index.md) | 1 (Phase 3) | `docs/specs/implemented/discovery/` |
 | [Listing Write Path](./implemented/listing-write-path/index.md) | 1 (Phase 4) | `docs/specs/implemented/listing-write-path/` |
 | [Housing Requests](./implemented/housing-requests/index.md) | 3 (5–7) | `docs/specs/implemented/housing-requests/` |
+| [Rate Limiting](./implemented/rate-limiting/index.md) | 1 (Phase 8) | `docs/specs/implemented/rate-limiting/` |
 
 ### Platform Foundation
 
@@ -61,6 +60,14 @@ The other side of the market, in three phases.
 | 6 | [Requests](./implemented/housing-requests/phase-6-requests.md) | `housing_requests`, seven operations, discovery filters that read from the owner's side |
 | 7 | [Offers](./implemented/housing-requests/phase-7-offers.md) | An owner answers with one of their own listings; offers die with the listing behind them |
 
+### Rate Limiting
+
+Login, registration, password reset, token redemption and the three write
+endpoints answer 429 with a `Retry-After` when an allowance is spent. Keyed on
+identity rather than IP address, because the API has no public URL and every
+request reaches it from the frontend. Only a *failed* login is charged, and
+nothing is ever locked — allowances refill on a clock.
+
 ## Decisions carried forward
 
 Recorded in the Platform Foundation `index.md` and still in force:
@@ -82,11 +89,14 @@ Recorded in the Platform Foundation `index.md` and still in force:
 
 ## What comes next
 
-Rate limiting is specified above and is next. One gap remains unspecified:
+**Admin and Moderation** (phases 9–11) is specified and accepted on its own
+branch, with the admin portal specified separately in the frontend repository.
+One gap remains unspecified:
 
 - **Email delivery.** Verification and reset links only reach the log, so on the
   live site nobody can finish signing up. The provider is chosen (Clerk's
-  transactional endpoint); `internal/email` already has the seam.
+  transactional endpoint); `internal/email` already has the seam. Until it lands,
+  an admin verifying accounts by hand is how a real student gets in.
 
 After those: saves, views and the question thread; then messaging with contact
 privacy, which is what "accept an offer" is waiting on. Each starts with a new

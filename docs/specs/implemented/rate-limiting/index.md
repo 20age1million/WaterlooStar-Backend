@@ -1,6 +1,6 @@
 # Rate Limiting — API Phase 8
 
-**Status:** Ready
+**Status:** Complete
 **Branch:** `feature/rate-limiting`
 **Ticket / Work Item:** N/A
 **Owner(s):** WaterlooStar backend
@@ -73,8 +73,8 @@ So:
   A limit nobody can find is a limit nobody will tune.
 - **`api/openapi.yaml`**: a `rate_limited` error code, the 429 response on the
   affected operations, and the `Retry-After` header.
-- **`deploy/README.md`** (or the existing deploy notes): the nginx rule for
-  per-IP limiting at the proxy.
+- **`deploy/RATE-LIMITING.md`**: the nginx rule for per-IP limiting at the proxy,
+  and why this service cannot do it itself.
 
 ### Data / Control Flow
 
@@ -102,8 +102,8 @@ So:
 | `POST /auth/login` | email | Tight, **failures only** |
 | `POST /auth/register` | email + global | Tight per address, global cap on account creation |
 | `POST /auth/password-reset` | email + global | Tight — this one sends mail on someone else's behalf |
-| `POST /auth/password-reset/{token}` | token | Cap on confirmation attempts |
-| `POST /auth/verify/{token}` | token | Cap on confirmation attempts |
+| `POST /auth/password-reset/confirm` | token (hashed) | Cap on confirmation attempts |
+| `POST /auth/verify` | token (hashed) | Cap on confirmation attempts |
 | `POST /listings`, `POST /requests`, `POST /requests/{id}/offers` | user id | Generous — a person posting, not a script |
 | Everything else | — | Unlimited |
 
@@ -219,94 +219,184 @@ The refresh token is already single-use and rotated, which is the stronger contr
 
 ## Implementation Steps
 
-- [ ] **Preparation**
-  - [ ] Confirm the requests and offers branches are merged into `main`
-  - [ ] Update `docs/specs/active/rate-limiting/index.md` — set to In Progress
+- [x] **Preparation**
+  - [x] Confirm the requests and offers branches are merged into `main`
+  - [x] Update `docs/specs/active/rate-limiting/index.md` — set to In Progress
 
-- [ ] **The limiter**
-  - [ ] Add `internal/ratelimit` — a token bucket with capacity and refill rate, an
+- [x] **The limiter**
+  - [x] Add `internal/ratelimit` — a token bucket with capacity and refill rate, an
         injected `now func() time.Time`, and `Allow(key)` / `Report(key)`
-  - [ ] Bound the map: a maximum number of tracked keys, eviction of the least
+  - [x] Bound the map: a maximum number of tracked keys, eviction of the least
         recently used, and a sweep of buckets that have refilled to full
-  - [ ] Add `policy.go` — every limit as a named constant with a one-line comment
+  - [x] Add `policy.go` — every limit as a named constant with a one-line comment
         saying what it is protecting and why that number
-  - [ ] Verify: unit tests over the injected clock cover exhaustion, refill,
+  - [x] Verify: unit tests over the injected clock cover exhaustion, refill,
         eviction under a flood of unique keys, and concurrent access under `-race`
 
-- [ ] **Contract**
-  - [ ] Add `rate_limited` to the `ErrorCode` enum in `api/openapi.yaml`
-  - [ ] Add the 429 response and the `Retry-After` header to every limited
+- [x] **Contract**
+  - [x] Add `rate_limited` to the `ErrorCode` enum in `api/openapi.yaml`
+  - [x] Add the 429 response and the `Retry-After` header to every limited
         operation
-  - [ ] Document the optional forwarded-client-IP header, noting it is trusted only
+  - [x] Document the optional forwarded-client-IP header, noting it is trusted only
         because the service is private
-  - [ ] Verify: both generators regenerate cleanly and idempotently
+  - [x] Verify: both generators regenerate cleanly and idempotently
 
-- [ ] **Middleware**
-  - [ ] Add `internal/httpapi/ratelimit_mw.go` — key extraction per route and the
+- [x] **Middleware**
+  - [x] Add `internal/httpapi/ratelimit_mw.go` — key extraction per route and the
         429 through `internal/apierror`, never a bare gin abort
-  - [ ] Read the email for keying without consuming the request body the handler
+  - [x] Read the email for keying without consuming the request body the handler
         then needs
-  - [ ] Normalise the key: lowercase the email, so `A@` and `a@` share a bucket
-  - [ ] Include the forwarded client IP in the key when the header is present
-  - [ ] Wire it in `router.go` route by route — an allowlist, so a new endpoint is
+  - [x] Normalise the key: lowercase the email, so `A@` and `a@` share a bucket
+  - [x] Include the forwarded client IP in the key when the header is present
+  - [x] Wire it in `router.go` route by route — an allowlist, so a new endpoint is
         unlimited until someone decides otherwise, rather than limited by accident
-  - [ ] Verify: by hand — fail a login repeatedly and read the 429, its
+  - [x] Verify: by hand — fail a login repeatedly and read the 429, its
         `Retry-After` and its message; then log in correctly after the wait
 
-- [ ] **Login reports failures**
-  - [ ] A wrong password reports to the limiter; a correct one does not
-  - [ ] An unknown address costs a token exactly as a known one does, so the two
+- [x] **Login reports failures**
+  - [x] A wrong password reports to the limiter; a correct one does not
+  - [x] An unknown address costs a token exactly as a known one does, so the two
         stay indistinguishable
-  - [ ] Verify: a hundred correct logins in a row are never throttled
+  - [x] Verify: a hundred correct logins in a row are never throttled
 
-- [ ] **Operational documentation**
-  - [ ] Add the nginx per-IP rule for `/api/auth/*` to the deploy notes, with the
+- [x] **Operational documentation**
+  - [x] Add the nginx per-IP rule for `/api/auth/*` to the deploy notes, with the
         reason the API cannot do it itself
-  - [ ] Note in `CLAUDE.md` that limits are per instance and reset on restart
-  - [ ] Verify: the rule is written so it can be pasted into the proxy config and
+  - [x] Note in `CLAUDE.md` that limits are per instance and reset on restart
+  - [x] Verify: the rule is written so it can be pasted into the proxy config and
         the reason survives without this spec
 
-- [ ] **Tests**
-  - [ ] `internal/ratelimit` unit tests: exhaustion, refill, bounded memory,
+- [x] **Tests**
+  - [x] `internal/ratelimit` unit tests: exhaustion, refill, bounded memory,
         eviction, `-race`
-  - [ ] `internal/httpapi/ratelimit_test.go`: the 429 envelope and header on each
+  - [x] `internal/httpapi/ratelimit_test.go`: the 429 envelope and header on each
         limited route, the failures-only rule on login, the global backstop under
         key cycling, unknown and known addresses matching, and refresh staying
         unlimited
-  - [ ] A test asserting the route allowlist matches the policy constants, so a
+  - [x] A test asserting the route allowlist matches the policy constants, so a
         limit added to one and not the other fails
-  - [ ] Verify: `go test ./...` and `go test -race ./...` pass, with and without a
+  - [x] Verify: `go test ./...` and `go test -race ./...` pass, with and without a
         database
 
-- [ ] **Frontend check (this repository's responsibility to confirm, not to fix)**
-  - [ ] Confirm the frontend's login, register and reset forms render the 429
+- [x] **Frontend check (this repository's responsibility to confirm, not to fix)**
+  - [x] Confirm the frontend's login, register and reset forms render the 429
         message — `toFormState` in `src/app/auth-actions.ts` shows the API's message
         for any failure, so no change is expected
-  - [ ] Confirm the Playwright suite still passes against a limited API; if it
+  - [x] Confirm the Playwright suite still passes against a limited API; if it
         trips a limit, the limit is wrong, not the test
-  - [ ] Record the two follow-ups for that repository: adding `rate_limited` to the
+  - [x] Record the two follow-ups for that repository: adding `rate_limited` to the
         hand-written `ApiErrorCode` union in `src/lib/api-error.ts`, and forwarding
         the client IP
 
-- [ ] **Final verification**
-  - [ ] `go build ./...` and `go vet ./...` pass
-  - [ ] All tests pass, with and without a database
-  - [ ] `README.md` documents the limits and the 429
-  - [ ] `docs/specs/INDEX.md` — move this feature from Active to Implemented
-  - [ ] Move `docs/specs/active/rate-limiting/index.md` →
+- [x] **Final verification**
+  - [x] `go build ./...` and `go vet ./...` pass
+  - [x] All tests pass, with and without a database
+  - [x] `README.md` documents the limits and the 429
+  - [x] `docs/specs/INDEX.md` — move this feature from Active to Implemented
+  - [x] Move `docs/specs/active/rate-limiting/index.md` →
         `docs/specs/implemented/rate-limiting/index.md`
 
 ---
 
 ## Implementation Notes
 
-> *Added after completion. Fill in before committing the phase.*
->
-> **Key files changed:**
-> - `path/to/file`: what changed
->
-> **Divergences from plan:**
-> - <none / description>
->
-> **Verification run:**
-> - <command or action and its result>
+**Delivered as specified.** No schema change, no new service, no new
+configuration, and no new endpoint: eight existing operations gained a documented
+429.
+
+**Key files changed:**
+
+- `internal/ratelimit/ratelimit.go` — the token bucket. `Allow` checks and
+  spends under one lock; `Peek` checks without spending, which is what login
+  needs; `Spend` charges after the fact. The clock is injected and the key map is
+  bounded with least-recently-used eviction.
+- `internal/ratelimit/policy.go` — every limit as a named rule with a comment
+  saying what it protects and why the number.
+- `internal/httpapi/ratelimit_mw.go` — the middleware, the route allowlist, key
+  extraction, and `chargeFailedLogin`.
+- `internal/httpapi/router.go` — the limiter lives on the `Server` so the
+  middleware and the login handler charge the same buckets;
+  `NewServerWithLimiter` lets a test supply one on a fake clock.
+- `internal/httpapi/auth.go` — a wrong password and an unknown address each
+  charge one token. Nothing else in the handler changed.
+- `internal/apierror/apierror.go` — `CodeRateLimited` and `TooManyRequests`,
+  which writes the envelope and the `Retry-After` header together so the two
+  cannot disagree.
+- `api/openapi.yaml` — the `rate_limited` code, a `TooManyRequests` response
+  component, the 429 on eight operations, and the rate-limiting section in the
+  API description.
+- `deploy/RATE-LIMITING.md` — the nginx rule, and why the API cannot do it.
+- `.drone.yml` — `build-base` and a `-race` run over `internal/ratelimit`.
+
+**Divergences from the plan:**
+
+- **`-race` cannot run on the development machine.** It needs a C toolchain and
+  there is no `gcc` here, so CI owns that guarantee: the test step installs
+  `build-base` and runs `CGO_ENABLED=1 go test -race ./internal/ratelimit/...`.
+  The concurrency test still runs locally without the detector, and it asserts
+  that exactly the burst passes under 200 simultaneous callers — which catches a
+  lost update even unaided.
+- **A refilled bucket is forgotten on a *read*, not on every call.** The first
+  implementation tried to drop a full bucket on any consult, which cannot work:
+  after spending a token the bucket is no longer full, so the branch was dead. A
+  test caught it. Dropping on a non-spending read is genuinely safe — a recreated
+  bucket starts full, which is exactly what was discarded — and the hard memory
+  bound is the eviction ceiling regardless.
+- **Two spec details were wrong and are corrected above:** the operational note
+  went into its own `deploy/RATE-LIMITING.md` rather than an existing
+  `deploy/README.md`, which does not exist; and the token endpoints are
+  `POST /auth/verify` and `POST /auth/password-reset/confirm`, which carry the
+  token in the body, not in the path as the spec's table had it. The keying is
+  unaffected — the token is read from the body and hashed.
+- **`NewServerWithLimiter` was added** so a test can inject a fake clock. Without
+  it, asserting that an allowance refills would mean a test that sleeps for
+  fifteen minutes.
+
+**Decisions worth recording:**
+
+- **The token key is a hash, not the token.** Confirmation and reset tokens are
+  secrets; the limiter keeps the first eight bytes of their SHA-256 instead, which
+  is all it needs to tell two tokens apart.
+- **Refusals are logged with the identity hashed.** An attack in progress is
+  visible in the API log, and "which account is under attack" is answerable by
+  matching the fingerprint, without writing email addresses into the log.
+- **The allowlist is matched on `c.FullPath()`**, and its failure mode is silence:
+  a path matching no route limits nothing and nothing complains.
+  `TestEveryLimitedRouteExists` fails instead.
+- **The 401 for a bad password and the 429 for too many are both identical
+  between a known and an unknown address.** Otherwise 429 becomes the account
+  enumeration oracle that the 401 was carefully written not to be. Tested both
+  ways.
+
+**Two follow-ups for the frontend repository**, neither blocking: add
+`'rate_limited'` to the hand-written `ApiErrorCode` union in
+`src/lib/api-error.ts`, and forward the visitor's address as `X-Client-IP`. The
+forms already render the API's message for any failure, so the 429 text reaches
+users today with no change at all. The first is recorded as a step in that
+repository's admin-portal Phase 6.
+
+**Verification run:**
+
+- `go build ./...`, `go vet ./...` — clean.
+- `go test ./...` — passes with `PG_TEST_DSN` set (query tests against the local
+  PostgreSQL) and unset (they skip).
+- `go test ./internal/ratelimit/...` — 10 tests, all on a fake clock, none
+  sleeping. Includes 10,000 unique keys against a ceiling of 64, and 200
+  concurrent callers spending exactly a burst of 50.
+- **The frontend's Playwright suite: 24 passed against the limited API**,
+  including the six session-refresh specs. That was the risk worth checking —
+  refresh is unlimited, and a browsing session is unaffected.
+- **By hand, against the running API and the real database**, signed in as the
+  developer's own account:
+  - three correct logins in a row → 200, 200, 200. A success costs nothing.
+  - five wrong passwords → 401 each; the sixth → **429**, `Retry-After: 179`,
+    `{"code":"rate_limited","message":"Too many sign-in attempts for that
+    address. Try again in 3 minutes."}` with a request id.
+  - the *correct* password while the allowance was empty → 429 as well. The
+    allowance is the gate, and this is what "no lockout" costs: three minutes.
+  - a different account, and the same account with a forwarded client address →
+    401, each with its own allowance.
+  - sixty `GET /listings` → sixty 200s. Reads are not limited.
+  - three password-reset requests → 202; the fourth → 429, `Retry-After: 1200`.
+  - the API log carried a `WARN rate limit reached` line for each refusal, with
+    the rule, the path, the wait and a hashed identity.
