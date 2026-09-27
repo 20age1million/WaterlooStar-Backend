@@ -14,7 +14,9 @@ across both; everything from Phase 4 onward is not.
 
 ## Active
 
-*None.*
+| Feature | Phases | Status | Location |
+|---|---|---|---|
+| [Rate Limiting](./active/rate-limiting/index.md) | 1 (Phase 8) | Ready | `docs/specs/active/rate-limiting/` |
 
 ## Implemented
 
@@ -80,14 +82,11 @@ Recorded in the Platform Foundation `index.md` and still in force:
 
 ## What comes next
 
-Nothing is specified; `active/` is empty. Two things are overdue before more
-features, both recorded as gaps rather than specs:
+Rate limiting is specified above and is next. One gap remains unspecified:
 
-1. **Email delivery.** Verification and reset links only reach the log, so on the
-   live site nobody can finish signing up. The provider is chosen (Clerk's
-   transactional endpoint); `internal/email` already has the seam.
-2. **Rate limiting.** There is none — login accepts unlimited guesses against
-   guessable `uwaterloo.ca` addresses, and password reset has no cap.
+- **Email delivery.** Verification and reset links only reach the log, so on the
+  live site nobody can finish signing up. The provider is chosen (Clerk's
+  transactional endpoint); `internal/email` already has the seam.
 
 After those: saves, views and the question thread; then messaging with contact
 privacy, which is what "accept an offer" is waiting on. Each starts with a new
