@@ -16,6 +16,23 @@ info:
     Housing". The internal terms *renter* and *rentee* never appear in any path,
     field name or response body.
 
+    ## Rate limiting
+
+    Authentication and the write endpoints are rate limited and may answer `429`
+    with a `Retry-After` header. The limit is keyed on **identity** — the address
+    being logged into, the token being redeemed, the signed-in user — and not on
+    IP address: this service has no public URL, so every request reaches it from
+    the frontend's address and per-IP counting inside it would treat the whole
+    internet as one client. Per-IP limiting belongs at the reverse proxy.
+
+    A client may send `X-Client-IP` with the real address of the person it is
+    acting for, and it will be used as an additional dimension of the key. It is
+    trusted *only* because this service is unreachable from the internet; if that
+    ever changes, the header must stop being trusted on the same day.
+
+    Nothing is ever locked: an exhausted allowance refills on a clock, and a
+    successful login costs nothing at all.
+
 servers:
   - url: http://localhost:8080
     description: Local development
@@ -92,6 +109,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalError" }
 
   /auth/verify:
@@ -122,6 +140,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalError" }
 
   /auth/login:
@@ -160,6 +179,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalError" }
 
   /auth/refresh:
@@ -220,6 +240,7 @@ paths:
         "202":
           description: If that address has an account, an email is on its way.
         "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalError" }
 
   /auth/password-reset/confirm:
@@ -246,6 +267,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalError" }
 
   /me:
@@ -384,6 +406,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalError" }
 
   /listings/{id}:
@@ -641,6 +664,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalError" }
 
   /requests/{id}:
@@ -841,6 +865,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalError" }
 
   /offers/{id}:
@@ -1467,6 +1492,7 @@ components:
         - forbidden
         - not_found
         - conflict
+        - rate_limited
         - internal_error
         - service_unavailable
 
@@ -1540,6 +1566,25 @@ components:
             $ref: "#/components/schemas/Error"
     NotFound:
       description: No such resource.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    TooManyRequests:
+      description: |
+        Too many attempts. The limit is per identity — the address being logged
+        into, the account being reset, the signed-in user — not per IP address,
+        because this service sits on a private network where every request
+        arrives from the frontend's address.
+
+        `message` names the wait in plain words and is safe to show to a user.
+        Nothing is locked: the allowance refills on a clock.
+      headers:
+        Retry-After:
+          description: Seconds to wait before trying again.
+          schema:
+            type: integer
+            minimum: 1
       content:
         application/json:
           schema:

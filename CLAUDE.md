@@ -9,11 +9,17 @@ The frontend is a **separate repository**, checked out beside this one as
 
 ---
 
-## Before doing anything: read the skills
+## Required before anything else: read the skill library
+
+**Reading the skill library in `.claude/skills/` is a requirement for picking up
+this project, not a suggestion.** Every feature here was built through it, and the
+workflow is not inferable from the code: nothing in the repository tells you that
+a specification is written and accepted before implementation, that a phase is one
+commit, or where a phase doc has to end up. Work that skips it produces changes
+that cannot be reviewed against anything and phases nobody can pick up after you.
 
 **This project works from committed specifications, not from ad-hoc changes.**
-The workflow is not optional and it is not obvious from the code, so read it
-before touching anything:
+Read these before touching anything:
 
 1. `.claude/skills/feature-start/SKILL.md` — how a feature begins. Produces an
    agreed spec under `docs/specs/active/<slug>/`, committed on a feature branch,
@@ -25,6 +31,12 @@ Also read whichever of these the task touches:
 
 - `.claude/skills/implementation-breakdown/SKILL.md` — splitting work into phases
 - `.claude/skills/release/SKILL.md` — release process
+
+The commit and pull-request conventions come from the skill library too:
+conventional commits as `<type>(<slug>): <description>`, branches as
+`<type>/<slug>`. The spec commit that opens a feature takes **no trailer lines** —
+`feature-start` says so explicitly, and it is the one exception to how every other
+commit here is signed.
 
 **Two skills in that folder do not apply here.** `az-pr-create` and
 `azure-devops-project-creator` came with the toolkit from another organisation's
@@ -49,7 +61,9 @@ that way; everything from Phase 4 onward is not.
 
 ### The short version of the workflow
 
-- Never work on `main`. Branch as `feature/<slug>`.
+- Never work on `main`. Branch as `<type>/<slug>` — the type is the kind of change,
+  matching the commit's, so a spec branch is `feature/…` but a test-only phase is
+  `test/…` and a fix is `fix/…`.
 - A spec is written and **accepted by the developer** before implementation.
   Acceptance is explicit — silence is not agreement.
 - One phase at a time. Each phase ends with: checklist ticked, Implementation
@@ -81,19 +95,35 @@ only thing that calls it.
 | 5 | Query tests against a real PostgreSQL, plus a guard for untested queries |
 | 6 | Housing requests: table, lifecycle, browse with filters, write path |
 | 7 | Offers: an owner answers a request with one of their own listings |
+| 8 | Rate limiting on the auth and write endpoints, keyed on identity |
 
-Twenty-six endpoints are live; `README.md` has the table.
+Twenty-six endpoints are live; `README.md` has the table, and the rate limits with
+it.
+
+**Branches in flight**, oldest first — each is based on the one above it, so they
+merge in this order:
+
+| Branch | Holds |
+|---|---|
+| `test/query-test-layer` | Phase 5 and the spec for 5–7 |
+| `feat/housing-requests` | Phase 6 |
+| `feat/request-offers` | Phase 7 |
+| `feature/rate-limiting` | Phase 8, complete |
+| `feature/admin-moderation` | The accepted spec for phases 9–11; no code yet |
 
 ### What comes next
 
-Nothing is specified. Candidates, in the order I would take them:
+**Specified and accepted:** Admin and Moderation, phases 9–11, in
+`docs/specs/active/admin-moderation/`. The admin portal is a separate feature in
+the frontend repository.
+
+Unspecified, in the order I would take it:
 
 1. **Email delivery.** Verification and reset links only reach the log, so on the
    live site nobody can finish signing up. The developer has chosen Clerk's
-   transactional endpoint; `internal/email` already has the `Sender` seam.
-2. **Rate limiting.** There is none anywhere — login accepts unlimited guesses
-   against guessable `uwaterloo.ca` addresses, and password reset has no cap.
-3. Saves, views and the question thread → messaging with contact privacy →
+   transactional endpoint; `internal/email` already has the `Sender` seam. Until
+   it lands, an admin verifying accounts by hand is how a real student gets in.
+2. Saves, views and the question thread → messaging with contact privacy →
    matching and real maps.
 
 ---
@@ -152,6 +182,23 @@ These were all found the hard way and will silently regress if undone.
 - **Offer counts are computed, never stored.** An offer stops counting when its
   listing is taken down — a different table — so a stored counter would drift.
   The column added in migration 6 was dropped in migration 7 for that reason.
+- **The rate limiter cannot see client IP addresses.** This service has no public
+  URL and the Next.js server is its only client, so every request arrives from one
+  address. Limits are keyed on identity — the email, the token, the user — and
+  per-IP limiting lives at the reverse proxy (`deploy/RATE-LIMITING.md`). A
+  per-IP limiter added here would throttle the entire site as one client.
+- **Only a *failed* login is charged to the limiter.** `RateLimit` peeks on the
+  login route and `chargeFailedLogin` spends afterwards. Make login spend up
+  front and the Playwright suite — which signs in repeatedly on purpose — starts
+  failing, along with anyone who signs in several times a day.
+- **`internal/ratelimit` runs on an injected clock, and no test may sleep.** A
+  suite that waits for real seconds flakes in CI and then gets deleted. The
+  race detector needs a C toolchain the development machine does not have, so CI
+  runs `-race` over that package instead.
+- **The limited routes are an allowlist** in `internal/httpapi/ratelimit_mw.go`,
+  matched on `c.FullPath()`. Its failure mode is silence: a path that matches no
+  route limits nothing and nothing complains, which is why
+  `TestEveryLimitedRouteExists` checks them against the registered routes.
 
 ---
 
@@ -161,7 +208,7 @@ These were all found the hard way and will silently regress if undone.
 cp .env.example .env
 docker compose up -d       # PostgreSQL 18 on :5433
 go run ./cmd/migrate up
-go run ./cmd/seed          # six development listings
+go run ./cmd/seed          # 6 development listings and 5 requests
 go run ./cmd/api           # :8080
 ```
 

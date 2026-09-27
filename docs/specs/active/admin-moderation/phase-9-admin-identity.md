@@ -31,8 +31,9 @@
 
 ## Dependencies / Prerequisites
 
-- **Phase 8 — rate limiting — merged.** This phase hands out keys; that one fits
-  the lock. An admin account behind an unlimited login form is the wrong order.
+- **Phase 8 — rate limiting — complete.** This phase hands out keys; that one fit
+  the lock, and it is done: login allows five failed attempts per address per 15
+  minutes, with a service-wide backstop behind it.
 - Phase 7 — the three open pull requests (query test layer, requests, offers)
   must be merged into `main`, because the account view counts requests and the new
   queries need the test harness.

@@ -206,6 +206,9 @@ func (s *Server) Login(ctx context.Context, request gen.LoginRequestObject) (gen
 			// Spend the time a real comparison would, so response timing does
 			// not reveal which addresses are registered.
 			auth.WasteComparison(request.Body.Password)
+			// Charged exactly as a wrong password is, for the same reason: an
+			// unknown address and a known one must be indistinguishable.
+			s.chargeFailedLogin(ctx)
 			return invalidCredentials(), nil
 		}
 		s.log.Error("look up user by email", slog.String("error", err.Error()))
@@ -213,6 +216,7 @@ func (s *Server) Login(ctx context.Context, request gen.LoginRequestObject) (gen
 	}
 
 	if err := auth.ComparePassword(user.PasswordHash, request.Body.Password); err != nil {
+		s.chargeFailedLogin(ctx)
 		return invalidCredentials(), nil
 	}
 

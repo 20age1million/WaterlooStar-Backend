@@ -16,11 +16,11 @@ across both; everything from Phase 4 onward is not.
 
 | Feature | Phases | Status | Location |
 |---|---|---|---|
-| [Rate Limiting](./active/rate-limiting/index.md) | 1 (Phase 8) | Ready | `docs/specs/active/rate-limiting/` |
 | [Admin and Moderation](./active/admin-moderation/index.md) | 3 (9–11) | Ready | `docs/specs/active/admin-moderation/` |
 
-Rate limiting ships first: it protects every student's login, not just an admin's,
-and the admin surface should not exist in front of an unlimited login form.
+Rate limiting was its prerequisite and has shipped — it protected every student's
+login, not just an admin's, and the admin surface should not have existed in front
+of an unlimited login form.
 
 ## Implemented
 
@@ -30,6 +30,7 @@ and the admin surface should not exist in front of an unlimited login form.
 | [Discovery](./implemented/discovery/index.md) | 1 (Phase 3) | `docs/specs/implemented/discovery/` |
 | [Listing Write Path](./implemented/listing-write-path/index.md) | 1 (Phase 4) | `docs/specs/implemented/listing-write-path/` |
 | [Housing Requests](./implemented/housing-requests/index.md) | 3 (5–7) | `docs/specs/implemented/housing-requests/` |
+| [Rate Limiting](./implemented/rate-limiting/index.md) | 1 (Phase 8) | `docs/specs/implemented/rate-limiting/` |
 
 ### Platform Foundation
 
@@ -65,6 +66,14 @@ The other side of the market, in three phases.
 | 6 | [Requests](./implemented/housing-requests/phase-6-requests.md) | `housing_requests`, seven operations, discovery filters that read from the owner's side |
 | 7 | [Offers](./implemented/housing-requests/phase-7-offers.md) | An owner answers with one of their own listings; offers die with the listing behind them |
 
+### Rate Limiting
+
+Login, registration, password reset, token redemption and the three write
+endpoints answer 429 with a `Retry-After` when an allowance is spent. Keyed on
+identity rather than IP address, because the API has no public URL and every
+request reaches it from the frontend. Only a *failed* login is charged, and
+nothing is ever locked — allowances refill on a clock.
+
 ## Decisions carried forward
 
 Recorded in the Platform Foundation `index.md` and still in force:
@@ -86,8 +95,9 @@ Recorded in the Platform Foundation `index.md` and still in force:
 
 ## What comes next
 
-Rate limiting and the admin surface are specified above and are next, in that
-order. One gap remains unspecified:
+**Admin and Moderation** (phases 9–11) is specified and accepted above, with the
+admin portal specified separately in the frontend repository. One gap remains
+unspecified:
 
 - **Email delivery.** Verification and reset links only reach the log, so on the
   live site nobody can finish signing up. The provider is chosen (Clerk's

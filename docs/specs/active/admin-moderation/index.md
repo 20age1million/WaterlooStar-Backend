@@ -127,11 +127,12 @@ Nothing is ever erased. Every admin power in this feature has an inverse.
 | [10 — Account management](./phase-10-account-management.md) | Suspend, reinstate, verify by hand, change role — each logged, each reversible | Ready | `docs/specs/active/admin-moderation/` |
 | [11 — Post moderation](./phase-11-post-moderation.md) | Read every post regardless of status; take one down and restore it | Ready | `docs/specs/active/admin-moderation/` |
 
-**Phase 8 — [Rate Limiting](../rate-limiting/index.md) — is a prerequisite of this
-whole feature**, not a phase of it. It is a separate feature because it protects
-every student's login as much as an admin's, and it ships on its own. But it ships
-*first*: an admin password is the most valuable secret on the site, and login
-currently accepts unlimited guesses.
+**Phase 8 — [Rate Limiting](../../implemented/rate-limiting/index.md) — was a
+prerequisite of this whole feature**, not a phase of it. It stayed a separate
+feature because it protects every student's login as much as an admin's, and it
+shipped on its own and first: an admin password is the most valuable secret on the
+site, and login accepted unlimited guesses until it landed. **It is now complete**,
+so this feature's prerequisite is met.
 
 ---
 
@@ -189,8 +190,9 @@ currently accepts unlimited guesses.
 
 ## Constraints
 
-- **Phase 8 (rate limiting) is merged before this feature ships.** Not a
-  suggestion: the admin login is the highest-value target on the site.
+- **Phase 8 (rate limiting) ships before this feature.** Not a suggestion: the
+  admin login is the highest-value target on the site. **Met** — Phase 8 is
+  complete, and login now allows five failed attempts per address per 15 minutes.
 - **This repository is specified on its own.** The admin portal is a separate
   feature in the frontend repository, consuming this through `api/openapi.yaml`.
 - **No new runtime configuration.** No secrets, no environment variables — the
@@ -235,7 +237,7 @@ currently accepts unlimited guesses.
 
 ## References (internal only)
 
-- The prerequisite: `docs/specs/active/rate-limiting/index.md`
+- The prerequisite, now shipped: `docs/specs/implemented/rate-limiting/index.md`
 - Related specs: `docs/specs/implemented/platform-foundation/index.md` (roles,
   sessions, the 404 rule), `docs/specs/implemented/housing-requests/index.md`
   (the query test layer these phases depend on)
