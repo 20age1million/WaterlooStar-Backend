@@ -17,6 +17,10 @@ across both; everything from Phase 4 onward is not.
 | Feature | Phases | Status | Location |
 |---|---|---|---|
 | [Rate Limiting](./active/rate-limiting/index.md) | 1 (Phase 8) | Ready | `docs/specs/active/rate-limiting/` |
+| [Admin and Moderation](./active/admin-moderation/index.md) | 3 (9–11) | Ready | `docs/specs/active/admin-moderation/` |
+
+Rate limiting ships first: it protects every student's login, not just an admin's,
+and the admin surface should not exist in front of an unlimited login form.
 
 ## Implemented
 
@@ -82,11 +86,13 @@ Recorded in the Platform Foundation `index.md` and still in force:
 
 ## What comes next
 
-Rate limiting is specified above and is next. One gap remains unspecified:
+Rate limiting and the admin surface are specified above and are next, in that
+order. One gap remains unspecified:
 
 - **Email delivery.** Verification and reset links only reach the log, so on the
   live site nobody can finish signing up. The provider is chosen (Clerk's
-  transactional endpoint); `internal/email` already has the seam.
+  transactional endpoint); `internal/email` already has the seam. Until it lands,
+  an admin verifying accounts by hand (Phase 10) is how a real student gets in.
 
 After those: saves, views and the question thread; then messaging with contact
 privacy, which is what "accept an offer" is waiting on. Each starts with a new
