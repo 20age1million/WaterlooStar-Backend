@@ -9,11 +9,17 @@ The frontend is a **separate repository**, checked out beside this one as
 
 ---
 
-## Before doing anything: read the skills
+## Required before anything else: read the skill library
+
+**Reading the skill library in `.claude/skills/` is a requirement for picking up
+this project, not a suggestion.** Every feature here was built through it, and the
+workflow is not inferable from the code: nothing in the repository tells you that
+a specification is written and accepted before implementation, that a phase is one
+commit, or where a phase doc has to end up. Work that skips it produces changes
+that cannot be reviewed against anything and phases nobody can pick up after you.
 
 **This project works from committed specifications, not from ad-hoc changes.**
-The workflow is not optional and it is not obvious from the code, so read it
-before touching anything:
+Read these before touching anything:
 
 1. `.claude/skills/feature-start/SKILL.md` — how a feature begins. Produces an
    agreed spec under `docs/specs/active/<slug>/`, committed on a feature branch,
@@ -25,6 +31,12 @@ Also read whichever of these the task touches:
 
 - `.claude/skills/implementation-breakdown/SKILL.md` — splitting work into phases
 - `.claude/skills/release/SKILL.md` — release process
+
+The commit and pull-request conventions come from the skill library too:
+conventional commits as `<type>(<slug>): <description>`, branches as
+`<type>/<slug>`. The spec commit that opens a feature takes **no trailer lines** —
+`feature-start` says so explicitly, and it is the one exception to how every other
+commit here is signed.
 
 **Two skills in that folder do not apply here.** `az-pr-create` and
 `azure-devops-project-creator` came with the toolkit from another organisation's
@@ -49,7 +61,9 @@ that way; everything from Phase 4 onward is not.
 
 ### The short version of the workflow
 
-- Never work on `main`. Branch as `feature/<slug>`.
+- Never work on `main`. Branch as `<type>/<slug>` — the type is the kind of change,
+  matching the commit's, so a spec branch is `feature/…` but a test-only phase is
+  `test/…` and a fix is `fix/…`.
 - A spec is written and **accepted by the developer** before implementation.
   Acceptance is explicit — silence is not agreement.
 - One phase at a time. Each phase ends with: checklist ticked, Implementation
@@ -83,7 +97,19 @@ only thing that calls it.
 | 7 | Offers: an owner answers a request with one of their own listings |
 | 8 | Rate limiting on the auth and write endpoints, keyed on identity |
 
-Twenty-six endpoints are live; `README.md` has the table.
+Twenty-six endpoints are live; `README.md` has the table, and the rate limits with
+it.
+
+**Branches in flight**, oldest first — each is based on the one above it, so they
+merge in this order:
+
+| Branch | Holds |
+|---|---|
+| `test/query-test-layer` | Phase 5 and the spec for 5–7 |
+| `feat/housing-requests` | Phase 6 |
+| `feat/request-offers` | Phase 7 |
+| `feature/rate-limiting` | Phase 8, complete |
+| `feature/admin-moderation` | The accepted spec for phases 9–11; no code yet |
 
 ### What comes next
 
@@ -182,7 +208,7 @@ These were all found the hard way and will silently regress if undone.
 cp .env.example .env
 docker compose up -d       # PostgreSQL 18 on :5433
 go run ./cmd/migrate up
-go run ./cmd/seed          # six development listings
+go run ./cmd/seed          # 6 development listings and 5 requests
 go run ./cmd/api           # :8080
 ```
 

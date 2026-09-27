@@ -19,7 +19,7 @@ oapi-codegen are pinned as `go.mod` tool dependencies.
 cp .env.example .env     # defaults match docker-compose.yml
 make up                  # start PostgreSQL 18
 make migrate-up          # apply migrations
-make seed                # load the six development listings
+make seed                # load the development fixtures: 6 listings, 5 requests
 make run                 # start the API on :8080
 ```
 
@@ -56,11 +56,15 @@ internal/db              pgx pool; queries/ holds the .sql sqlc generates from.
 internal/db/sqlcgen      Generated. Do not edit.
 internal/httpapi         Router and handlers.
 internal/httpapi/gen     Generated from openapi.yaml. Do not edit.
-internal/db/seed         Development fixtures: the six prototype listings.
+internal/db/seed         Development fixtures: 6 prototype listings and 5 requests.
 internal/email           Sender interface; log-only implementation, no provider yet.
 internal/middleware      Request id, logging, recovery, CORS, auth, CSRF.
+internal/ratelimit       Token buckets and the limits, in policy.go.
+internal/db/dbtest       Harness that runs queries against a real PostgreSQL.
 migrations               Schema source of truth; sqlc reads these too.
+deploy                   Production compose file and the reverse-proxy notes.
 docs/specs               Feature specifications.
+.claude/skills           The skill library. Read it before changing anything.
 ```
 
 ## Endpoints
@@ -137,6 +141,14 @@ The state lives in the process, so a restart forgets the counters and a second
 replica would double every limit. Both are recorded rather than hidden.
 
 ## Working on it
+
+**Read `.claude/skills/` first — it is required, not optional.** Every feature here
+was built from a committed specification under `docs/specs/`: `feature-start`
+produces one and gets it accepted before any code is written, and
+`feature-implement` builds a single phase per run and stops at its commit. None of
+that is inferable from the code, and work that skips it cannot be reviewed against
+anything. `docs/specs/INDEX.md` says what is built, what is specified and what is
+next.
 
 **The contract comes first.** `api/openapi.yaml` is edited *before* the handler
 that serves a new shape, never after. Then:
