@@ -33,6 +33,7 @@ type fakeQuerier struct {
 	listings          []sqlcgen.Listing
 	requests          []sqlcgen.HousingRequest
 	offers            []sqlcgen.RequestOffer
+	adminActions      []sqlcgen.AdminAction
 
 	pingErr error
 }

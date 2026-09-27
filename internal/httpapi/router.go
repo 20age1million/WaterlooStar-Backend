@@ -13,6 +13,7 @@ import (
 	"github.com/20age1million/WaterlooStar-Backend/internal/apierror"
 	"github.com/20age1million/WaterlooStar-Backend/internal/auth"
 	"github.com/20age1million/WaterlooStar-Backend/internal/config"
+	"github.com/20age1million/WaterlooStar-Backend/internal/db"
 	"github.com/20age1million/WaterlooStar-Backend/internal/db/sqlcgen"
 	"github.com/20age1million/WaterlooStar-Backend/internal/email"
 	"github.com/20age1million/WaterlooStar-Backend/internal/httpapi/gen"
@@ -27,9 +28,13 @@ import (
 // so handler tests can substitute a stub and exercise failure paths — an
 // unreachable database, for one — without standing up PostgreSQL.
 type Server struct {
-	cfg          config.Config
-	log          *slog.Logger
-	queries      sqlcgen.Querier
+	cfg     config.Config
+	log     *slog.Logger
+	queries sqlcgen.Querier
+	// tx runs a function in one transaction. Admin changes go through
+	// db.Audited with it, so a change and its ledger row commit together. Over
+	// the in-memory fake it is db.Direct, which has nothing to roll back.
+	tx           db.TxRunner
 	tokens       *auth.TokenService
 	cookies      auth.CookieWriter
 	mailer       email.Sender
@@ -39,7 +44,9 @@ type Server struct {
 
 // NewServer wires the dependencies a handler set needs.
 func NewServer(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, mailer email.Sender, buildVersion string) *Server {
-	return NewServerWithQuerier(cfg, log, sqlcgen.New(pool), mailer, buildVersion)
+	s := NewServerWithQuerier(cfg, log, sqlcgen.New(pool), mailer, buildVersion)
+	s.tx = db.PoolTx(pool)
+	return s
 }
 
 // NewServerWithQuerier builds a Server over any Querier. Used by tests.
@@ -59,6 +66,7 @@ func NewServerWithLimiter(cfg config.Config, log *slog.Logger, q sqlcgen.Querier
 		cfg:          cfg,
 		log:          log,
 		queries:      q,
+		tx:           db.Direct(q),
 		tokens:       auth.NewTokenService(cfg.JWTSecret),
 		cookies:      auth.NewCookieWriter(cfg.IsDevelopment()),
 		mailer:       mailer,

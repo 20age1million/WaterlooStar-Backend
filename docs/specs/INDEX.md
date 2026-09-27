@@ -16,7 +16,7 @@ across both; everything from Phase 4 onward is not.
 
 | Feature | Phases | Status | Location |
 |---|---|---|---|
-| [Admin and Moderation](./active/admin-moderation/index.md) | 3 (9–11) | Ready | `docs/specs/active/admin-moderation/` |
+| [Admin and Moderation](./active/admin-moderation/index.md) | 3 (9–11) | In Progress: 9 complete | `docs/specs/active/admin-moderation/` |
 
 Rate limiting was its prerequisite and has shipped — it protected every student's
 login, not just an admin's, and the admin surface should not have existed in front

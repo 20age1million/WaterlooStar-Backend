@@ -20,8 +20,11 @@ sql:
             go_type: "github.com/google/uuid.UUID"
           - db_type: "uuid"
             nullable: true
+            # "UUID", not "uuid.UUID": with import set, sqlc prefixes the
+            # package itself. The doubled form went unnoticed until migration 8
+            # added the first nullable uuid column, and then failed to compile.
             go_type:
-              type: "uuid.UUID"
+              type: "UUID"
               pointer: true
               import: "github.com/google/uuid"
           - db_type: "timestamptz"

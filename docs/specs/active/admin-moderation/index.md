@@ -1,6 +1,6 @@
 # Admin and Moderation — API Phases 9–11
 
-**Status:** Ready
+**Status:** In Progress
 **Branch:** `feature/admin-moderation`
 **Ticket / Work Item:** N/A
 **Owner(s):** WaterlooStar backend
@@ -123,7 +123,7 @@ Nothing is ever erased. Every admin power in this feature has an inverse.
 
 | Phase | Title | Status | Location |
 |---|---|---|---|
-| [9 — Admin identity and the ledger](./phase-9-admin-identity.md) | The role becomes real, the audit table exists, and an admin can read every account | Ready | `docs/specs/active/admin-moderation/` |
+| [9 — Admin identity and the ledger](../../implemented/admin-moderation/phase-9-admin-identity.md) | The role becomes real, the audit table exists, and an admin can read every account | Complete | `docs/specs/implemented/admin-moderation/` |
 | [10 — Account management](./phase-10-account-management.md) | Suspend, reinstate, verify by hand, change role — each logged, each reversible | Ready | `docs/specs/active/admin-moderation/` |
 | [11 — Post moderation](./phase-11-post-moderation.md) | Read every post regardless of status; take one down and restore it | Ready | `docs/specs/active/admin-moderation/` |
 

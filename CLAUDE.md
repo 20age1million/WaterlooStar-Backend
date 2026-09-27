@@ -96,24 +96,24 @@ only thing that calls it.
 | 6 | Housing requests: table, lifecycle, browse with filters, write path |
 | 7 | Offers: an owner answers a request with one of their own listings |
 | 8 | Rate limiting on the auth and write endpoints, keyed on identity |
+| 9 | Admin identity: `cmd/admin`, the `admin_actions` ledger, read-only `/admin` surface |
 
-Twenty-six endpoints are live; `README.md` has the table, and the rate limits with
+Thirty endpoints exist, four of them admin-only; `README.md` has the table, and the rate limits with
 it.
+
+Phases 5–7 are merged into `main` (pull requests #6–#8).
 
 **Branches in flight**, oldest first — each is based on the one above it, so they
 merge in this order:
 
 | Branch | Holds |
 |---|---|
-| `test/query-test-layer` | Phase 5 and the spec for 5–7 |
-| `feat/housing-requests` | Phase 6 |
-| `feat/request-offers` | Phase 7 |
-| `feature/rate-limiting` | Phase 8, complete |
-| `feature/admin-moderation` | The accepted spec for phases 9–11; no code yet |
+| `feature/rate-limiting` | Phase 8, complete; not yet merged into `main` |
+| `feature/admin-moderation` | Phase 8 merged in, the spec for 9–11, and Phase 9 |
 
 ### What comes next
 
-**Specified and accepted:** Admin and Moderation, phases 9–11, in
+**Specified and accepted:** Admin and Moderation, phases 10–11 remaining, in
 `docs/specs/active/admin-moderation/`. The admin portal is a separate feature in
 the frontend repository.
 
@@ -200,6 +200,22 @@ These were all found the hard way and will silently regress if undone.
   route limits nothing and nothing complains, which is why
   `TestEveryLimitedRouteExists` checks them against the registered routes.
 
+- **`/admin` must look unrouted to non-admins, down to the headers.**
+  `requireAdmin` writes the refusal itself with `apierror.NotFound`, the call the
+  router's `NoRoute` makes, and the handler returns `unrouted{}`. The generated 404
+  response types encode differently (bare `application/json`, trailing newline),
+  so using them leaks which paths exist. A new admin operation needs a `Visit`
+  method on `unrouted`.
+- **Every admin change goes through `db.Audited`**, which runs the change and its
+  `admin_actions` row in one transaction. `db.ChangeRole` is the role change, with
+  the last-admin guard, for both `cmd/admin` and the portal.
+- **`go run ./cmd/migrate down` rolls back every migration**, and ignores a count
+  after it. One step is `down-one`. On the development database that means
+  re-running `migrate up` and `cmd/seed`.
+- **sqlc's nullable-uuid override names the type `UUID`, not `uuid.UUID`**,
+  because `import` already supplies the package. The doubled form went unnoticed
+  until migration 8 added the first nullable uuid column.
+
 ---
 
 ## Running it
@@ -209,6 +225,7 @@ cp .env.example .env
 docker compose up -d       # PostgreSQL 18 on :5433
 go run ./cmd/migrate up
 go run ./cmd/seed          # 6 development listings and 5 requests
+go run ./cmd/admin promote meil@uwaterloo.ca   # an admin, if you need one
 go run ./cmd/api           # :8080
 ```
 

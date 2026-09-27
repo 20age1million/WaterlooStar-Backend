@@ -49,6 +49,13 @@ tags:
       Housing Available - places students are offering. Public: browsing does
       not require an account.
 
+  - name: admin
+    description: |
+      The operator's surface. Every path here requires a session whose role is
+      `admin`, and answers **404** - not 401 or 403 - to anyone else, including
+      an anonymous caller. The refusal is the same one an unknown path gets, so
+      probing cannot tell that the surface exists.
+
 paths:
   /healthz:
     get:
@@ -907,6 +914,98 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /admin/overview:
+    get:
+      tags: [admin]
+      operationId: getAdminOverview
+      summary: Counts across the whole site
+      responses:
+        "200":
+          description: The numbers an operator starts from.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOverview"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/users:
+    get:
+      tags: [admin]
+      operationId: listAdminUsers
+      summary: Every account, searchable
+      description: |
+        Newest first. `q` matches part of an email address or username. Every
+        filter is optional and they compose; the total in `meta` reflects them.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [user, moderator, admin]
+        - name: verified
+          in: query
+          schema: { type: boolean }
+        - name: suspended
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: A page of accounts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/users/{id}:
+    get:
+      tags: [admin]
+      operationId: getAdminUser
+      summary: One account, and what has been done to it
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The account and its ledger entries, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserDetail"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/actions:
+    get:
+      tags: [admin]
+      operationId: listAdminActions
+      summary: The ledger
+      description: |
+        Every change an admin has made, newest first. Append-only: nothing in
+        this API edits or removes an entry.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: A page of ledger entries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminActionPage"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
 components:
   schemas:
     Health:
@@ -1452,6 +1551,137 @@ components:
           $ref: "#/components/schemas/Listing"
         owner:
           $ref: "#/components/schemas/ListingOwner"
+
+    AdminUser:
+      type: object
+      description: |
+        An account as an operator sees it. Deliberately separate from `User`:
+        the public shape has no business growing an operator's fields. Counts
+        include posts in every status.
+      required: [id, email, username, role, verified, created_at, suspended_at, suspend_reason, listing_count, request_count, offer_count]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        username: { type: string }
+        role:
+          type: string
+          enum: [user, moderator, admin]
+        verified: { type: boolean }
+        created_at: { type: string, format: date-time }
+        suspended_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Set while the account is suspended; null otherwise.
+        suspend_reason:
+          type: string
+          nullable: true
+        listing_count: { type: integer, minimum: 0 }
+        request_count: { type: integer, minimum: 0 }
+        offer_count: { type: integer, minimum: 0 }
+
+    AdminUserPage:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminUser"
+        meta:
+          $ref: "#/components/schemas/PageMeta"
+
+    AdminUserDetail:
+      type: object
+      required: [user, actions]
+      properties:
+        user:
+          $ref: "#/components/schemas/AdminUser"
+        actions:
+          type: array
+          description: What admins have done to this account, newest first.
+          items:
+            $ref: "#/components/schemas/AdminAction"
+
+    AdminAction:
+      type: object
+      description: One ledger entry.
+      required: [id, action, subject_type, subject_id, reason, detail, actor, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        action:
+          type: string
+          enum: [set_role, suspend, reinstate, verify, remove_post, restore_post]
+        subject_type:
+          type: string
+          enum: [user, listing, request]
+        subject_id: { type: string, format: uuid }
+        reason: { type: string }
+        detail:
+          type: object
+          additionalProperties: true
+          description: |
+            The before and after of this change. Its shape depends on the
+            action - for `set_role`, `{"from": "user", "to": "admin"}`.
+        actor:
+          $ref: "#/components/schemas/AdminActor"
+        created_at: { type: string, format: date-time }
+
+    AdminActor:
+      type: object
+      nullable: true
+      description: |
+        Who acted. Null when the change was made from the host with
+        `cmd/admin`, or when the acting account no longer exists.
+      required: [id, username]
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+
+    AdminActionPage:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminAction"
+        meta:
+          $ref: "#/components/schemas/PageMeta"
+
+    AdminOverview:
+      type: object
+      required: [users, listings, requests, actions_last_week]
+      properties:
+        users:
+          $ref: "#/components/schemas/AdminUserCounts"
+        listings:
+          $ref: "#/components/schemas/AdminPostCounts"
+        requests:
+          $ref: "#/components/schemas/AdminPostCounts"
+        actions_last_week:
+          type: integer
+          minimum: 0
+          description: Ledger entries written in the last seven days.
+
+    AdminUserCounts:
+      type: object
+      required: [total, verified, suspended, admins]
+      properties:
+        total: { type: integer, minimum: 0 }
+        verified: { type: integer, minimum: 0 }
+        suspended: { type: integer, minimum: 0 }
+        admins: { type: integer, minimum: 0 }
+
+    AdminPostCounts:
+      type: object
+      required: [total, published]
+      properties:
+        total:
+          type: integer
+          minimum: 0
+          description: Every post, whatever its status.
+        published: { type: integer, minimum: 0 }
 
     Error:
       type: object

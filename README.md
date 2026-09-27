@@ -49,6 +49,7 @@ api/openapi.yaml         The contract. Authoritative — edit before the handler
 cmd/api                  Service entry point.
 cmd/migrate              Migration runner (golang-migrate as a library).
 cmd/seed                 Loads development fixtures. Refuses to run outside development.
+cmd/admin                Grants and removes the admin role from the host. Every change is logged.
 internal/apierror        The single error envelope every failure returns.
 internal/auth            Password hashing, JWT mint/verify, cookie shaping, tokens.
 internal/config          Environment binding and validation.
@@ -99,6 +100,10 @@ Everything is described in `api/openapi.yaml`; this is the summary.
 | POST | `/requests/{id}/offers` | verified | Answer with one of your listings |
 | GET | `/requests/{id}/offers` | poster or offerer | The offers on a request |
 | DELETE | `/offers/{id}` | offerer | Withdraw yours |
+| GET | `/admin/overview` | admin | Counts across the site |
+| GET | `/admin/users` | admin | Every account, searchable and filterable |
+| GET | `/admin/users/{id}` | admin | One account, with what admins have done to it |
+| GET | `/admin/actions` | admin | The ledger of every admin change |
 
 Browsing is public by design: an account is only needed to post, to offer, or
 to message a poster.
@@ -139,6 +144,30 @@ Four things about it are deliberate:
 
 The state lives in the process, so a restart forgets the counters and a second
 replica would double every limit. Both are recorded rather than hidden.
+
+## Admin
+
+Every `/admin` path answers **404** to anyone who is not an admin, including an
+anonymous caller, and the response is identical to an unknown path's. Nothing
+tells a prober the surface exists.
+
+The first admin is made from the host. No HTTP path grants the role to someone
+who does not already hold it:
+
+```bash
+go run ./cmd/admin promote you@uwaterloo.ca -reason "Site operator"
+go run ./cmd/admin list
+go run ./cmd/admin demote  you@uwaterloo.ca -reason "Stepped down"
+```
+
+The account must already exist, so register it first. A role change ends the
+account's sessions, and the new role applies from the next login. The last
+admin cannot be demoted.
+
+Every admin change, from the CLI or later from the portal, is written to
+`admin_actions` in the same transaction as the change itself, with a reason.
+The table is append-only: no query updates or deletes a row, and a test fails
+if one is added.
 
 ## Working on it
 
