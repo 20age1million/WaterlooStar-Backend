@@ -97,8 +97,9 @@ only thing that calls it.
 | 7 | Offers: an owner answers a request with one of their own listings |
 | 8 | Rate limiting on the auth and write endpoints, keyed on identity |
 | 9 | Admin identity: `cmd/admin`, the `admin_actions` ledger, read-only `/admin` surface |
+| 10 | Account management: suspend, reinstate, verify by hand, change role |
 
-Thirty endpoints exist, four of them admin-only; `README.md` has the table, and the rate limits with
+Thirty-four endpoints exist, eight of them admin-only; `README.md` has the table, and the rate limits with
 it.
 
 Phases 5–7 are merged into `main` (pull requests #6–#8).
@@ -109,12 +110,14 @@ merge in this order:
 | Branch | Holds |
 |---|---|
 | `feature/rate-limiting` | Phase 8, complete; not yet merged into `main` |
-| `feature/admin-moderation` | Phase 8 merged in, the spec for 9–11, and Phase 9 |
+| `feature/admin-moderation` | Phase 8 merged in, the spec for 9–11, and Phases 9–10 |
 
 ### What comes next
 
-**Specified and accepted:** Admin and Moderation, phases 10–11 remaining, in
-`docs/specs/active/admin-moderation/`. The admin portal is a separate feature in
+**Specified and accepted:** Admin and Moderation, Phase 11 remaining, in
+`docs/specs/active/admin-moderation/`. Listing Terms (Phase 12), on
+`feature/listing-terms`, merges after it because of migration order. Then email
+delivery as Phase 13, agreed 2026-09-27. The admin portal is a separate feature in
 the frontend repository.
 
 Unspecified, in the order I would take it:
@@ -209,6 +212,13 @@ These were all found the hard way and will silently regress if undone.
 - **Every admin change goes through `db.Audited`**, which runs the change and its
   `admin_actions` row in one transaction. `db.ChangeRole` is the role change, with
   the last-admin guard, for both `cmd/admin` and the portal.
+- **Every public read must filter out suspended accounts, in the SQL.** Listings,
+  requests and offers each carry `AND u.suspended_at IS NULL` on the owner, and
+  the offer counts inside the request reads join the offering owner for the same
+  reason. A new public query without it shows a suspended account's posts. The
+  owner's own `/me/...` reads deliberately do not filter.
+- **Login says "suspended" only after the password matches.** Checking earlier
+  would tell anyone guessing that the address exists and is suspended.
 - **`go run ./cmd/migrate down` rolls back every migration**, and ignores a count
   after it. One step is `down-one`. On the development database that means
   re-running `migrate up` and `cmd/seed`.

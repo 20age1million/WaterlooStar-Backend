@@ -36,6 +36,12 @@ type RoleChange struct {
 //
 // cmd/admin calls this with a nil actor; the portal will pass the admin's id.
 func ChangeRole(ctx context.Context, run TxRunner, actor *uuid.UUID, userID uuid.UUID, role, reason string) (RoleChange, error) {
+	// An admin cannot change their own role from the portal: the only change
+	// available is a demotion, which could leave nobody able to undo it.
+	if actor != nil && *actor == userID {
+		return RoleChange{}, ErrSelfAction
+	}
+
 	var out RoleChange
 
 	logged, err := Audited(ctx, run, Action{

@@ -109,3 +109,29 @@ SELECT
     (SELECT count(*) FROM housing_requests WHERE status = 'published') AS requests_published,
     (SELECT count(*) FROM admin_actions
       WHERE created_at > now() - interval '7 days')               AS actions_last_week;
+
+-- Suspension sets the time, the actor and the reason together. Only an active
+-- account matches, so suspending one already suspended keeps the original
+-- time and reason rather than overwriting them; no row back means that.
+-- name: SuspendUser :one
+UPDATE users
+SET suspended_at = now(),
+    suspended_by = sqlc.narg('actor_id'),
+    suspend_reason = sqlc.arg('reason')
+WHERE id = sqlc.arg('id') AND suspended_at IS NULL
+RETURNING *;
+
+-- Reinstating clears all three, so a reinstated account looks like one never
+-- suspended. The history lives in admin_actions, not here.
+-- name: ReinstateUser :one
+UPDATE users
+SET suspended_at = NULL, suspended_by = NULL, suspend_reason = NULL
+WHERE id = sqlc.arg('id') AND suspended_at IS NOT NULL
+RETURNING *;
+
+-- Verification by hand, for while email links only reach the log. Only an
+-- unverified account matches, so a repeat changes and logs nothing.
+-- name: VerifyUserAsAdmin :one
+UPDATE users SET verified = true
+WHERE id = sqlc.arg('id') AND NOT verified
+RETURNING *;

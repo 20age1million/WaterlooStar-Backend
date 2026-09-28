@@ -17,6 +17,9 @@ SELECT count(*)
 FROM housing_requests r
 JOIN users u ON u.id = r.poster_id
 WHERE r.status = 'published'
+  -- A suspended owner's posts leave public view while the suspension lasts
+  -- (Phase 10). In the SQL, not the handler, so no read path can forget it.
+  AND u.suspended_at IS NULL
   AND ($1::text IS NULL
        OR r.search @@ websearch_to_tsquery('english', $1::text))
   AND ($2::date IS NULL OR r.start_date <= $2::date)
@@ -187,12 +190,15 @@ SELECT
     (SELECT count(*)
        FROM request_offers o
        JOIN listings ol ON ol.id = o.listing_id
+       JOIN users ou    ON ou.id = o.owner_id
       WHERE o.request_id = r.id
         AND o.withdrawn_at IS NULL
-        AND ol.status = 'published') AS offer_count
+        AND ol.status = 'published'
+        AND ou.suspended_at IS NULL) AS offer_count
 FROM housing_requests r
 JOIN users u ON u.id = r.poster_id
 WHERE r.id = $1 AND r.status = 'published'
+  AND u.suspended_at IS NULL
 `
 
 type GetPublishedRequestRow struct {
@@ -283,12 +289,17 @@ SELECT
     (SELECT count(*)
        FROM request_offers o
        JOIN listings ol ON ol.id = o.listing_id
+       JOIN users ou    ON ou.id = o.owner_id
       WHERE o.request_id = r.id
         AND o.withdrawn_at IS NULL
-        AND ol.status = 'published') AS offer_count
+        AND ol.status = 'published'
+        AND ou.suspended_at IS NULL) AS offer_count
 FROM housing_requests r
 JOIN users u ON u.id = r.poster_id
 WHERE r.status = 'published'
+  -- A suspended owner's posts leave public view while the suspension lasts
+  -- (Phase 10). In the SQL, not the handler, so no read path can forget it.
+  AND u.suspended_at IS NULL
   AND ($1::text IS NULL
        OR r.search @@ websearch_to_tsquery('english', $1::text))
   -- A request wants a place for its own window: it overlaps what an owner has
@@ -430,9 +441,11 @@ SELECT
     (SELECT count(*)
        FROM request_offers o
        JOIN listings ol ON ol.id = o.listing_id
+       JOIN users ou    ON ou.id = o.owner_id
       WHERE o.request_id = r.id
         AND o.withdrawn_at IS NULL
-        AND ol.status = 'published') AS offer_count
+        AND ol.status = 'published'
+        AND ou.suspended_at IS NULL) AS offer_count
 FROM housing_requests r
 JOIN users u ON u.id = r.poster_id
 WHERE r.poster_id = $1

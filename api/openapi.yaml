@@ -186,6 +186,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "403":
+          description: |
+            The account is suspended. Returned only when the password is
+            correct, so it tells someone guessing nothing they did not know.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalError" }
 
@@ -985,6 +993,161 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /admin/users/{id}/suspend:
+    post:
+      tags: [admin]
+      operationId: suspendAdminUser
+      summary: Suspend an account
+      description: |
+        The account can no longer log in or refresh, every session it has
+        ends, and its listings, requests and offers leave public view. Nothing
+        it posted is changed, so reinstating restores exactly what this hid.
+        An admin cannot suspend themselves.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminReason"
+      responses:
+        "200":
+          description: The account as it now stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            The change cannot be made: it would change nothing, it targets your
+            own account, or it would remove the last admin. `message` says which.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/users/{id}/reinstate:
+    post:
+      tags: [admin]
+      operationId: reinstateAdminUser
+      summary: Lift a suspension
+      description: |
+        The account can log in again and its posts return to public view
+        in whatever state their owner left them.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminReason"
+      responses:
+        "200":
+          description: The account as it now stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            The change cannot be made: it would change nothing, it targets your
+            own account, or it would remove the last admin. `message` says which.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/users/{id}/verify:
+    post:
+      tags: [admin]
+      operationId: verifyAdminUser
+      summary: Verify an account by hand
+      description: |
+        Marks the uwaterloo.ca address as confirmed without the email link.
+        The account's next session refresh carries the change.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminReason"
+      responses:
+        "200":
+          description: The account as it now stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            The change cannot be made: it would change nothing, it targets your
+            own account, or it would remove the last admin. `message` says which.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/users/{id}/role:
+    post:
+      tags: [admin]
+      operationId: setAdminUserRole
+      summary: Change an account's role
+      description: |
+        Between `user` and `admin`. Ends the account's sessions, so the new
+        role applies from its next login. An admin cannot change their own
+        role, and the last admin cannot be demoted.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminRoleChange"
+      responses:
+        "200":
+          description: The account as it now stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            The change cannot be made: it would change nothing, it targets your
+            own account, or it would remove the last admin. `message` says which.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /admin/actions:
     get:
       tags: [admin]
@@ -1579,6 +1742,29 @@ components:
         listing_count: { type: integer, minimum: 0 }
         request_count: { type: integer, minimum: 0 }
         offer_count: { type: integer, minimum: 0 }
+
+    AdminReason:
+      type: object
+      description: Why an admin is making a change. Recorded in the ledger.
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 1000
+          description: At least ten characters once trimmed.
+
+    AdminRoleChange:
+      type: object
+      required: [role, reason]
+      properties:
+        role:
+          type: string
+          enum: [user, admin]
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 1000
 
     AdminUserPage:
       type: object

@@ -397,6 +397,37 @@ func (q *Queries) ListUsersForAdmin(ctx context.Context, arg ListUsersForAdminPa
 	return items, nil
 }
 
+const reinstateUser = `-- name: ReinstateUser :one
+UPDATE users
+SET suspended_at = NULL, suspended_by = NULL, suspend_reason = NULL
+WHERE id = $1 AND suspended_at IS NOT NULL
+RETURNING id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason
+`
+
+// Reinstating clears all three, so a reinstated account looks like one never
+// suspended. The history lives in admin_actions, not here.
+func (q *Queries) ReinstateUser(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, reinstateUser, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Username,
+		&i.PasswordHash,
+		&i.Role,
+		&i.Verified,
+		&i.AvatarUrl,
+		&i.Level,
+		&i.StarPoints,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SuspendedAt,
+		&i.SuspendedBy,
+		&i.SuspendReason,
+	)
+	return i, err
+}
+
 const setUserRole = `-- name: SetUserRole :one
 UPDATE users SET role = $1 WHERE id = $2 RETURNING id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason
 `
@@ -410,6 +441,76 @@ type SetUserRoleParams struct {
 // Phase 10. Always paired with InsertAdminAction in one transaction.
 func (q *Queries) SetUserRole(ctx context.Context, arg SetUserRoleParams) (User, error) {
 	row := q.db.QueryRow(ctx, setUserRole, arg.Role, arg.ID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Username,
+		&i.PasswordHash,
+		&i.Role,
+		&i.Verified,
+		&i.AvatarUrl,
+		&i.Level,
+		&i.StarPoints,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SuspendedAt,
+		&i.SuspendedBy,
+		&i.SuspendReason,
+	)
+	return i, err
+}
+
+const suspendUser = `-- name: SuspendUser :one
+UPDATE users
+SET suspended_at = now(),
+    suspended_by = $1,
+    suspend_reason = $2
+WHERE id = $3 AND suspended_at IS NULL
+RETURNING id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason
+`
+
+type SuspendUserParams struct {
+	ActorID *uuid.UUID
+	Reason  *string
+	ID      uuid.UUID
+}
+
+// Suspension sets the time, the actor and the reason together. Only an active
+// account matches, so suspending one already suspended keeps the original
+// time and reason rather than overwriting them; no row back means that.
+func (q *Queries) SuspendUser(ctx context.Context, arg SuspendUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, suspendUser, arg.ActorID, arg.Reason, arg.ID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Username,
+		&i.PasswordHash,
+		&i.Role,
+		&i.Verified,
+		&i.AvatarUrl,
+		&i.Level,
+		&i.StarPoints,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SuspendedAt,
+		&i.SuspendedBy,
+		&i.SuspendReason,
+	)
+	return i, err
+}
+
+const verifyUserAsAdmin = `-- name: VerifyUserAsAdmin :one
+UPDATE users SET verified = true
+WHERE id = $1 AND NOT verified
+RETURNING id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason
+`
+
+// Verification by hand, for while email links only reach the log. Only an
+// unverified account matches, so a repeat changes and logs nothing.
+func (q *Queries) VerifyUserAsAdmin(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, verifyUserAsAdmin, id)
 	var i User
 	err := row.Scan(
 		&i.ID,

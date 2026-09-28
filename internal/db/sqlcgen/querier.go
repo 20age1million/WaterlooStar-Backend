@@ -146,6 +146,9 @@ type Querier interface {
 	// sqlc codegen, generated method, real round-trip — works end to end, before any
 	// domain table exists to query.
 	Ping(ctx context.Context) (int32, error)
+	// Reinstating clears all three, so a reinstated account looks like one never
+	// suspended. The history lives in admin_actions, not here.
+	ReinstateUser(ctx context.Context, id uuid.UUID) (User, error)
 	// Used on password change: every existing session is ended, so a password reset
 	// actually evicts whoever prompted it.
 	RevokeAllRefreshTokensForUser(ctx context.Context, userID uuid.UUID) error
@@ -163,6 +166,10 @@ type Querier interface {
 	// A role change. Only cmd/admin calls it in this phase; the portal gains it in
 	// Phase 10. Always paired with InsertAdminAction in one transaction.
 	SetUserRole(ctx context.Context, arg SetUserRoleParams) (User, error)
+	// Suspension sets the time, the actor and the reason together. Only an active
+	// account matches, so suspending one already suspended keeps the original
+	// time and reason rather than overwriting them; no row back means that.
+	SuspendUser(ctx context.Context, arg SuspendUserParams) (User, error)
 	// Every field is optional: an edit form sends what changed, and COALESCE leaves
 	// the rest alone. A PUT would make every omitted field a deletion.
 	UpdateListing(ctx context.Context, arg UpdateListingParams) (Listing, error)
@@ -170,6 +177,9 @@ type Querier interface {
 	// every omitted field a deletion.
 	UpdateRequest(ctx context.Context, arg UpdateRequestParams) (HousingRequest, error)
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
+	// Verification by hand, for while email links only reach the log. Only an
+	// unverified account matches, so a repeat changes and logs nothing.
+	VerifyUserAsAdmin(ctx context.Context, id uuid.UUID) (User, error)
 	// Withdrawn rather than deleted: the row stays, so the same listing cannot be
 	// re-offered against the same request by working around the unique constraint.
 	WithdrawOffer(ctx context.Context, id uuid.UUID) (RequestOffer, error)

@@ -81,7 +81,7 @@ func Audited(
 	a Action,
 	change func(q sqlcgen.Querier) (detail map[string]any, err error),
 ) (sqlcgen.AdminAction, error) {
-	reason := strings.TrimSpace(a.Reason)
+	reason := trimmedReason(a.Reason)
 	if reason == "" {
 		return sqlcgen.AdminAction{}, ErrReasonRequired
 	}
@@ -118,3 +118,6 @@ func Audited(
 	}
 	return logged, nil
 }
+
+// trimmedReason is a reason as it is stored: without surrounding whitespace.
+func trimmedReason(reason string) string { return strings.TrimSpace(reason) }

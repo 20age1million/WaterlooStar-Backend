@@ -373,6 +373,10 @@ func (f *fakeQuerier) matches(l sqlcgen.Listing, p sqlcgen.ListListingsParams) b
 		return false
 	}
 	owner := f.users[l.OwnerID]
+	// A suspended owner's posts are out of public view (Phase 10).
+	if owner.SuspendedAt != nil {
+		return false
+	}
 
 	if p.Search != nil {
 		haystack := strings.ToLower(strings.Join(
@@ -499,7 +503,7 @@ func (f *fakeQuerier) GetPublishedListing(_ context.Context, id uuid.UUID) (sqlc
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	for _, l := range f.listings {
-		if l.ID == id && l.Status == "published" {
+		if l.ID == id && l.Status == "published" && f.users[l.OwnerID].SuspendedAt == nil {
 			owner := f.users[l.OwnerID]
 			return sqlcgen.GetPublishedListingRow{
 				Listing:        l,

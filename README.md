@@ -104,6 +104,10 @@ Everything is described in `api/openapi.yaml`; this is the summary.
 | GET | `/admin/users` | admin | Every account, searchable and filterable |
 | GET | `/admin/users/{id}` | admin | One account, with what admins have done to it |
 | GET | `/admin/actions` | admin | The ledger of every admin change |
+| POST | `/admin/users/{id}/suspend` | admin | Suspend an account |
+| POST | `/admin/users/{id}/reinstate` | admin | Lift a suspension |
+| POST | `/admin/users/{id}/verify` | admin | Verify an account by hand |
+| POST | `/admin/users/{id}/role` | admin | Move an account between user and admin |
 
 Browsing is public by design: an account is only needed to post, to offer, or
 to message a poster.
@@ -164,7 +168,17 @@ The account must already exist, so register it first. A role change ends the
 account's sessions, and the new role applies from the next login. The last
 admin cannot be demoted.
 
-Every admin change, from the CLI or later from the portal, is written to
+**Suspension** is reversible and changes nothing an account posted. A suspended
+account cannot log in (a 403, given only after the right password) or refresh,
+its sessions end, and its listings, requests and offers leave every public read,
+because the read queries filter on it. Reinstating brings all of it back as it
+was. Every action needs a reason of at least ten characters. An admin cannot
+suspend themselves or change their own role.
+
+**Verifying by hand** is how a real student gets in while verification emails
+only reach the log.
+
+Every admin change, from the CLI or the portal, is written to
 `admin_actions` in the same transaction as the change itself, with a reason.
 The table is append-only: no query updates or deletes a row, and a test fails
 if one is added.

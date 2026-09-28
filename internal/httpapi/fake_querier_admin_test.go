@@ -221,3 +221,40 @@ func (f *fakeQuerier) AdminOverviewCounts(context.Context) (sqlcgen.AdminOvervie
 	}
 	return c, nil
 }
+
+func (f *fakeQuerier) SuspendUser(_ context.Context, arg sqlcgen.SuspendUserParams) (sqlcgen.User, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	u, ok := f.users[arg.ID]
+	if !ok || u.SuspendedAt != nil {
+		return sqlcgen.User{}, pgx.ErrNoRows
+	}
+	now := time.Now()
+	u.SuspendedAt, u.SuspendedBy, u.SuspendReason = &now, arg.ActorID, arg.Reason
+	f.users[arg.ID] = u
+	return u, nil
+}
+
+func (f *fakeQuerier) ReinstateUser(_ context.Context, id uuid.UUID) (sqlcgen.User, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	u, ok := f.users[id]
+	if !ok || u.SuspendedAt == nil {
+		return sqlcgen.User{}, pgx.ErrNoRows
+	}
+	u.SuspendedAt, u.SuspendedBy, u.SuspendReason = nil, nil, nil
+	f.users[id] = u
+	return u, nil
+}
+
+func (f *fakeQuerier) VerifyUserAsAdmin(_ context.Context, id uuid.UUID) (sqlcgen.User, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	u, ok := f.users[id]
+	if !ok || u.Verified {
+		return sqlcgen.User{}, pgx.ErrNoRows
+	}
+	u.Verified = true
+	f.users[id] = u
+	return u, nil
+}
