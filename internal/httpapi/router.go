@@ -17,6 +17,7 @@ import (
 	"github.com/20age1million/WaterlooStar-Backend/internal/email"
 	"github.com/20age1million/WaterlooStar-Backend/internal/httpapi/gen"
 	"github.com/20age1million/WaterlooStar-Backend/internal/middleware"
+	"github.com/20age1million/WaterlooStar-Backend/internal/ratelimit"
 )
 
 // Server implements the generated StrictServerInterface. It holds everything a
@@ -32,6 +33,7 @@ type Server struct {
 	tokens       *auth.TokenService
 	cookies      auth.CookieWriter
 	mailer       email.Sender
+	limiter      *ratelimit.Limiter
 	buildVersion string
 }
 
@@ -42,6 +44,17 @@ func NewServer(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, mailer e
 
 // NewServerWithQuerier builds a Server over any Querier. Used by tests.
 func NewServerWithQuerier(cfg config.Config, log *slog.Logger, q sqlcgen.Querier, mailer email.Sender, buildVersion string) *Server {
+	return NewServerWithLimiter(cfg, log, q, mailer, buildVersion, ratelimit.New(0, nil))
+}
+
+// NewServerWithLimiter builds a Server over a specific rate limiter.
+//
+// It exists so a test can supply a limiter on a fake clock and assert that an
+// exhausted allowance refills, without the suite waiting real minutes for it.
+func NewServerWithLimiter(cfg config.Config, log *slog.Logger, q sqlcgen.Querier, mailer email.Sender, buildVersion string, limiter *ratelimit.Limiter) *Server {
+	if limiter == nil {
+		limiter = ratelimit.New(0, nil)
+	}
 	return &Server{
 		cfg:          cfg,
 		log:          log,
@@ -49,6 +62,7 @@ func NewServerWithQuerier(cfg config.Config, log *slog.Logger, q sqlcgen.Querier
 		tokens:       auth.NewTokenService(cfg.JWTSecret),
 		cookies:      auth.NewCookieWriter(cfg.IsDevelopment()),
 		mailer:       mailer,
+		limiter:      limiter,
 		buildVersion: buildVersion,
 	}
 }
@@ -56,6 +70,10 @@ func NewServerWithQuerier(cfg config.Config, log *slog.Logger, q sqlcgen.Querier
 // Tokens exposes the token service so the router can build the authentication
 // middleware from the same instance the handlers mint with.
 func (s *Server) Tokens() *auth.TokenService { return s.tokens }
+
+// Limiter exposes the rate limiter so the router's middleware and the login
+// handler charge against the same buckets.
+func (s *Server) Limiter() *ratelimit.Limiter { return s.limiter }
 
 // NewRouter builds the gin engine with the middleware chain and mounts the
 // generated routes.
@@ -86,6 +104,12 @@ func NewRouter(cfg config.Config, log *slog.Logger, srv *Server) *gin.Engine {
 		// Rejects unsafe methods that carry a session cookie without a matching
 		// CSRF header. Runs before any handler sees the request.
 		middleware.CSRF(),
+		// Answers 429 before the expensive part of a limited route runs — a
+		// bcrypt comparison, a database round trip, an email. It runs after
+		// Authenticate because the per-user limits key on the principal, and
+		// after CSRF because a request that cannot prove intent should not be
+		// able to spend someone else's allowance.
+		RateLimit(srv.Limiter(), log),
 	)
 
 	// An unknown path and an unknown record should look the same to a client.
