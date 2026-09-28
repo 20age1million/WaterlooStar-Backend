@@ -258,3 +258,144 @@ func (f *fakeQuerier) VerifyUserAsAdmin(_ context.Context, id uuid.UUID) (sqlcge
 	f.users[id] = u
 	return u, nil
 }
+
+// ------------------------------------------------------ post moderation
+
+func (f *fakeQuerier) adminListings(search, status *string, removed *bool, owner *uuid.UUID) []sqlcgen.Listing {
+	var out []sqlcgen.Listing
+	for _, l := range f.listings {
+		if search != nil && !strings.Contains(strings.ToLower(l.Title+" "+l.Body+" "+l.Neighbourhood), strings.ToLower(*search)) {
+			continue
+		}
+		if status != nil && l.Status != *status {
+			continue
+		}
+		if removed != nil && (l.RemovedAt != nil) != *removed {
+			continue
+		}
+		if owner != nil && l.OwnerID != *owner {
+			continue
+		}
+		out = append(out, l)
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
+	return out
+}
+
+func (f *fakeQuerier) ListListingsForAdmin(_ context.Context, arg sqlcgen.ListListingsForAdminParams) ([]sqlcgen.ListListingsForAdminRow, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	all := f.adminListings(arg.Search, arg.Status, arg.Removed, arg.OwnerID)
+	out := []sqlcgen.ListListingsForAdminRow{}
+	for i := int(arg.Offset); i < len(all) && len(out) < int(arg.Limit); i++ {
+		u := f.users[all[i].OwnerID]
+		out = append(out, sqlcgen.ListListingsForAdminRow{
+			Listing: all[i], OwnerUsername: u.Username, OwnerEmail: u.Email,
+			OwnerAvatarUrl: u.AvatarUrl, OwnerVerified: u.Verified, OwnerSuspendedAt: u.SuspendedAt,
+		})
+	}
+	return out, nil
+}
+
+func (f *fakeQuerier) CountListingsForAdmin(_ context.Context, arg sqlcgen.CountListingsForAdminParams) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return int64(len(f.adminListings(arg.Search, arg.Status, arg.Removed, arg.OwnerID))), nil
+}
+
+func (f *fakeQuerier) adminRequests(search, status *string, removed *bool, owner *uuid.UUID) []sqlcgen.HousingRequest {
+	var out []sqlcgen.HousingRequest
+	for _, r := range f.requests {
+		if search != nil && !strings.Contains(strings.ToLower(r.Title+" "+r.Body+" "+r.Neighbourhood), strings.ToLower(*search)) {
+			continue
+		}
+		if status != nil && r.Status != *status {
+			continue
+		}
+		if removed != nil && (r.RemovedAt != nil) != *removed {
+			continue
+		}
+		if owner != nil && r.PosterID != *owner {
+			continue
+		}
+		out = append(out, r)
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
+	return out
+}
+
+func (f *fakeQuerier) ListRequestsForAdmin(_ context.Context, arg sqlcgen.ListRequestsForAdminParams) ([]sqlcgen.ListRequestsForAdminRow, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	all := f.adminRequests(arg.Search, arg.Status, arg.Removed, arg.OwnerID)
+	out := []sqlcgen.ListRequestsForAdminRow{}
+	for i := int(arg.Offset); i < len(all) && len(out) < int(arg.Limit); i++ {
+		u := f.users[all[i].PosterID]
+		out = append(out, sqlcgen.ListRequestsForAdminRow{
+			HousingRequest: all[i], PosterUsername: u.Username, PosterEmail: u.Email,
+			PosterAvatarUrl: u.AvatarUrl, PosterVerified: u.Verified, PosterSuspendedAt: u.SuspendedAt,
+			OfferCount: int64(len(f.visibleOffers(all[i].ID))),
+		})
+	}
+	return out, nil
+}
+
+func (f *fakeQuerier) CountRequestsForAdmin(_ context.Context, arg sqlcgen.CountRequestsForAdminParams) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return int64(len(f.adminRequests(arg.Search, arg.Status, arg.Removed, arg.OwnerID))), nil
+}
+
+func (f *fakeQuerier) RemoveListing(_ context.Context, arg sqlcgen.RemoveListingParams) (sqlcgen.Listing, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i, l := range f.listings {
+		if l.ID == arg.ID && l.RemovedAt == nil {
+			now := time.Now()
+			l.RemovedAt, l.RemovedBy, l.RemovedReason = &now, arg.ActorID, arg.Reason
+			f.listings[i] = l
+			return l, nil
+		}
+	}
+	return sqlcgen.Listing{}, pgx.ErrNoRows
+}
+
+func (f *fakeQuerier) RestoreListing(_ context.Context, id uuid.UUID) (sqlcgen.Listing, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i, l := range f.listings {
+		if l.ID == id && l.RemovedAt != nil {
+			l.RemovedAt, l.RemovedBy, l.RemovedReason = nil, nil, nil
+			f.listings[i] = l
+			return l, nil
+		}
+	}
+	return sqlcgen.Listing{}, pgx.ErrNoRows
+}
+
+func (f *fakeQuerier) RemoveRequest(_ context.Context, arg sqlcgen.RemoveRequestParams) (sqlcgen.HousingRequest, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i, r := range f.requests {
+		if r.ID == arg.ID && r.RemovedAt == nil {
+			now := time.Now()
+			r.RemovedAt, r.RemovedBy, r.RemovedReason = &now, arg.ActorID, arg.Reason
+			f.requests[i] = r
+			return r, nil
+		}
+	}
+	return sqlcgen.HousingRequest{}, pgx.ErrNoRows
+}
+
+func (f *fakeQuerier) RestoreRequest(_ context.Context, id uuid.UUID) (sqlcgen.HousingRequest, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i, r := range f.requests {
+		if r.ID == id && r.RemovedAt != nil {
+			r.RemovedAt, r.RemovedBy, r.RemovedReason = nil, nil, nil
+			f.requests[i] = r
+			return r, nil
+		}
+	}
+	return sqlcgen.HousingRequest{}, pgx.ErrNoRows
+}

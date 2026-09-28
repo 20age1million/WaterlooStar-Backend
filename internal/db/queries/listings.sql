@@ -20,6 +20,8 @@ WHERE l.status = 'published'
   -- A suspended owner's posts leave public view while the suspension lasts
   -- (Phase 10). In the SQL, not the handler, so no read path can forget it.
   AND u.suspended_at IS NULL
+  -- ...and a post a moderator took down is out of view whatever its status.
+  AND l.removed_at IS NULL
   AND (sqlc.narg('search')::text IS NULL
        OR l.search @@ websearch_to_tsquery('english', sqlc.narg('search')::text))
   -- A listing is available for a wanted window if it starts by then and runs
@@ -59,6 +61,8 @@ WHERE l.status = 'published'
   -- A suspended owner's posts leave public view while the suspension lasts
   -- (Phase 10). In the SQL, not the handler, so no read path can forget it.
   AND u.suspended_at IS NULL
+  -- ...and a post a moderator took down is out of view whatever its status.
+  AND l.removed_at IS NULL
   AND (sqlc.narg('search')::text IS NULL
        OR l.search @@ websearch_to_tsquery('english', sqlc.narg('search')::text))
   AND (sqlc.narg('start_after')::date  IS NULL OR l.start_date <= sqlc.narg('start_after')::date)
@@ -85,7 +89,8 @@ SELECT
 FROM listings l
 JOIN users u ON u.id = l.owner_id
 WHERE l.id = $1 AND l.status = 'published'
-  AND u.suspended_at IS NULL;
+  AND u.suspended_at IS NULL
+  AND l.removed_at IS NULL;
 
 -- name: ListPhotosForListing :many
 SELECT * FROM listing_photos

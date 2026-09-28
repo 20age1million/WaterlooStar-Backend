@@ -48,11 +48,17 @@ func requireAdmin(ctx context.Context) (auth.Principal, bool) {
 // interface and writes nothing.
 type unrouted struct{}
 
-func (unrouted) VisitGetAdminOverviewResponse(http.ResponseWriter) error   { return nil }
-func (unrouted) VisitListAdminUsersResponse(http.ResponseWriter) error     { return nil }
-func (unrouted) VisitGetAdminUserResponse(http.ResponseWriter) error       { return nil }
-func (unrouted) VisitListAdminActionsResponse(http.ResponseWriter) error   { return nil }
-func (unrouted) VisitSuspendAdminUserResponse(http.ResponseWriter) error   { return nil }
-func (unrouted) VisitReinstateAdminUserResponse(http.ResponseWriter) error { return nil }
-func (unrouted) VisitVerifyAdminUserResponse(http.ResponseWriter) error    { return nil }
-func (unrouted) VisitSetAdminUserRoleResponse(http.ResponseWriter) error   { return nil }
+func (unrouted) VisitGetAdminOverviewResponse(http.ResponseWriter) error    { return nil }
+func (unrouted) VisitListAdminUsersResponse(http.ResponseWriter) error      { return nil }
+func (unrouted) VisitGetAdminUserResponse(http.ResponseWriter) error        { return nil }
+func (unrouted) VisitListAdminActionsResponse(http.ResponseWriter) error    { return nil }
+func (unrouted) VisitSuspendAdminUserResponse(http.ResponseWriter) error    { return nil }
+func (unrouted) VisitReinstateAdminUserResponse(http.ResponseWriter) error  { return nil }
+func (unrouted) VisitVerifyAdminUserResponse(http.ResponseWriter) error     { return nil }
+func (unrouted) VisitSetAdminUserRoleResponse(http.ResponseWriter) error    { return nil }
+func (unrouted) VisitListAdminListingsResponse(http.ResponseWriter) error   { return nil }
+func (unrouted) VisitRemoveAdminListingResponse(http.ResponseWriter) error  { return nil }
+func (unrouted) VisitRestoreAdminListingResponse(http.ResponseWriter) error { return nil }
+func (unrouted) VisitListAdminRequestsResponse(http.ResponseWriter) error   { return nil }
+func (unrouted) VisitRemoveAdminRequestResponse(http.ResponseWriter) error  { return nil }
+func (unrouted) VisitRestoreAdminRequestResponse(http.ResponseWriter) error { return nil }

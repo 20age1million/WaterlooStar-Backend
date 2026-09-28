@@ -108,6 +108,12 @@ Everything is described in `api/openapi.yaml`; this is the summary.
 | POST | `/admin/users/{id}/reinstate` | admin | Lift a suspension |
 | POST | `/admin/users/{id}/verify` | admin | Verify an account by hand |
 | POST | `/admin/users/{id}/role` | admin | Move an account between user and admin |
+| GET | `/admin/listings` | admin | Every listing, in any state |
+| POST | `/admin/listings/{id}/remove` | admin | Take a listing down |
+| POST | `/admin/listings/{id}/restore` | admin | Restore it |
+| GET | `/admin/requests` | admin | Every request, in any state |
+| POST | `/admin/requests/{id}/remove` | admin | Take a request down |
+| POST | `/admin/requests/{id}/restore` | admin | Restore it |
 
 Browsing is public by design: an account is only needed to post, to offer, or
 to message a poster.
@@ -174,6 +180,12 @@ its sessions end, and its listings, requests and offers leave every public read,
 because the read queries filter on it. Reinstating brings all of it back as it
 was. Every action needs a reason of at least ten characters. An admin cannot
 suspend themselves or change their own role.
+
+**Takedown** is a moderator's axis, separate from the owner's `status`. A removed
+listing or request leaves every public read whatever its status, its owner still
+sees it with the moderator's reason, and the owner cannot edit, republish or
+archive it (409) until it is restored. Restoring returns it in whatever status
+the owner had left it.
 
 **Verifying by hand** is how a real student gets in while verification emails
 only reach the log.

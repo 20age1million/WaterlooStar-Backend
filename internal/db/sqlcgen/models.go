@@ -52,6 +52,9 @@ type HousingRequest struct {
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 	Search             interface{}
+	RemovedAt          *time.Time
+	RemovedBy          *uuid.UUID
+	RemovedReason      *string
 }
 
 type Listing struct {
@@ -93,6 +96,9 @@ type Listing struct {
 	UpdatedAt        time.Time
 	Search           interface{}
 	PublishedAt      *time.Time
+	RemovedAt        *time.Time
+	RemovedBy        *uuid.UUID
+	RemovedReason    *string
 }
 
 type ListingPhoto struct {

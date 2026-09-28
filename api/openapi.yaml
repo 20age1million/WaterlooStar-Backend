@@ -481,6 +481,15 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            A moderator has taken this post down. It cannot be edited, republished
+            or archived until it is restored; `message` carries the moderator's
+            reason.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
 
     delete:
@@ -501,6 +510,15 @@ paths:
           description: Archived.
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            A moderator has taken this post down. It cannot be edited, republished
+            or archived until it is restored; `message` carries the moderator's
+            reason.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
 
   /listings/{id}/status:
@@ -547,6 +565,15 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            A moderator has taken this post down. It cannot be edited, republished
+            or archived until it is restored; `message` carries the moderator's
+            reason.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
 
   /me/listings:
@@ -732,6 +759,15 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            A moderator has taken this post down. It cannot be edited, republished
+            or archived until it is restored; `message` carries the moderator's
+            reason.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
 
     delete:
@@ -751,6 +787,15 @@ paths:
           description: Archived.
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            A moderator has taken this post down. It cannot be edited, republished
+            or archived until it is restored; `message` carries the moderator's
+            reason.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
 
   /requests/{id}/status:
@@ -792,6 +837,15 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            A moderator has taken this post down. It cannot be edited, republished
+            or archived until it is restored; `message` carries the moderator's
+            reason.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
 
   /requests/{id}/offers:
@@ -1148,6 +1202,228 @@ paths:
                 $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /admin/listings:
+    get:
+      tags: [admin]
+      operationId: listAdminListings
+      summary: Every listing, in any status
+      description: |
+        Newest first, including drafts, paused, archived and taken-down posts,
+        and posts by suspended accounts. The one read in this API that is not
+        limited to what the public sees.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - name: q
+          in: query
+          description: The same full-text search the public reads use.
+          schema: { type: string }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, published, paused, archived]
+        - name: removed
+          in: query
+          schema: { type: boolean }
+        - name: owner_id
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: A page of listings with their owners.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminListingPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/listings/{id}/remove:
+    post:
+      tags: [admin]
+      operationId: removeAdminListing
+      summary: Take a listing down
+      description: |
+        Hides it from every public read, whatever its status, and stops its
+        owner editing, republishing or archiving it. Its status is untouched.
+        The owner sees the reason.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminReason"
+      responses:
+        "200":
+          description: The listing as it now stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminListing"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Already taken down. The first takedown's reason stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/listings/{id}/restore:
+    post:
+      tags: [admin]
+      operationId: restoreAdminListing
+      summary: Restore a listing
+      description: |
+        Lifts the takedown. The listing returns in whatever status its owner
+        left it. A reason is optional here; the change is logged either way.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminOptionalReason"
+      responses:
+        "200":
+          description: The listing as it now stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminListing"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Not taken down.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/requests:
+    get:
+      tags: [admin]
+      operationId: listAdminRequests
+      summary: Every request, in any status
+      description: |
+        Newest first, including drafts, paused, archived and taken-down posts,
+        and posts by suspended accounts. The one read in this API that is not
+        limited to what the public sees.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - name: q
+          in: query
+          description: The same full-text search the public reads use.
+          schema: { type: string }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, published, paused, archived]
+        - name: removed
+          in: query
+          schema: { type: boolean }
+        - name: owner_id
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: A page of requests with their owners.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRequestPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/requests/{id}/remove:
+    post:
+      tags: [admin]
+      operationId: removeAdminRequest
+      summary: Take a request down
+      description: |
+        Hides it from every public read, whatever its status, and stops its
+        owner editing, republishing or archiving it. Its status is untouched.
+        The owner sees the reason.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminReason"
+      responses:
+        "200":
+          description: The request as it now stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRequest"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Already taken down. The first takedown's reason stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/requests/{id}/restore:
+    post:
+      tags: [admin]
+      operationId: restoreAdminRequest
+      summary: Restore a request
+      description: |
+        Lifts the takedown. The request returns in whatever status its owner
+        left it. A reason is optional here; the change is logged either way.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminOptionalReason"
+      responses:
+        "200":
+          description: The request as it now stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRequest"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Not taken down.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /admin/actions:
     get:
       tags: [admin]
@@ -1444,6 +1720,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ListingPhoto"
+        removal:
+          $ref: "#/components/schemas/PostRemoval"
 
     ListingInput:
       type: object
@@ -1634,6 +1912,8 @@ components:
         created_at: { type: string, format: date-time }
         poster:
           $ref: "#/components/schemas/ListingOwner"
+        removal:
+          $ref: "#/components/schemas/PostRemoval"
 
     RequestInput:
       type: object
@@ -1765,6 +2045,79 @@ components:
           type: string
           minLength: 10
           maxLength: 1000
+
+    PostRemoval:
+      type: object
+      description: |
+        A moderator's takedown. Present only on the owner's own reads and the
+        admin surface; a removed post never reaches a public read.
+      required: [removed_at, reason]
+      properties:
+        removed_at: { type: string, format: date-time }
+        reason:
+          type: string
+          description: The moderator's reason, shown to the owner as written.
+
+    AdminOptionalReason:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 1000
+
+    AdminPostOwner:
+      type: object
+      description: Whose post it is, as an operator needs to know it.
+      required: [id, username, email, verified, suspended_at]
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+        email: { type: string, format: email }
+        verified: { type: boolean }
+        suspended_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    AdminListing:
+      type: object
+      required: [listing, owner]
+      properties:
+        listing:
+          $ref: "#/components/schemas/Listing"
+        owner:
+          $ref: "#/components/schemas/AdminPostOwner"
+
+    AdminListingPage:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminListing"
+        meta:
+          $ref: "#/components/schemas/PageMeta"
+
+    AdminRequest:
+      type: object
+      required: [request, owner]
+      properties:
+        request:
+          $ref: "#/components/schemas/HousingRequest"
+        owner:
+          $ref: "#/components/schemas/AdminPostOwner"
+
+    AdminRequestPage:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminRequest"
+        meta:
+          $ref: "#/components/schemas/PageMeta"
 
     AdminUserPage:
       type: object

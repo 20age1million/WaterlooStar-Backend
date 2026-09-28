@@ -25,10 +25,12 @@ type Querier interface {
 	// The last-admin guard reads this before any demotion.
 	CountAdmins(ctx context.Context) (int64, error)
 	CountListings(ctx context.Context, arg CountListingsParams) (int64, error)
+	CountListingsForAdmin(ctx context.Context, arg CountListingsForAdminParams) (int64, error)
 	// The same count the read queries compute inline, for the write path's
 	// responses. Visible offers only, on the same two conditions.
 	CountOffersForRequest(ctx context.Context, requestID uuid.UUID) (int64, error)
 	CountRequests(ctx context.Context, arg CountRequestsParams) (int64, error)
+	CountRequestsForAdmin(ctx context.Context, arg CountRequestsForAdminParams) (int64, error)
 	// Used to tell a duplicate email from a duplicate username *internally*, without
 	// the response revealing which one collided.
 	CountUsersByEmailOrUsername(ctx context.Context, arg CountUsersByEmailOrUsernameParams) (CountUsersByEmailOrUsernameRow, error)
@@ -101,6 +103,20 @@ type Querier interface {
 	// The owner's own listings, every status. The public endpoints show only
 	// published rows, so this is the only way to see a paused or archived post.
 	ListListingsByOwner(ctx context.Context, ownerID uuid.UUID) ([]ListListingsByOwnerRow, error)
+	// The operator's view of posts, and takedown.
+	//
+	// Takedown is not status. status is the owner's; removed_at is the
+	// moderator's. Restoring clears the moderator's columns and nothing else, so a
+	// restored post is back in whatever status its owner had left it, having never
+	// lost it.
+	// EVERY listing, in any status, removed or not, whoever owns it.
+	//
+	// This and ListRequestsForAdmin are the only queries in the repository that do
+	// not filter on status = 'published', suspension and takedown. The rest of the
+	// query files exist to keep that rule; these break it on purpose, because an
+	// operator has to see what the public cannot. Reached only through the /admin
+	// guard.
+	ListListingsForAdmin(ctx context.Context, arg ListListingsForAdminParams) ([]ListListingsForAdminRow, error)
 	// An owner's own offers, whatever became of them.
 	ListOffersByOwner(ctx context.Context, ownerID uuid.UUID) ([]ListOffersByOwnerRow, error)
 	// The offers on a request, as the student sees them: the listing comes with it,
@@ -128,6 +144,10 @@ type Querier interface {
 	// The poster's own requests, every status. The public endpoints show only
 	// published ones, so this is the only way to see a draft or a paused request.
 	ListRequestsByPoster(ctx context.Context, posterID uuid.UUID) ([]ListRequestsByPosterRow, error)
+	// EVERY request, in any status, removed or not. The same deliberate exception
+	// as ListListingsForAdmin; see there. The offer count is the one the poster
+	// sees: live offers on visible listings from active owners.
+	ListRequestsForAdmin(ctx context.Context, arg ListRequestsForAdminParams) ([]ListRequestsForAdminRow, error)
 	// The operator's read surface, and the ledger.
 	//
 	// Everything here is reached only through the /admin guard or cmd/admin. These
@@ -149,6 +169,12 @@ type Querier interface {
 	// Reinstating clears all three, so a reinstated account looks like one never
 	// suspended. The history lives in admin_actions, not here.
 	ReinstateUser(ctx context.Context, id uuid.UUID) (User, error)
+	// Takedown. Only a post not already removed matches, so a second takedown
+	// cannot overwrite the first one's time and reason; no row back means that.
+	RemoveListing(ctx context.Context, arg RemoveListingParams) (Listing, error)
+	RemoveRequest(ctx context.Context, arg RemoveRequestParams) (HousingRequest, error)
+	RestoreListing(ctx context.Context, id uuid.UUID) (Listing, error)
+	RestoreRequest(ctx context.Context, id uuid.UUID) (HousingRequest, error)
 	// Used on password change: every existing session is ended, so a password reset
 	// actually evicts whoever prompted it.
 	RevokeAllRefreshTokensForUser(ctx context.Context, userID uuid.UUID) error

@@ -80,6 +80,12 @@ func (s *Server) CreateOffer(ctx context.Context, request gen.CreateOfferRequest
 				errorBody(apierror.CodeNotFound, "No listing of yours with that id.")),
 		}, nil
 	}
+	if listing.RemovedAt != nil {
+		return gen.CreateOffer400JSONResponse{
+			BadRequestJSONResponse: gen.BadRequestJSONResponse(errorBody(apierror.CodeValidation,
+				"A moderator took that listing down, so it can't be offered.")),
+		}, nil
+	}
 	if listing.Status != "published" {
 		return gen.CreateOffer400JSONResponse{
 			BadRequestJSONResponse: gen.BadRequestJSONResponse(errorBody(apierror.CodeValidation,

@@ -21,6 +21,7 @@ SELECT
       WHERE o.request_id = r.id
         AND o.withdrawn_at IS NULL
         AND ol.status = 'published'
+        AND ol.removed_at IS NULL
         AND ou.suspended_at IS NULL) AS offer_count
 FROM housing_requests r
 JOIN users u ON u.id = r.poster_id
@@ -28,6 +29,8 @@ WHERE r.status = 'published'
   -- A suspended owner's posts leave public view while the suspension lasts
   -- (Phase 10). In the SQL, not the handler, so no read path can forget it.
   AND u.suspended_at IS NULL
+  -- ...and a post a moderator took down is out of view whatever its status.
+  AND r.removed_at IS NULL
   AND (sqlc.narg('search')::text IS NULL
        OR r.search @@ websearch_to_tsquery('english', sqlc.narg('search')::text))
   -- A request wants a place for its own window: it overlaps what an owner has
@@ -68,6 +71,8 @@ WHERE r.status = 'published'
   -- A suspended owner's posts leave public view while the suspension lasts
   -- (Phase 10). In the SQL, not the handler, so no read path can forget it.
   AND u.suspended_at IS NULL
+  -- ...and a post a moderator took down is out of view whatever its status.
+  AND r.removed_at IS NULL
   AND (sqlc.narg('search')::text IS NULL
        OR r.search @@ websearch_to_tsquery('english', sqlc.narg('search')::text))
   AND (sqlc.narg('start_after')::date IS NULL OR r.start_date <= sqlc.narg('start_after')::date)
@@ -99,11 +104,13 @@ SELECT
       WHERE o.request_id = r.id
         AND o.withdrawn_at IS NULL
         AND ol.status = 'published'
+        AND ol.removed_at IS NULL
         AND ou.suspended_at IS NULL) AS offer_count
 FROM housing_requests r
 JOIN users u ON u.id = r.poster_id
 WHERE r.id = sqlc.arg('id') AND r.status = 'published'
-  AND u.suspended_at IS NULL;
+  AND u.suspended_at IS NULL
+  AND r.removed_at IS NULL;
 
 -- ---------------------------------------------------------------- write path
 
@@ -122,6 +129,7 @@ SELECT
       WHERE o.request_id = r.id
         AND o.withdrawn_at IS NULL
         AND ol.status = 'published'
+        AND ol.removed_at IS NULL
         AND ou.suspended_at IS NULL) AS offer_count
 FROM housing_requests r
 JOIN users u ON u.id = r.poster_id

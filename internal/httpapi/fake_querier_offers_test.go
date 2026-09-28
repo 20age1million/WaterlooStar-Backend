@@ -52,7 +52,7 @@ func (f *fakeQuerier) visibleOffers(requestID uuid.UUID) []sqlcgen.RequestOffer 
 			continue
 		}
 		for _, l := range f.listings {
-			if l.ID == o.ListingID && l.Status == "published" {
+			if l.ID == o.ListingID && l.Status == "published" && l.RemovedAt == nil {
 				out = append(out, o)
 				break
 			}

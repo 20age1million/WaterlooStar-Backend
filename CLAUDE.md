@@ -98,8 +98,9 @@ only thing that calls it.
 | 8 | Rate limiting on the auth and write endpoints, keyed on identity |
 | 9 | Admin identity: `cmd/admin`, the `admin_actions` ledger, read-only `/admin` surface |
 | 10 | Account management: suspend, reinstate, verify by hand, change role |
+| 11 | Post moderation: every post in any state, takedown and restore |
 
-Thirty-four endpoints exist, eight of them admin-only; `README.md` has the table, and the rate limits with
+Forty endpoints exist, fourteen of them admin-only; `README.md` has the table, and the rate limits with
 it.
 
 Phases 5–7 are merged into `main` (pull requests #6–#8).
@@ -110,13 +111,13 @@ merge in this order:
 | Branch | Holds |
 |---|---|
 | `feature/rate-limiting` | Phase 8, complete; not yet merged into `main` |
-| `feature/admin-moderation` | Phase 8 merged in, the spec for 9–11, and Phases 9–10 |
+| `feature/admin-moderation` | Phase 8 merged in, and Admin and Moderation complete (9–11) |
+| `feature/listing-terms` | The accepted spec for Phase 12; merges after the above (migration 10) |
 
 ### What comes next
 
-**Specified and accepted:** Admin and Moderation, Phase 11 remaining, in
-`docs/specs/active/admin-moderation/`. Listing Terms (Phase 12), on
-`feature/listing-terms`, merges after it because of migration order. Then email
+**Specified and accepted:** Listing Terms (Phase 12), on `feature/listing-terms`,
+which merges after Admin and Moderation because of migration order. Then email
 delivery as Phase 13, agreed 2026-09-27. The admin portal is a separate feature in
 the frontend repository.
 
@@ -212,6 +213,14 @@ These were all found the hard way and will silently regress if undone.
 - **Every admin change goes through `db.Audited`**, which runs the change and its
   `admin_actions` row in one transaction. `db.ChangeRole` is the role change, with
   the last-admin guard, for both `cmd/admin` and the portal.
+- **Takedown is not `status`.** `removed_at` is the moderator's; `status` is the
+  owner's. Sharing a column would let an owner republish over a moderator and
+  lose what the status was. `ownedListing`/`ownedRequest` refuse a removed post
+  with a 409, so every owner write path inherits the rule.
+- **The admin post lists are the one exception to the published-only rule.**
+  `ListListingsForAdmin` and `ListRequestsForAdmin` read every row on purpose,
+  behind the `/admin` guard. Every other read of a post filters on `status`,
+  `removed_at` and the owner's `suspended_at`.
 - **Every public read must filter out suspended accounts, in the SQL.** Listings,
   requests and offers each carry `AND u.suspended_at IS NULL` on the owner, and
   the offer counts inside the request reads join the offering owner for the same

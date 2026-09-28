@@ -369,7 +369,7 @@ func (f *fakeQuerier) DeleteAllListings(context.Context) error {
 // a fake that filtered more loosely than the database would let a handler test
 // pass against behaviour PostgreSQL would reject.
 func (f *fakeQuerier) matches(l sqlcgen.Listing, p sqlcgen.ListListingsParams) bool {
-	if l.Status != "published" {
+	if l.Status != "published" || l.RemovedAt != nil {
 		return false
 	}
 	owner := f.users[l.OwnerID]
@@ -503,7 +503,7 @@ func (f *fakeQuerier) GetPublishedListing(_ context.Context, id uuid.UUID) (sqlc
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	for _, l := range f.listings {
-		if l.ID == id && l.Status == "published" && f.users[l.OwnerID].SuspendedAt == nil {
+		if l.ID == id && l.Status == "published" && l.RemovedAt == nil && f.users[l.OwnerID].SuspendedAt == nil {
 			owner := f.users[l.OwnerID]
 			return sqlcgen.GetPublishedListingRow{
 				Listing:        l,
