@@ -14,7 +14,9 @@ across both; everything from Phase 4 onward is not.
 
 ## Active
 
-*None.*
+| Feature | Phases | Status | Location |
+|---|---|---|---|
+| [Listing Terms](./active/listing-terms/index.md) | 1 (Phase 12) | Ready | `docs/specs/active/listing-terms/` |
 
 ## Implemented
 
