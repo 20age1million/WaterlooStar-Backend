@@ -118,6 +118,7 @@ func toListing(row sqlcgen.Listing, owner gen.ListingOwner, photos []sqlcgen.Lis
 			Position: int(photo.Position),
 		})
 	}
+	out.Removal = removalFrom(row.RemovedAt, row.RemovedReason)
 
 	return out
 }
@@ -159,6 +160,7 @@ func toRequest(row sqlcgen.HousingRequest, poster gen.ListingOwner, offers int64
 	} else {
 		out.PublishedAt = nullable.NewNullNullable[time.Time]()
 	}
+	out.Removal = removalFrom(row.RemovedAt, row.RemovedReason)
 
 	return out
 }
@@ -193,4 +195,18 @@ func nullableString(value *string) nullable.Nullable[string] {
 		return nullable.NewNullNullable[string]()
 	}
 	return nullable.NewNullableWithValue(*value)
+}
+
+// removalFrom is a post's takedown for the response, or nil. A removed post
+// never reaches a public read, so only the owner's reads and the admin's carry
+// one; public responses are unchanged.
+func removalFrom(at *time.Time, reason *string) *gen.PostRemoval {
+	if at == nil {
+		return nil
+	}
+	r := gen.PostRemoval{RemovedAt: *at}
+	if reason != nil {
+		r.Reason = *reason
+	}
+	return &r
 }

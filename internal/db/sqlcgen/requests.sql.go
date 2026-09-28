@@ -17,6 +17,11 @@ SELECT count(*)
 FROM housing_requests r
 JOIN users u ON u.id = r.poster_id
 WHERE r.status = 'published'
+  -- A suspended owner's posts leave public view while the suspension lasts
+  -- (Phase 10). In the SQL, not the handler, so no read path can forget it.
+  AND u.suspended_at IS NULL
+  -- ...and a post a moderator took down is out of view whatever its status.
+  AND r.removed_at IS NULL
   AND ($1::text IS NULL
        OR r.search @@ websearch_to_tsquery('english', $1::text))
   AND ($2::date IS NULL OR r.start_date <= $2::date)
@@ -92,7 +97,7 @@ INSERT INTO housing_requests (
     CASE WHEN $17::text = 'published' THEN now() END,
     $18
 )
-RETURNING id, poster_id, title, body, budget_cents, start_date, end_date, lease_months, term_tag, occupants, pets, furnished_preferred, parking_needed, laundry_needed, max_distance_m, neighbourhood, status, published_at, views, created_at, updated_at, search
+RETURNING id, poster_id, title, body, budget_cents, start_date, end_date, lease_months, term_tag, occupants, pets, furnished_preferred, parking_needed, laundry_needed, max_distance_m, neighbourhood, status, published_at, views, created_at, updated_at, search, removed_at, removed_by, removed_reason
 `
 
 type CreateRequestParams struct {
@@ -164,6 +169,9 @@ func (q *Queries) CreateRequest(ctx context.Context, arg CreateRequestParams) (H
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Search,
+		&i.RemovedAt,
+		&i.RemovedBy,
+		&i.RemovedReason,
 	)
 	return i, err
 }
@@ -180,19 +188,24 @@ func (q *Queries) DeleteAllRequests(ctx context.Context) error {
 
 const getPublishedRequest = `-- name: GetPublishedRequest :one
 SELECT
-    r.id, r.poster_id, r.title, r.body, r.budget_cents, r.start_date, r.end_date, r.lease_months, r.term_tag, r.occupants, r.pets, r.furnished_preferred, r.parking_needed, r.laundry_needed, r.max_distance_m, r.neighbourhood, r.status, r.published_at, r.views, r.created_at, r.updated_at, r.search,
+    r.id, r.poster_id, r.title, r.body, r.budget_cents, r.start_date, r.end_date, r.lease_months, r.term_tag, r.occupants, r.pets, r.furnished_preferred, r.parking_needed, r.laundry_needed, r.max_distance_m, r.neighbourhood, r.status, r.published_at, r.views, r.created_at, r.updated_at, r.search, r.removed_at, r.removed_by, r.removed_reason,
     u.username   AS poster_username,
     u.avatar_url AS poster_avatar_url,
     u.verified   AS poster_verified,
     (SELECT count(*)
        FROM request_offers o
        JOIN listings ol ON ol.id = o.listing_id
+       JOIN users ou    ON ou.id = o.owner_id
       WHERE o.request_id = r.id
         AND o.withdrawn_at IS NULL
-        AND ol.status = 'published') AS offer_count
+        AND ol.status = 'published'
+        AND ol.removed_at IS NULL
+        AND ou.suspended_at IS NULL) AS offer_count
 FROM housing_requests r
 JOIN users u ON u.id = r.poster_id
 WHERE r.id = $1 AND r.status = 'published'
+  AND u.suspended_at IS NULL
+  AND r.removed_at IS NULL
 `
 
 type GetPublishedRequestRow struct {
@@ -229,6 +242,9 @@ func (q *Queries) GetPublishedRequest(ctx context.Context, id uuid.UUID) (GetPub
 		&i.HousingRequest.CreatedAt,
 		&i.HousingRequest.UpdatedAt,
 		&i.HousingRequest.Search,
+		&i.HousingRequest.RemovedAt,
+		&i.HousingRequest.RemovedBy,
+		&i.HousingRequest.RemovedReason,
 		&i.PosterUsername,
 		&i.PosterAvatarUrl,
 		&i.PosterVerified,
@@ -238,7 +254,7 @@ func (q *Queries) GetPublishedRequest(ctx context.Context, id uuid.UUID) (GetPub
 }
 
 const getRequestForOwner = `-- name: GetRequestForOwner :one
-SELECT id, poster_id, title, body, budget_cents, start_date, end_date, lease_months, term_tag, occupants, pets, furnished_preferred, parking_needed, laundry_needed, max_distance_m, neighbourhood, status, published_at, views, created_at, updated_at, search FROM housing_requests WHERE id = $1
+SELECT id, poster_id, title, body, budget_cents, start_date, end_date, lease_months, term_tag, occupants, pets, furnished_preferred, parking_needed, laundry_needed, max_distance_m, neighbourhood, status, published_at, views, created_at, updated_at, search, removed_at, removed_by, removed_reason FROM housing_requests WHERE id = $1
 `
 
 // Any status, so ownership can be checked before an edit. "Not yours" and "does
@@ -269,6 +285,9 @@ func (q *Queries) GetRequestForOwner(ctx context.Context, id uuid.UUID) (Housing
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Search,
+		&i.RemovedAt,
+		&i.RemovedBy,
+		&i.RemovedReason,
 	)
 	return i, err
 }
@@ -276,19 +295,27 @@ func (q *Queries) GetRequestForOwner(ctx context.Context, id uuid.UUID) (Housing
 const listRequests = `-- name: ListRequests :many
 
 SELECT
-    r.id, r.poster_id, r.title, r.body, r.budget_cents, r.start_date, r.end_date, r.lease_months, r.term_tag, r.occupants, r.pets, r.furnished_preferred, r.parking_needed, r.laundry_needed, r.max_distance_m, r.neighbourhood, r.status, r.published_at, r.views, r.created_at, r.updated_at, r.search,
+    r.id, r.poster_id, r.title, r.body, r.budget_cents, r.start_date, r.end_date, r.lease_months, r.term_tag, r.occupants, r.pets, r.furnished_preferred, r.parking_needed, r.laundry_needed, r.max_distance_m, r.neighbourhood, r.status, r.published_at, r.views, r.created_at, r.updated_at, r.search, r.removed_at, r.removed_by, r.removed_reason,
     u.username   AS poster_username,
     u.avatar_url AS poster_avatar_url,
     u.verified   AS poster_verified,
     (SELECT count(*)
        FROM request_offers o
        JOIN listings ol ON ol.id = o.listing_id
+       JOIN users ou    ON ou.id = o.owner_id
       WHERE o.request_id = r.id
         AND o.withdrawn_at IS NULL
-        AND ol.status = 'published') AS offer_count
+        AND ol.status = 'published'
+        AND ol.removed_at IS NULL
+        AND ou.suspended_at IS NULL) AS offer_count
 FROM housing_requests r
 JOIN users u ON u.id = r.poster_id
 WHERE r.status = 'published'
+  -- A suspended owner's posts leave public view while the suspension lasts
+  -- (Phase 10). In the SQL, not the handler, so no read path can forget it.
+  AND u.suspended_at IS NULL
+  -- ...and a post a moderator took down is out of view whatever its status.
+  AND r.removed_at IS NULL
   AND ($1::text IS NULL
        OR r.search @@ websearch_to_tsquery('english', $1::text))
   -- A request wants a place for its own window: it overlaps what an owner has
@@ -405,6 +432,9 @@ func (q *Queries) ListRequests(ctx context.Context, arg ListRequestsParams) ([]L
 			&i.HousingRequest.CreatedAt,
 			&i.HousingRequest.UpdatedAt,
 			&i.HousingRequest.Search,
+			&i.HousingRequest.RemovedAt,
+			&i.HousingRequest.RemovedBy,
+			&i.HousingRequest.RemovedReason,
 			&i.PosterUsername,
 			&i.PosterAvatarUrl,
 			&i.PosterVerified,
@@ -423,16 +453,19 @@ func (q *Queries) ListRequests(ctx context.Context, arg ListRequestsParams) ([]L
 const listRequestsByPoster = `-- name: ListRequestsByPoster :many
 
 SELECT
-    r.id, r.poster_id, r.title, r.body, r.budget_cents, r.start_date, r.end_date, r.lease_months, r.term_tag, r.occupants, r.pets, r.furnished_preferred, r.parking_needed, r.laundry_needed, r.max_distance_m, r.neighbourhood, r.status, r.published_at, r.views, r.created_at, r.updated_at, r.search,
+    r.id, r.poster_id, r.title, r.body, r.budget_cents, r.start_date, r.end_date, r.lease_months, r.term_tag, r.occupants, r.pets, r.furnished_preferred, r.parking_needed, r.laundry_needed, r.max_distance_m, r.neighbourhood, r.status, r.published_at, r.views, r.created_at, r.updated_at, r.search, r.removed_at, r.removed_by, r.removed_reason,
     u.username   AS poster_username,
     u.avatar_url AS poster_avatar_url,
     u.verified   AS poster_verified,
     (SELECT count(*)
        FROM request_offers o
        JOIN listings ol ON ol.id = o.listing_id
+       JOIN users ou    ON ou.id = o.owner_id
       WHERE o.request_id = r.id
         AND o.withdrawn_at IS NULL
-        AND ol.status = 'published') AS offer_count
+        AND ol.status = 'published'
+        AND ol.removed_at IS NULL
+        AND ou.suspended_at IS NULL) AS offer_count
 FROM housing_requests r
 JOIN users u ON u.id = r.poster_id
 WHERE r.poster_id = $1
@@ -482,6 +515,9 @@ func (q *Queries) ListRequestsByPoster(ctx context.Context, posterID uuid.UUID) 
 			&i.HousingRequest.CreatedAt,
 			&i.HousingRequest.UpdatedAt,
 			&i.HousingRequest.Search,
+			&i.HousingRequest.RemovedAt,
+			&i.HousingRequest.RemovedBy,
+			&i.HousingRequest.RemovedReason,
 			&i.PosterUsername,
 			&i.PosterAvatarUrl,
 			&i.PosterVerified,
@@ -505,7 +541,7 @@ SET status = $1::text,
         ELSE published_at
     END
 WHERE id = $2
-RETURNING id, poster_id, title, body, budget_cents, start_date, end_date, lease_months, term_tag, occupants, pets, furnished_preferred, parking_needed, laundry_needed, max_distance_m, neighbourhood, status, published_at, views, created_at, updated_at, search
+RETURNING id, poster_id, title, body, budget_cents, start_date, end_date, lease_months, term_tag, occupants, pets, furnished_preferred, parking_needed, laundry_needed, max_distance_m, neighbourhood, status, published_at, views, created_at, updated_at, search, removed_at, removed_by, removed_reason
 `
 
 type SetRequestStatusParams struct {
@@ -542,6 +578,9 @@ func (q *Queries) SetRequestStatus(ctx context.Context, arg SetRequestStatusPara
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Search,
+		&i.RemovedAt,
+		&i.RemovedBy,
+		&i.RemovedReason,
 	)
 	return i, err
 }
@@ -563,7 +602,7 @@ SET title               = coalesce($1,               title),
     max_distance_m      = coalesce($13,      max_distance_m),
     neighbourhood       = coalesce($14,       neighbourhood)
 WHERE id = $15
-RETURNING id, poster_id, title, body, budget_cents, start_date, end_date, lease_months, term_tag, occupants, pets, furnished_preferred, parking_needed, laundry_needed, max_distance_m, neighbourhood, status, published_at, views, created_at, updated_at, search
+RETURNING id, poster_id, title, body, budget_cents, start_date, end_date, lease_months, term_tag, occupants, pets, furnished_preferred, parking_needed, laundry_needed, max_distance_m, neighbourhood, status, published_at, views, created_at, updated_at, search, removed_at, removed_by, removed_reason
 `
 
 type UpdateRequestParams struct {
@@ -628,6 +667,9 @@ func (q *Queries) UpdateRequest(ctx context.Context, arg UpdateRequestParams) (H
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Search,
+		&i.RemovedAt,
+		&i.RemovedBy,
+		&i.RemovedReason,
 	)
 	return i, err
 }

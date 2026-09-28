@@ -220,6 +220,14 @@ func (s *Server) Login(ctx context.Context, request gen.LoginRequestObject) (gen
 		return invalidCredentials(), nil
 	}
 
+	// Checked only after the password matches, so a suspension is news only to
+	// the person who owns the account, never to someone guessing at it. Not a
+	// failed login either: nothing is charged to the limiter.
+	if user.SuspendedAt != nil {
+		return gen.Login403JSONResponse(errorBody(apierror.CodeForbidden,
+			"This account is suspended. If you think that's a mistake, contact the site's operators.")), nil
+	}
+
 	cookies, err := s.startSession(ctx, user, userAgentFrom(ctx))
 	if err != nil {
 		s.log.Error("start session", slog.String("error", err.Error()))
@@ -295,6 +303,18 @@ func (s *Server) RefreshSession(ctx context.Context, _ gen.RefreshSessionRequest
 	if err != nil {
 		s.log.Error("load user for refresh", slog.String("error", err.Error()))
 		return nil, err
+	}
+
+	// Suspension revokes every refresh token, so this should find none; it is
+	// checked anyway, so a token that escaped revocation still cannot renew a
+	// suspended account's session.
+	if user.SuspendedAt != nil {
+		if err := s.queries.RevokeRefreshToken(ctx, token.TokenHash); err != nil {
+			s.log.Error("revoke suspended account's refresh token", slog.String("error", err.Error()))
+			return nil, err
+		}
+		return gen.RefreshSession401JSONResponse(
+			errorBody(apierror.CodeUnauthorized, "This account is suspended.")), nil
 	}
 
 	// Rotation: the presented token dies as its replacement is born, so a copy

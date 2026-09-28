@@ -49,6 +49,13 @@ tags:
       Housing Available - places students are offering. Public: browsing does
       not require an account.
 
+  - name: admin
+    description: |
+      The operator's surface. Every path here requires a session whose role is
+      `admin`, and answers **404** - not 401 or 403 - to anyone else, including
+      an anonymous caller. The refusal is the same one an unknown path gets, so
+      probing cannot tell that the surface exists.
+
 paths:
   /healthz:
     get:
@@ -175,6 +182,14 @@ paths:
           description: |
             The address and password do not match. Deliberately identical whether
             or not the address exists.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: |
+            The account is suspended. Returned only when the password is
+            correct, so it tells someone guessing nothing they did not know.
           content:
             application/json:
               schema:
@@ -466,6 +481,15 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            A moderator has taken this post down. It cannot be edited, republished
+            or archived until it is restored; `message` carries the moderator's
+            reason.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
 
     delete:
@@ -486,6 +510,15 @@ paths:
           description: Archived.
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            A moderator has taken this post down. It cannot be edited, republished
+            or archived until it is restored; `message` carries the moderator's
+            reason.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
 
   /listings/{id}/status:
@@ -532,6 +565,15 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            A moderator has taken this post down. It cannot be edited, republished
+            or archived until it is restored; `message` carries the moderator's
+            reason.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
 
   /me/listings:
@@ -717,6 +759,15 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            A moderator has taken this post down. It cannot be edited, republished
+            or archived until it is restored; `message` carries the moderator's
+            reason.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
 
     delete:
@@ -736,6 +787,15 @@ paths:
           description: Archived.
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            A moderator has taken this post down. It cannot be edited, republished
+            or archived until it is restored; `message` carries the moderator's
+            reason.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
 
   /requests/{id}/status:
@@ -777,6 +837,15 @@ paths:
                 $ref: "#/components/schemas/Error"
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            A moderator has taken this post down. It cannot be edited, republished
+            or archived until it is restored; `message` carries the moderator's
+            reason.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
 
   /requests/{id}/offers:
@@ -905,6 +974,475 @@ paths:
                 items:
                   $ref: "#/components/schemas/HousingRequest"
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/overview:
+    get:
+      tags: [admin]
+      operationId: getAdminOverview
+      summary: Counts across the whole site
+      responses:
+        "200":
+          description: The numbers an operator starts from.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOverview"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/users:
+    get:
+      tags: [admin]
+      operationId: listAdminUsers
+      summary: Every account, searchable
+      description: |
+        Newest first. `q` matches part of an email address or username. Every
+        filter is optional and they compose; the total in `meta` reflects them.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [user, moderator, admin]
+        - name: verified
+          in: query
+          schema: { type: boolean }
+        - name: suspended
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: A page of accounts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/users/{id}:
+    get:
+      tags: [admin]
+      operationId: getAdminUser
+      summary: One account, and what has been done to it
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The account and its ledger entries, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserDetail"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/users/{id}/suspend:
+    post:
+      tags: [admin]
+      operationId: suspendAdminUser
+      summary: Suspend an account
+      description: |
+        The account can no longer log in or refresh, every session it has
+        ends, and its listings, requests and offers leave public view. Nothing
+        it posted is changed, so reinstating restores exactly what this hid.
+        An admin cannot suspend themselves.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminReason"
+      responses:
+        "200":
+          description: The account as it now stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            The change cannot be made: it would change nothing, it targets your
+            own account, or it would remove the last admin. `message` says which.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/users/{id}/reinstate:
+    post:
+      tags: [admin]
+      operationId: reinstateAdminUser
+      summary: Lift a suspension
+      description: |
+        The account can log in again and its posts return to public view
+        in whatever state their owner left them.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminReason"
+      responses:
+        "200":
+          description: The account as it now stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            The change cannot be made: it would change nothing, it targets your
+            own account, or it would remove the last admin. `message` says which.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/users/{id}/verify:
+    post:
+      tags: [admin]
+      operationId: verifyAdminUser
+      summary: Verify an account by hand
+      description: |
+        Marks the uwaterloo.ca address as confirmed without the email link.
+        The account's next session refresh carries the change.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminReason"
+      responses:
+        "200":
+          description: The account as it now stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            The change cannot be made: it would change nothing, it targets your
+            own account, or it would remove the last admin. `message` says which.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/users/{id}/role:
+    post:
+      tags: [admin]
+      operationId: setAdminUserRole
+      summary: Change an account's role
+      description: |
+        Between `user` and `admin`. Ends the account's sessions, so the new
+        role applies from its next login. An admin cannot change their own
+        role, and the last admin cannot be demoted.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminRoleChange"
+      responses:
+        "200":
+          description: The account as it now stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            The change cannot be made: it would change nothing, it targets your
+            own account, or it would remove the last admin. `message` says which.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/listings:
+    get:
+      tags: [admin]
+      operationId: listAdminListings
+      summary: Every listing, in any status
+      description: |
+        Newest first, including drafts, paused, archived and taken-down posts,
+        and posts by suspended accounts. The one read in this API that is not
+        limited to what the public sees.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - name: q
+          in: query
+          description: The same full-text search the public reads use.
+          schema: { type: string }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, published, paused, archived]
+        - name: removed
+          in: query
+          schema: { type: boolean }
+        - name: owner_id
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: A page of listings with their owners.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminListingPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/listings/{id}/remove:
+    post:
+      tags: [admin]
+      operationId: removeAdminListing
+      summary: Take a listing down
+      description: |
+        Hides it from every public read, whatever its status, and stops its
+        owner editing, republishing or archiving it. Its status is untouched.
+        The owner sees the reason.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminReason"
+      responses:
+        "200":
+          description: The listing as it now stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminListing"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Already taken down. The first takedown's reason stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/listings/{id}/restore:
+    post:
+      tags: [admin]
+      operationId: restoreAdminListing
+      summary: Restore a listing
+      description: |
+        Lifts the takedown. The listing returns in whatever status its owner
+        left it. A reason is optional here; the change is logged either way.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminOptionalReason"
+      responses:
+        "200":
+          description: The listing as it now stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminListing"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Not taken down.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/requests:
+    get:
+      tags: [admin]
+      operationId: listAdminRequests
+      summary: Every request, in any status
+      description: |
+        Newest first, including drafts, paused, archived and taken-down posts,
+        and posts by suspended accounts. The one read in this API that is not
+        limited to what the public sees.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - name: q
+          in: query
+          description: The same full-text search the public reads use.
+          schema: { type: string }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, published, paused, archived]
+        - name: removed
+          in: query
+          schema: { type: boolean }
+        - name: owner_id
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: A page of requests with their owners.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRequestPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/requests/{id}/remove:
+    post:
+      tags: [admin]
+      operationId: removeAdminRequest
+      summary: Take a request down
+      description: |
+        Hides it from every public read, whatever its status, and stops its
+        owner editing, republishing or archiving it. Its status is untouched.
+        The owner sees the reason.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminReason"
+      responses:
+        "200":
+          description: The request as it now stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRequest"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Already taken down. The first takedown's reason stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/requests/{id}/restore:
+    post:
+      tags: [admin]
+      operationId: restoreAdminRequest
+      summary: Restore a request
+      description: |
+        Lifts the takedown. The request returns in whatever status its owner
+        left it. A reason is optional here; the change is logged either way.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminOptionalReason"
+      responses:
+        "200":
+          description: The request as it now stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRequest"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Not taken down.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /admin/actions:
+    get:
+      tags: [admin]
+      operationId: listAdminActions
+      summary: The ledger
+      description: |
+        Every change an admin has made, newest first. Append-only: nothing in
+        this API edits or removes an entry.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: A page of ledger entries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminActionPage"
+        "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
 components:
@@ -1182,6 +1720,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ListingPhoto"
+        removal:
+          $ref: "#/components/schemas/PostRemoval"
 
     ListingInput:
       type: object
@@ -1372,6 +1912,8 @@ components:
         created_at: { type: string, format: date-time }
         poster:
           $ref: "#/components/schemas/ListingOwner"
+        removal:
+          $ref: "#/components/schemas/PostRemoval"
 
     RequestInput:
       type: object
@@ -1452,6 +1994,233 @@ components:
           $ref: "#/components/schemas/Listing"
         owner:
           $ref: "#/components/schemas/ListingOwner"
+
+    AdminUser:
+      type: object
+      description: |
+        An account as an operator sees it. Deliberately separate from `User`:
+        the public shape has no business growing an operator's fields. Counts
+        include posts in every status.
+      required: [id, email, username, role, verified, created_at, suspended_at, suspend_reason, listing_count, request_count, offer_count]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        username: { type: string }
+        role:
+          type: string
+          enum: [user, moderator, admin]
+        verified: { type: boolean }
+        created_at: { type: string, format: date-time }
+        suspended_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Set while the account is suspended; null otherwise.
+        suspend_reason:
+          type: string
+          nullable: true
+        listing_count: { type: integer, minimum: 0 }
+        request_count: { type: integer, minimum: 0 }
+        offer_count: { type: integer, minimum: 0 }
+
+    AdminReason:
+      type: object
+      description: Why an admin is making a change. Recorded in the ledger.
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 1000
+          description: At least ten characters once trimmed.
+
+    AdminRoleChange:
+      type: object
+      required: [role, reason]
+      properties:
+        role:
+          type: string
+          enum: [user, admin]
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 1000
+
+    PostRemoval:
+      type: object
+      description: |
+        A moderator's takedown. Present only on the owner's own reads and the
+        admin surface; a removed post never reaches a public read.
+      required: [removed_at, reason]
+      properties:
+        removed_at: { type: string, format: date-time }
+        reason:
+          type: string
+          description: The moderator's reason, shown to the owner as written.
+
+    AdminOptionalReason:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 1000
+
+    AdminPostOwner:
+      type: object
+      description: Whose post it is, as an operator needs to know it.
+      required: [id, username, email, verified, suspended_at]
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+        email: { type: string, format: email }
+        verified: { type: boolean }
+        suspended_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    AdminListing:
+      type: object
+      required: [listing, owner]
+      properties:
+        listing:
+          $ref: "#/components/schemas/Listing"
+        owner:
+          $ref: "#/components/schemas/AdminPostOwner"
+
+    AdminListingPage:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminListing"
+        meta:
+          $ref: "#/components/schemas/PageMeta"
+
+    AdminRequest:
+      type: object
+      required: [request, owner]
+      properties:
+        request:
+          $ref: "#/components/schemas/HousingRequest"
+        owner:
+          $ref: "#/components/schemas/AdminPostOwner"
+
+    AdminRequestPage:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminRequest"
+        meta:
+          $ref: "#/components/schemas/PageMeta"
+
+    AdminUserPage:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminUser"
+        meta:
+          $ref: "#/components/schemas/PageMeta"
+
+    AdminUserDetail:
+      type: object
+      required: [user, actions]
+      properties:
+        user:
+          $ref: "#/components/schemas/AdminUser"
+        actions:
+          type: array
+          description: What admins have done to this account, newest first.
+          items:
+            $ref: "#/components/schemas/AdminAction"
+
+    AdminAction:
+      type: object
+      description: One ledger entry.
+      required: [id, action, subject_type, subject_id, reason, detail, actor, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        action:
+          type: string
+          enum: [set_role, suspend, reinstate, verify, remove_post, restore_post]
+        subject_type:
+          type: string
+          enum: [user, listing, request]
+        subject_id: { type: string, format: uuid }
+        reason: { type: string }
+        detail:
+          type: object
+          additionalProperties: true
+          description: |
+            The before and after of this change. Its shape depends on the
+            action - for `set_role`, `{"from": "user", "to": "admin"}`.
+        actor:
+          $ref: "#/components/schemas/AdminActor"
+        created_at: { type: string, format: date-time }
+
+    AdminActor:
+      type: object
+      nullable: true
+      description: |
+        Who acted. Null when the change was made from the host with
+        `cmd/admin`, or when the acting account no longer exists.
+      required: [id, username]
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+
+    AdminActionPage:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminAction"
+        meta:
+          $ref: "#/components/schemas/PageMeta"
+
+    AdminOverview:
+      type: object
+      required: [users, listings, requests, actions_last_week]
+      properties:
+        users:
+          $ref: "#/components/schemas/AdminUserCounts"
+        listings:
+          $ref: "#/components/schemas/AdminPostCounts"
+        requests:
+          $ref: "#/components/schemas/AdminPostCounts"
+        actions_last_week:
+          type: integer
+          minimum: 0
+          description: Ledger entries written in the last seven days.
+
+    AdminUserCounts:
+      type: object
+      required: [total, verified, suspended, admins]
+      properties:
+        total: { type: integer, minimum: 0 }
+        verified: { type: integer, minimum: 0 }
+        suspended: { type: integer, minimum: 0 }
+        admins: { type: integer, minimum: 0 }
+
+    AdminPostCounts:
+      type: object
+      required: [total, published]
+      properties:
+        total:
+          type: integer
+          minimum: 0
+          description: Every post, whatever its status.
+        published: { type: integer, minimum: 0 }
 
     Error:
       type: object

@@ -43,15 +43,16 @@ func (f *fakeQuerier) CreateOffer(_ context.Context, arg sqlcgen.CreateOfferPara
 	return offer, nil
 }
 
-// visibleOffers is the join the SQL does: live offers on published listings.
+// visibleOffers is the join the SQL does: live offers on published listings,
+// from owners who are not suspended.
 func (f *fakeQuerier) visibleOffers(requestID uuid.UUID) []sqlcgen.RequestOffer {
 	out := []sqlcgen.RequestOffer{}
 	for _, o := range f.offers {
-		if o.RequestID != requestID || o.WithdrawnAt != nil {
+		if o.RequestID != requestID || o.WithdrawnAt != nil || f.users[o.OwnerID].SuspendedAt != nil {
 			continue
 		}
 		for _, l := range f.listings {
-			if l.ID == o.ListingID && l.Status == "published" {
+			if l.ID == o.ListingID && l.Status == "published" && l.RemovedAt == nil {
 				out = append(out, o)
 				break
 			}

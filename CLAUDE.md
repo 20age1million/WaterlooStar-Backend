@@ -96,25 +96,29 @@ only thing that calls it.
 | 6 | Housing requests: table, lifecycle, browse with filters, write path |
 | 7 | Offers: an owner answers a request with one of their own listings |
 | 8 | Rate limiting on the auth and write endpoints, keyed on identity |
+| 9 | Admin identity: `cmd/admin`, the `admin_actions` ledger, read-only `/admin` surface |
+| 10 | Account management: suspend, reinstate, verify by hand, change role |
+| 11 | Post moderation: every post in any state, takedown and restore |
 
-Twenty-six endpoints are live; `README.md` has the table, and the rate limits with
+Forty endpoints exist, fourteen of them admin-only; `README.md` has the table, and the rate limits with
 it.
+
+Phases 5–7 are merged into `main` (pull requests #6–#8).
 
 **Branches in flight**, oldest first — each is based on the one above it, so they
 merge in this order:
 
 | Branch | Holds |
 |---|---|
-| `test/query-test-layer` | Phase 5 and the spec for 5–7 |
-| `feat/housing-requests` | Phase 6 |
-| `feat/request-offers` | Phase 7 |
-| `feature/rate-limiting` | Phase 8, complete |
-| `feature/admin-moderation` | The accepted spec for phases 9–11; no code yet |
+| `feature/rate-limiting` | Phase 8, complete; not yet merged into `main` |
+| `feature/admin-moderation` | Phase 8 merged in, and Admin and Moderation complete (9–11) |
+| `feature/listing-terms` | The accepted spec for Phase 12; merges after the above (migration 10) |
 
 ### What comes next
 
-**Specified and accepted:** Admin and Moderation, phases 9–11, in
-`docs/specs/active/admin-moderation/`. The admin portal is a separate feature in
+**Specified and accepted:** Listing Terms (Phase 12), on `feature/listing-terms`,
+which merges after Admin and Moderation because of migration order. Then email
+delivery as Phase 13, agreed 2026-09-27. The admin portal is a separate feature in
 the frontend repository.
 
 Unspecified, in the order I would take it:
@@ -200,6 +204,37 @@ These were all found the hard way and will silently regress if undone.
   route limits nothing and nothing complains, which is why
   `TestEveryLimitedRouteExists` checks them against the registered routes.
 
+- **`/admin` must look unrouted to non-admins, down to the headers.**
+  `requireAdmin` writes the refusal itself with `apierror.NotFound`, the call the
+  router's `NoRoute` makes, and the handler returns `unrouted{}`. The generated 404
+  response types encode differently (bare `application/json`, trailing newline),
+  so using them leaks which paths exist. A new admin operation needs a `Visit`
+  method on `unrouted`.
+- **Every admin change goes through `db.Audited`**, which runs the change and its
+  `admin_actions` row in one transaction. `db.ChangeRole` is the role change, with
+  the last-admin guard, for both `cmd/admin` and the portal.
+- **Takedown is not `status`.** `removed_at` is the moderator's; `status` is the
+  owner's. Sharing a column would let an owner republish over a moderator and
+  lose what the status was. `ownedListing`/`ownedRequest` refuse a removed post
+  with a 409, so every owner write path inherits the rule.
+- **The admin post lists are the one exception to the published-only rule.**
+  `ListListingsForAdmin` and `ListRequestsForAdmin` read every row on purpose,
+  behind the `/admin` guard. Every other read of a post filters on `status`,
+  `removed_at` and the owner's `suspended_at`.
+- **Every public read must filter out suspended accounts, in the SQL.** Listings,
+  requests and offers each carry `AND u.suspended_at IS NULL` on the owner, and
+  the offer counts inside the request reads join the offering owner for the same
+  reason. A new public query without it shows a suspended account's posts. The
+  owner's own `/me/...` reads deliberately do not filter.
+- **Login says "suspended" only after the password matches.** Checking earlier
+  would tell anyone guessing that the address exists and is suspended.
+- **`go run ./cmd/migrate down` rolls back every migration**, and ignores a count
+  after it. One step is `down-one`. On the development database that means
+  re-running `migrate up` and `cmd/seed`.
+- **sqlc's nullable-uuid override names the type `UUID`, not `uuid.UUID`**,
+  because `import` already supplies the package. The doubled form went unnoticed
+  until migration 8 added the first nullable uuid column.
+
 ---
 
 ## Running it
@@ -209,6 +244,7 @@ cp .env.example .env
 docker compose up -d       # PostgreSQL 18 on :5433
 go run ./cmd/migrate up
 go run ./cmd/seed          # 6 development listings and 5 requests
+go run ./cmd/admin promote meil@uwaterloo.ca   # an admin, if you need one
 go run ./cmd/api           # :8080
 ```
 
