@@ -11,20 +11,31 @@ import (
 )
 
 type Querier interface {
+	// The overview's numbers, in one round trip. Post counts include every status,
+	// with published broken out, because "how much is live" and "how much exists"
+	// are both questions an operator asks.
+	AdminOverviewCounts(ctx context.Context) (AdminOverviewCountsRow, error)
 	// A fresh request invalidates earlier outstanding ones, so a forwarded old email
 	// cannot still be used.
 	ConsumeAllEmailVerificationTokensForUser(ctx context.Context, userID uuid.UUID) error
 	ConsumeAllPasswordResetTokensForUser(ctx context.Context, userID uuid.UUID) error
 	ConsumeEmailVerificationToken(ctx context.Context, tokenHash []byte) error
 	ConsumePasswordResetToken(ctx context.Context, tokenHash []byte) error
+	CountAdminActions(ctx context.Context) (int64, error)
+	// The last-admin guard reads this before any demotion.
+	CountAdmins(ctx context.Context) (int64, error)
 	CountListings(ctx context.Context, arg CountListingsParams) (int64, error)
+	CountListingsForAdmin(ctx context.Context, arg CountListingsForAdminParams) (int64, error)
 	// The same count the read queries compute inline, for the write path's
 	// responses. Visible offers only, on the same two conditions.
 	CountOffersForRequest(ctx context.Context, requestID uuid.UUID) (int64, error)
 	CountRequests(ctx context.Context, arg CountRequestsParams) (int64, error)
+	CountRequestsForAdmin(ctx context.Context, arg CountRequestsForAdminParams) (int64, error)
 	// Used to tell a duplicate email from a duplicate username *internally*, without
 	// the response revealing which one collided.
 	CountUsersByEmailOrUsername(ctx context.Context, arg CountUsersByEmailOrUsernameParams) (CountUsersByEmailOrUsernameRow, error)
+	// The same filters, counted, so the page total describes the whole match.
+	CountUsersForAdmin(ctx context.Context, arg CountUsersForAdminParams) (int64, error)
 	// Every lookup here filters on consumed/revoked and expiry in SQL rather than in
 	// Go, so a caller cannot forget the check and accept a spent token.
 	CreateEmailVerificationToken(ctx context.Context, arg CreateEmailVerificationTokenParams) error
@@ -70,6 +81,15 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, lower string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, lower string) (User, error)
+	// One account, with what it has posted. Counts include every status: an
+	// operator needs to know about the draft as much as the published listing.
+	GetUserForAdmin(ctx context.Context, id uuid.UUID) (GetUserForAdminRow, error)
+	// The only write against admin_actions.
+	InsertAdminAction(ctx context.Context, arg InsertAdminActionParams) (AdminAction, error)
+	// The ledger, newest first, with the actor's name. A null actor is the host.
+	ListAdminActions(ctx context.Context, arg ListAdminActionsParams) ([]ListAdminActionsRow, error)
+	// What has been done to one account or post, newest first.
+	ListAdminActionsForSubject(ctx context.Context, arg ListAdminActionsForSubjectParams) ([]ListAdminActionsForSubjectRow, error)
 	// Only published rows are ever served. Filtering here rather than in Go means a
 	// handler cannot forget and expose somebody's draft.
 	// Filtered browse. Every parameter is optional and they compose: the
@@ -83,6 +103,20 @@ type Querier interface {
 	// The owner's own listings, every status. The public endpoints show only
 	// published rows, so this is the only way to see a paused or archived post.
 	ListListingsByOwner(ctx context.Context, ownerID uuid.UUID) ([]ListListingsByOwnerRow, error)
+	// The operator's view of posts, and takedown.
+	//
+	// Takedown is not status. status is the owner's; removed_at is the
+	// moderator's. Restoring clears the moderator's columns and nothing else, so a
+	// restored post is back in whatever status its owner had left it, having never
+	// lost it.
+	// EVERY listing, in any status, removed or not, whoever owns it.
+	//
+	// This and ListRequestsForAdmin are the only queries in the repository that do
+	// not filter on status = 'published', suspension and takedown. The rest of the
+	// query files exist to keep that rule; these break it on purpose, because an
+	// operator has to see what the public cannot. Reached only through the /admin
+	// guard.
+	ListListingsForAdmin(ctx context.Context, arg ListListingsForAdminParams) ([]ListListingsForAdminRow, error)
 	// An owner's own offers, whatever became of them.
 	ListOffersByOwner(ctx context.Context, ownerID uuid.UUID) ([]ListOffersByOwnerRow, error)
 	// The offers on a request, as the student sees them: the listing comes with it,
@@ -110,11 +144,37 @@ type Querier interface {
 	// The poster's own requests, every status. The public endpoints show only
 	// published ones, so this is the only way to see a draft or a paused request.
 	ListRequestsByPoster(ctx context.Context, posterID uuid.UUID) ([]ListRequestsByPosterRow, error)
+	// EVERY request, in any status, removed or not. The same deliberate exception
+	// as ListListingsForAdmin; see there. The offer count is the one the poster
+	// sees: live offers on visible listings from active owners.
+	ListRequestsForAdmin(ctx context.Context, arg ListRequestsForAdminParams) ([]ListRequestsForAdminRow, error)
+	// The operator's read surface, and the ledger.
+	//
+	// Everything here is reached only through the /admin guard or cmd/admin. These
+	// are the one set of queries allowed past the status = 'published' filter the
+	// public reads carry, because an operator has to see what the public cannot.
+	//
+	// admin_actions is append-only: there is an INSERT below and no UPDATE or
+	// DELETE anywhere in this directory. A test in internal/httpapi fails if one is
+	// added.
+	// Accounts, filtered and paged, newest first. Search matches a fragment of the
+	// email or the username, because an operator looking someone up has whichever
+	// one the complaint quoted, and often only part of it.
+	ListUsersForAdmin(ctx context.Context, arg ListUsersForAdminParams) ([]ListUsersForAdminRow, error)
 	MarkUserVerified(ctx context.Context, id uuid.UUID) (User, error)
 	// Health check. Trivial on purpose: it exists to prove the whole chain — pool,
 	// sqlc codegen, generated method, real round-trip — works end to end, before any
 	// domain table exists to query.
 	Ping(ctx context.Context) (int32, error)
+	// Reinstating clears all three, so a reinstated account looks like one never
+	// suspended. The history lives in admin_actions, not here.
+	ReinstateUser(ctx context.Context, id uuid.UUID) (User, error)
+	// Takedown. Only a post not already removed matches, so a second takedown
+	// cannot overwrite the first one's time and reason; no row back means that.
+	RemoveListing(ctx context.Context, arg RemoveListingParams) (Listing, error)
+	RemoveRequest(ctx context.Context, arg RemoveRequestParams) (HousingRequest, error)
+	RestoreListing(ctx context.Context, id uuid.UUID) (Listing, error)
+	RestoreRequest(ctx context.Context, id uuid.UUID) (HousingRequest, error)
 	// Used on password change: every existing session is ended, so a password reset
 	// actually evicts whoever prompted it.
 	RevokeAllRefreshTokensForUser(ctx context.Context, userID uuid.UUID) error
@@ -129,6 +189,13 @@ type Querier interface {
 	// and ::text in another makes PostgreSQL refuse to deduce a type (SQLSTATE
 	// 42P08). That shipped once already on listings.
 	SetRequestStatus(ctx context.Context, arg SetRequestStatusParams) (HousingRequest, error)
+	// A role change. Only cmd/admin calls it in this phase; the portal gains it in
+	// Phase 10. Always paired with InsertAdminAction in one transaction.
+	SetUserRole(ctx context.Context, arg SetUserRoleParams) (User, error)
+	// Suspension sets the time, the actor and the reason together. Only an active
+	// account matches, so suspending one already suspended keeps the original
+	// time and reason rather than overwriting them; no row back means that.
+	SuspendUser(ctx context.Context, arg SuspendUserParams) (User, error)
 	// Every field is optional: an edit form sends what changed, and COALESCE leaves
 	// the rest alone. A PUT would make every omitted field a deletion.
 	UpdateListing(ctx context.Context, arg UpdateListingParams) (Listing, error)
@@ -136,6 +203,9 @@ type Querier interface {
 	// every omitted field a deletion.
 	UpdateRequest(ctx context.Context, arg UpdateRequestParams) (HousingRequest, error)
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
+	// Verification by hand, for while email links only reach the log. Only an
+	// unverified account matches, so a repeat changes and logs nothing.
+	VerifyUserAsAdmin(ctx context.Context, id uuid.UUID) (User, error)
 	// Withdrawn rather than deleted: the row stays, so the same listing cannot be
 	// re-offered against the same request by working around the unique constraint.
 	WithdrawOffer(ctx context.Context, id uuid.UUID) (RequestOffer, error)

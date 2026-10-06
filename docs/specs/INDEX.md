@@ -26,6 +26,8 @@ across both; everything from Phase 4 onward is not.
 | [Discovery](./implemented/discovery/index.md) | 1 (Phase 3) | `docs/specs/implemented/discovery/` |
 | [Listing Write Path](./implemented/listing-write-path/index.md) | 1 (Phase 4) | `docs/specs/implemented/listing-write-path/` |
 | [Housing Requests](./implemented/housing-requests/index.md) | 3 (5–7) | `docs/specs/implemented/housing-requests/` |
+| [Rate Limiting](./implemented/rate-limiting/index.md) | 1 (Phase 8) | `docs/specs/implemented/rate-limiting/` |
+| [Admin and Moderation](./implemented/admin-moderation/index.md) | 3 (9–11) | `docs/specs/implemented/admin-moderation/` |
 
 ### Platform Foundation
 
@@ -61,6 +63,30 @@ The other side of the market, in three phases.
 | 6 | [Requests](./implemented/housing-requests/phase-6-requests.md) | `housing_requests`, seven operations, discovery filters that read from the owner's side |
 | 7 | [Offers](./implemented/housing-requests/phase-7-offers.md) | An owner answers with one of their own listings; offers die with the listing behind them |
 
+### Rate Limiting
+
+Login, registration, password reset, token redemption and the three write
+endpoints answer 429 with a `Retry-After` when an allowance is spent. Keyed on
+identity rather than IP address, because the API has no public URL and every
+request reaches it from the frontend. Only a *failed* login is charged, and
+nothing is ever locked — allowances refill on a clock.
+
+### Admin and Moderation
+
+The site gains an operator, in three phases. Rate limiting was its prerequisite
+and shipped first: the admin surface should not exist in front of an unlimited
+login form.
+
+| Phase | Title | Delivered |
+|---|---|---|
+| 9 | [Admin identity and the ledger](./implemented/admin-moderation/phase-9-admin-identity.md) | `cmd/admin`, the append-only `admin_actions` ledger, the `/admin` guard, read-only account views |
+| 10 | [Account management](./implemented/admin-moderation/phase-10-account-management.md) | Suspend, reinstate, verify by hand, change role; suspension hides content and ends sessions |
+| 11 | [Post moderation](./implemented/admin-moderation/phase-11-post-moderation.md) | Every post in any state; takedown and restore on their own axis, separate from the owner's status |
+
+Every action needs a reason, writes one ledger row in the same transaction, and
+has an inverse. `/admin` answers exactly as an unknown path does to anyone who
+is not an admin.
+
 ## Decisions carried forward
 
 Recorded in the Platform Foundation `index.md` and still in force:
@@ -82,14 +108,14 @@ Recorded in the Platform Foundation `index.md` and still in force:
 
 ## What comes next
 
-Nothing is specified; `active/` is empty. Two things are overdue before more
-features, both recorded as gaps rather than specs:
+**Listing Terms** (Phase 12) is specified on `feature/listing-terms`. The admin
+portal, specified in the frontend repository, can now be built against this
+contract. Next, agreed 2026-09-27:
 
-1. **Email delivery.** Verification and reset links only reach the log, so on the
-   live site nobody can finish signing up. The provider is chosen (Clerk's
-   transactional endpoint); `internal/email` already has the seam.
-2. **Rate limiting.** There is none — login accepts unlimited guesses against
-   guessable `uwaterloo.ca` addresses, and password reset has no cap.
+- **Email delivery** (Phase 13). Verification and reset links only reach the log, so on the
+  live site nobody can finish signing up. The provider is chosen (Clerk's
+  transactional endpoint); `internal/email` already has the seam. Until it lands,
+  an admin verifying accounts by hand (Phase 10) is how a real student gets in.
 
 After those: saves, views and the question thread; then messaging with contact
 privacy, which is what "accept an offer" is waiting on. Each starts with a new

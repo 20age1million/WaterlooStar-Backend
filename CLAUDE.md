@@ -9,11 +9,17 @@ The frontend is a **separate repository**, checked out beside this one as
 
 ---
 
-## Before doing anything: read the skills
+## Required before anything else: read the skill library
+
+**Reading the skill library in `.claude/skills/` is a requirement for picking up
+this project, not a suggestion.** Every feature here was built through it, and the
+workflow is not inferable from the code: nothing in the repository tells you that
+a specification is written and accepted before implementation, that a phase is one
+commit, or where a phase doc has to end up. Work that skips it produces changes
+that cannot be reviewed against anything and phases nobody can pick up after you.
 
 **This project works from committed specifications, not from ad-hoc changes.**
-The workflow is not optional and it is not obvious from the code, so read it
-before touching anything:
+Read these before touching anything:
 
 1. `.claude/skills/feature-start/SKILL.md` — how a feature begins. Produces an
    agreed spec under `docs/specs/active/<slug>/`, committed on a feature branch,
@@ -25,6 +31,12 @@ Also read whichever of these the task touches:
 
 - `.claude/skills/implementation-breakdown/SKILL.md` — splitting work into phases
 - `.claude/skills/release/SKILL.md` — release process
+
+The commit and pull-request conventions come from the skill library too:
+conventional commits as `<type>(<slug>): <description>`, branches as
+`<type>/<slug>`. The spec commit that opens a feature takes **no trailer lines** —
+`feature-start` says so explicitly, and it is the one exception to how every other
+commit here is signed.
 
 **Two skills in that folder do not apply here.** `az-pr-create` and
 `azure-devops-project-creator` came with the toolkit from another organisation's
@@ -49,7 +61,9 @@ that way; everything from Phase 4 onward is not.
 
 ### The short version of the workflow
 
-- Never work on `main`. Branch as `feature/<slug>`.
+- Never work on `main`. Branch as `<type>/<slug>` — the type is the kind of change,
+  matching the commit's, so a spec branch is `feature/…` but a test-only phase is
+  `test/…` and a fix is `fix/…`.
 - A spec is written and **accepted by the developer** before implementation.
   Acceptance is explicit — silence is not agreement.
 - One phase at a time. Each phase ends with: checklist ticked, Implementation
@@ -81,19 +95,39 @@ only thing that calls it.
 | 5 | Query tests against a real PostgreSQL, plus a guard for untested queries |
 | 6 | Housing requests: table, lifecycle, browse with filters, write path |
 | 7 | Offers: an owner answers a request with one of their own listings |
+| 8 | Rate limiting on the auth and write endpoints, keyed on identity |
+| 9 | Admin identity: `cmd/admin`, the `admin_actions` ledger, read-only `/admin` surface |
+| 10 | Account management: suspend, reinstate, verify by hand, change role |
+| 11 | Post moderation: every post in any state, takedown and restore |
 
-Twenty-six endpoints are live; `README.md` has the table.
+Forty endpoints exist, fourteen of them admin-only; `README.md` has the table, and the rate limits with
+it.
+
+Phases 5–7 are merged into `main` (pull requests #6–#8).
+
+**Branches in flight**, oldest first — each is based on the one above it, so they
+merge in this order:
+
+| Branch | Holds |
+|---|---|
+| `feature/rate-limiting` | Phase 8, complete; not yet merged into `main` |
+| `feature/admin-moderation` | Phase 8 merged in, and Admin and Moderation complete (9–11) |
+| `feature/listing-terms` | The accepted spec for Phase 12; merges after the above (migration 10) |
 
 ### What comes next
 
-Nothing is specified. Candidates, in the order I would take them:
+**Specified and accepted:** Listing Terms (Phase 12), on `feature/listing-terms`,
+which merges after Admin and Moderation because of migration order. Then email
+delivery as Phase 13, agreed 2026-09-27. The admin portal is a separate feature in
+the frontend repository.
+
+Unspecified, in the order I would take it:
 
 1. **Email delivery.** Verification and reset links only reach the log, so on the
    live site nobody can finish signing up. The developer has chosen Clerk's
-   transactional endpoint; `internal/email` already has the `Sender` seam.
-2. **Rate limiting.** There is none anywhere — login accepts unlimited guesses
-   against guessable `uwaterloo.ca` addresses, and password reset has no cap.
-3. Saves, views and the question thread → messaging with contact privacy →
+   transactional endpoint; `internal/email` already has the `Sender` seam. Until
+   it lands, an admin verifying accounts by hand is how a real student gets in.
+2. Saves, views and the question thread → messaging with contact privacy →
    matching and real maps.
 
 ---
@@ -152,6 +186,54 @@ These were all found the hard way and will silently regress if undone.
 - **Offer counts are computed, never stored.** An offer stops counting when its
   listing is taken down — a different table — so a stored counter would drift.
   The column added in migration 6 was dropped in migration 7 for that reason.
+- **The rate limiter cannot see client IP addresses.** This service has no public
+  URL and the Next.js server is its only client, so every request arrives from one
+  address. Limits are keyed on identity — the email, the token, the user — and
+  per-IP limiting lives at the reverse proxy (`deploy/RATE-LIMITING.md`). A
+  per-IP limiter added here would throttle the entire site as one client.
+- **Only a *failed* login is charged to the limiter.** `RateLimit` peeks on the
+  login route and `chargeFailedLogin` spends afterwards. Make login spend up
+  front and the Playwright suite — which signs in repeatedly on purpose — starts
+  failing, along with anyone who signs in several times a day.
+- **`internal/ratelimit` runs on an injected clock, and no test may sleep.** A
+  suite that waits for real seconds flakes in CI and then gets deleted. The
+  race detector needs a C toolchain the development machine does not have, so CI
+  runs `-race` over that package instead.
+- **The limited routes are an allowlist** in `internal/httpapi/ratelimit_mw.go`,
+  matched on `c.FullPath()`. Its failure mode is silence: a path that matches no
+  route limits nothing and nothing complains, which is why
+  `TestEveryLimitedRouteExists` checks them against the registered routes.
+
+- **`/admin` must look unrouted to non-admins, down to the headers.**
+  `requireAdmin` writes the refusal itself with `apierror.NotFound`, the call the
+  router's `NoRoute` makes, and the handler returns `unrouted{}`. The generated 404
+  response types encode differently (bare `application/json`, trailing newline),
+  so using them leaks which paths exist. A new admin operation needs a `Visit`
+  method on `unrouted`.
+- **Every admin change goes through `db.Audited`**, which runs the change and its
+  `admin_actions` row in one transaction. `db.ChangeRole` is the role change, with
+  the last-admin guard, for both `cmd/admin` and the portal.
+- **Takedown is not `status`.** `removed_at` is the moderator's; `status` is the
+  owner's. Sharing a column would let an owner republish over a moderator and
+  lose what the status was. `ownedListing`/`ownedRequest` refuse a removed post
+  with a 409, so every owner write path inherits the rule.
+- **The admin post lists are the one exception to the published-only rule.**
+  `ListListingsForAdmin` and `ListRequestsForAdmin` read every row on purpose,
+  behind the `/admin` guard. Every other read of a post filters on `status`,
+  `removed_at` and the owner's `suspended_at`.
+- **Every public read must filter out suspended accounts, in the SQL.** Listings,
+  requests and offers each carry `AND u.suspended_at IS NULL` on the owner, and
+  the offer counts inside the request reads join the offering owner for the same
+  reason. A new public query without it shows a suspended account's posts. The
+  owner's own `/me/...` reads deliberately do not filter.
+- **Login says "suspended" only after the password matches.** Checking earlier
+  would tell anyone guessing that the address exists and is suspended.
+- **`go run ./cmd/migrate down` rolls back every migration**, and ignores a count
+  after it. One step is `down-one`. On the development database that means
+  re-running `migrate up` and `cmd/seed`.
+- **sqlc's nullable-uuid override names the type `UUID`, not `uuid.UUID`**,
+  because `import` already supplies the package. The doubled form went unnoticed
+  until migration 8 added the first nullable uuid column.
 
 ---
 
@@ -161,7 +243,8 @@ These were all found the hard way and will silently regress if undone.
 cp .env.example .env
 docker compose up -d       # PostgreSQL 18 on :5433
 go run ./cmd/migrate up
-go run ./cmd/seed          # six development listings
+go run ./cmd/seed          # 6 development listings and 5 requests
+go run ./cmd/admin promote meil@uwaterloo.ca   # an admin, if you need one
 go run ./cmd/api           # :8080
 ```
 

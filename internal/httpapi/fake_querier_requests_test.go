@@ -58,7 +58,7 @@ func (f *fakeQuerier) CreateRequest(_ context.Context, arg sqlcgen.CreateRequest
 func (f *fakeQuerier) requestsMatching(arg sqlcgen.ListRequestsParams) []sqlcgen.HousingRequest {
 	out := []sqlcgen.HousingRequest{}
 	for _, r := range f.requests {
-		if r.Status != "published" {
+		if r.Status != "published" || r.RemovedAt != nil || f.users[r.PosterID].SuspendedAt != nil {
 			continue
 		}
 		if arg.Search != nil && !strings.Contains(
@@ -164,7 +164,7 @@ func (f *fakeQuerier) GetPublishedRequest(_ context.Context, id uuid.UUID) (sqlc
 	defer f.mu.Unlock()
 
 	for _, r := range f.requests {
-		if r.ID == id && r.Status == "published" {
+		if r.ID == id && r.Status == "published" && r.RemovedAt == nil && f.users[r.PosterID].SuspendedAt == nil {
 			row := f.requestRow(r)
 			return sqlcgen.GetPublishedRequestRow(row), nil
 		}

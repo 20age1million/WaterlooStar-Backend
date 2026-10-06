@@ -40,7 +40,7 @@ func (q *Queries) CountUsersByEmailOrUsername(ctx context.Context, arg CountUser
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (email, username, password_hash)
 VALUES ($1, $2, $3)
-RETURNING id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at
+RETURNING id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason
 `
 
 type CreateUserParams struct {
@@ -64,12 +64,15 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.StarPoints,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SuspendedAt,
+		&i.SuspendedBy,
+		&i.SuspendReason,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at FROM users WHERE lower(email) = lower($1)
+SELECT id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason FROM users WHERE lower(email) = lower($1)
 `
 
 // Addresses are compared case-insensitively, matching the unique index.
@@ -88,12 +91,15 @@ func (q *Queries) GetUserByEmail(ctx context.Context, lower string) (User, error
 		&i.StarPoints,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SuspendedAt,
+		&i.SuspendedBy,
+		&i.SuspendReason,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at FROM users WHERE id = $1
+SELECT id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -111,12 +117,15 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.StarPoints,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SuspendedAt,
+		&i.SuspendedBy,
+		&i.SuspendReason,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at FROM users WHERE lower(username) = lower($1)
+SELECT id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason FROM users WHERE lower(username) = lower($1)
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, lower string) (User, error) {
@@ -134,12 +143,15 @@ func (q *Queries) GetUserByUsername(ctx context.Context, lower string) (User, er
 		&i.StarPoints,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SuspendedAt,
+		&i.SuspendedBy,
+		&i.SuspendReason,
 	)
 	return i, err
 }
 
 const markUserVerified = `-- name: MarkUserVerified :one
-UPDATE users SET verified = true WHERE id = $1 RETURNING id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at
+UPDATE users SET verified = true WHERE id = $1 RETURNING id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason
 `
 
 func (q *Queries) MarkUserVerified(ctx context.Context, id uuid.UUID) (User, error) {
@@ -157,6 +169,9 @@ func (q *Queries) MarkUserVerified(ctx context.Context, id uuid.UUID) (User, err
 		&i.StarPoints,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SuspendedAt,
+		&i.SuspendedBy,
+		&i.SuspendReason,
 	)
 	return i, err
 }

@@ -248,7 +248,20 @@ func (s *Server) ListMyListings(ctx context.Context, _ gen.ListMyListingsRequest
 // refusal says which failure occurred without leaking anything.
 type refusal struct {
 	unauthorised bool
-	message      string
+	// conflict: the post is the caller's, but a moderator has taken it down, so
+	// the owner may not change it. A 409 carrying the moderator's reason.
+	conflict bool
+	message  string
+}
+
+// removedRefusal is the owner's answer while a moderator's takedown stands.
+// Without it, republishing would silently override the moderator.
+func removedRefusal(kind string, reason *string) *refusal {
+	msg := "A moderator took this " + kind + " down, so it can't be changed until it is restored."
+	if reason != nil && *reason != "" {
+		msg = "A moderator took this " + kind + " down: \"" + *reason + "\". It can't be changed until it is restored."
+	}
+	return &refusal{conflict: true, message: msg}
 }
 
 // ownedListing resolves a listing the caller owns, or the refusal to return.
@@ -272,6 +285,9 @@ func (s *Server) ownedListing(ctx context.Context, id uuid.UUID) (auth.Principal
 
 	if listing.OwnerID != principal.UserID {
 		return principal, sqlcgen.Listing{}, &refusal{message: "No listing with that id."}
+	}
+	if listing.RemovedAt != nil {
+		return principal, sqlcgen.Listing{}, removedRefusal("listing", listing.RemovedReason)
 	}
 
 	return principal, listing, nil
@@ -307,6 +323,9 @@ func contains(haystack []string, needle string) bool {
 // 401, anything else gives 404 — including "this is not yours".
 
 func updateRefusal(r *refusal) gen.UpdateListingResponseObject {
+	if r.conflict {
+		return gen.UpdateListing409JSONResponse(errorBody(apierror.CodeConflict, r.message))
+	}
 	if r.unauthorised {
 		return gen.UpdateListing401JSONResponse{
 			UnauthorizedJSONResponse: gen.UnauthorizedJSONResponse(
@@ -320,6 +339,9 @@ func updateRefusal(r *refusal) gen.UpdateListingResponseObject {
 }
 
 func statusRefusal(r *refusal) gen.SetListingStatusResponseObject {
+	if r.conflict {
+		return gen.SetListingStatus409JSONResponse(errorBody(apierror.CodeConflict, r.message))
+	}
 	if r.unauthorised {
 		return gen.SetListingStatus401JSONResponse{
 			UnauthorizedJSONResponse: gen.UnauthorizedJSONResponse(
@@ -333,6 +355,9 @@ func statusRefusal(r *refusal) gen.SetListingStatusResponseObject {
 }
 
 func deleteRefusal(r *refusal) gen.DeleteListingResponseObject {
+	if r.conflict {
+		return gen.DeleteListing409JSONResponse(errorBody(apierror.CodeConflict, r.message))
+	}
 	if r.unauthorised {
 		return gen.DeleteListing401JSONResponse{
 			UnauthorizedJSONResponse: gen.UnauthorizedJSONResponse(

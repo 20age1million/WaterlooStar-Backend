@@ -64,13 +64,20 @@ steps:
       PG_TEST_DSN: postgres://waterloostar:waterloostar@postgres:5432/waterloostar?sslmode=disable
     commands:
       # The service starts alongside this step, so wait for it rather than
-      # racing it.
-      - apk add --no-cache postgresql-client
+      # racing it. build-base is for the race detector below, which needs a C
+      # toolchain; the development machine has none, so CI is the only place
+      # that guarantee is available.
+      - apk add --no-cache postgresql-client build-base
       - for i in $(seq 1 30); do pg_isready -h postgres -U waterloostar && break; sleep 1; done
       - pg_isready -h postgres -U waterloostar
 
       - go vet ./...
       - go test ./...
+
+      # The rate limiter is the one package where several requests touch the same
+      # state at once, so it also runs under the race detector. A lost update
+      # there hands out free attempts against a password.
+      - CGO_ENABLED=1 go test -race ./internal/ratelimit/...
 
   # 2) Sync the repo into the host folder: /opt/repo/<repo_name_lowercase>
   - name: sync-host-repo

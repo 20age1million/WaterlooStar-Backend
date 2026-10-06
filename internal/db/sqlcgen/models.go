@@ -10,6 +10,17 @@ import (
 	"github.com/google/uuid"
 )
 
+type AdminAction struct {
+	ID          uuid.UUID
+	ActorID     *uuid.UUID
+	Action      string
+	SubjectType string
+	SubjectID   uuid.UUID
+	Reason      string
+	Detail      []byte
+	CreatedAt   time.Time
+}
+
 type EmailVerificationToken struct {
 	TokenHash  []byte
 	UserID     uuid.UUID
@@ -41,6 +52,9 @@ type HousingRequest struct {
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 	Search             interface{}
+	RemovedAt          *time.Time
+	RemovedBy          *uuid.UUID
+	RemovedReason      *string
 }
 
 type Listing struct {
@@ -82,6 +96,9 @@ type Listing struct {
 	UpdatedAt        time.Time
 	Search           interface{}
 	PublishedAt      *time.Time
+	RemovedAt        *time.Time
+	RemovedBy        *uuid.UUID
+	RemovedReason    *string
 }
 
 type ListingPhoto struct {
@@ -121,15 +138,18 @@ type RequestOffer struct {
 }
 
 type User struct {
-	ID           uuid.UUID
-	Email        string
-	Username     string
-	PasswordHash string
-	Role         string
-	Verified     bool
-	AvatarUrl    *string
-	Level        int32
-	StarPoints   int32
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID            uuid.UUID
+	Email         string
+	Username      string
+	PasswordHash  string
+	Role          string
+	Verified      bool
+	AvatarUrl     *string
+	Level         int32
+	StarPoints    int32
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	SuspendedAt   *time.Time
+	SuspendedBy   *uuid.UUID
+	SuspendReason *string
 }

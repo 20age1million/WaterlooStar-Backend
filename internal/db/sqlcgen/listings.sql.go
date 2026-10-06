@@ -17,6 +17,11 @@ SELECT count(*)
 FROM listings l
 JOIN users u ON u.id = l.owner_id
 WHERE l.status = 'published'
+  -- A suspended owner's posts leave public view while the suspension lasts
+  -- (Phase 10). In the SQL, not the handler, so no read path can forget it.
+  AND u.suspended_at IS NULL
+  -- ...and a post a moderator took down is out of view whatever its status.
+  AND l.removed_at IS NULL
   AND ($1::text IS NULL
        OR l.search @@ websearch_to_tsquery('english', $1::text))
   AND ($2::date  IS NULL OR l.start_date <= $2::date)
@@ -92,7 +97,7 @@ INSERT INTO listings (
     $26, $27, $28, $29,
     $30, $31, $32, $33
 )
-RETURNING id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at, search, published_at
+RETURNING id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at, search, published_at, removed_at, removed_by, removed_reason
 `
 
 type CreateListingParams struct {
@@ -207,6 +212,9 @@ func (q *Queries) CreateListing(ctx context.Context, arg CreateListingParams) (L
 		&i.UpdatedAt,
 		&i.Search,
 		&i.PublishedAt,
+		&i.RemovedAt,
+		&i.RemovedBy,
+		&i.RemovedReason,
 	)
 	return i, err
 }
@@ -221,7 +229,7 @@ func (q *Queries) DeleteAllListings(ctx context.Context) error {
 }
 
 const getListingForOwner = `-- name: GetListingForOwner :one
-SELECT id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at, search, published_at FROM listings WHERE id = $1
+SELECT id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at, search, published_at, removed_at, removed_by, removed_reason FROM listings WHERE id = $1
 `
 
 // Fetch for an ownership check. Returns the row whatever its status, so a
@@ -269,19 +277,24 @@ func (q *Queries) GetListingForOwner(ctx context.Context, id uuid.UUID) (Listing
 		&i.UpdatedAt,
 		&i.Search,
 		&i.PublishedAt,
+		&i.RemovedAt,
+		&i.RemovedBy,
+		&i.RemovedReason,
 	)
 	return i, err
 }
 
 const getPublishedListing = `-- name: GetPublishedListing :one
 SELECT
-    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.search, l.published_at,
+    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.search, l.published_at, l.removed_at, l.removed_by, l.removed_reason,
     u.username    AS owner_username,
     u.avatar_url  AS owner_avatar_url,
     u.verified    AS owner_verified
 FROM listings l
 JOIN users u ON u.id = l.owner_id
 WHERE l.id = $1 AND l.status = 'published'
+  AND u.suspended_at IS NULL
+  AND l.removed_at IS NULL
 `
 
 type GetPublishedListingRow struct {
@@ -333,6 +346,9 @@ func (q *Queries) GetPublishedListing(ctx context.Context, id uuid.UUID) (GetPub
 		&i.Listing.UpdatedAt,
 		&i.Listing.Search,
 		&i.Listing.PublishedAt,
+		&i.Listing.RemovedAt,
+		&i.Listing.RemovedBy,
+		&i.Listing.RemovedReason,
 		&i.OwnerUsername,
 		&i.OwnerAvatarUrl,
 		&i.OwnerVerified,
@@ -344,13 +360,18 @@ const listListings = `-- name: ListListings :many
 
 
 SELECT
-    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.search, l.published_at,
+    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.search, l.published_at, l.removed_at, l.removed_by, l.removed_reason,
     u.username    AS owner_username,
     u.avatar_url  AS owner_avatar_url,
     u.verified    AS owner_verified
 FROM listings l
 JOIN users u ON u.id = l.owner_id
 WHERE l.status = 'published'
+  -- A suspended owner's posts leave public view while the suspension lasts
+  -- (Phase 10). In the SQL, not the handler, so no read path can forget it.
+  AND u.suspended_at IS NULL
+  -- ...and a post a moderator took down is out of view whatever its status.
+  AND l.removed_at IS NULL
   AND ($1::text IS NULL
        OR l.search @@ websearch_to_tsquery('english', $1::text))
   -- A listing is available for a wanted window if it starts by then and runs
@@ -482,6 +503,9 @@ func (q *Queries) ListListings(ctx context.Context, arg ListListingsParams) ([]L
 			&i.Listing.UpdatedAt,
 			&i.Listing.Search,
 			&i.Listing.PublishedAt,
+			&i.Listing.RemovedAt,
+			&i.Listing.RemovedBy,
+			&i.Listing.RemovedReason,
 			&i.OwnerUsername,
 			&i.OwnerAvatarUrl,
 			&i.OwnerVerified,
@@ -499,7 +523,7 @@ func (q *Queries) ListListings(ctx context.Context, arg ListListingsParams) ([]L
 const listListingsByOwner = `-- name: ListListingsByOwner :many
 
 SELECT
-    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.search, l.published_at,
+    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.search, l.published_at, l.removed_at, l.removed_by, l.removed_reason,
     u.username    AS owner_username,
     u.avatar_url  AS owner_avatar_url,
     u.verified    AS owner_verified
@@ -567,6 +591,9 @@ func (q *Queries) ListListingsByOwner(ctx context.Context, ownerID uuid.UUID) ([
 			&i.Listing.UpdatedAt,
 			&i.Listing.Search,
 			&i.Listing.PublishedAt,
+			&i.Listing.RemovedAt,
+			&i.Listing.RemovedBy,
+			&i.Listing.RemovedReason,
 			&i.OwnerUsername,
 			&i.OwnerAvatarUrl,
 			&i.OwnerVerified,
@@ -656,7 +683,7 @@ SET status = $1::text,
         ELSE published_at
     END
 WHERE id = $2
-RETURNING id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at, search, published_at
+RETURNING id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at, search, published_at, removed_at, removed_by, removed_reason
 `
 
 type SetListingStatusParams struct {
@@ -711,6 +738,9 @@ func (q *Queries) SetListingStatus(ctx context.Context, arg SetListingStatusPara
 		&i.UpdatedAt,
 		&i.Search,
 		&i.PublishedAt,
+		&i.RemovedAt,
+		&i.RemovedBy,
+		&i.RemovedReason,
 	)
 	return i, err
 }
@@ -740,7 +770,7 @@ UPDATE listings SET
     neighbourhood  = coalesce($21,  neighbourhood),
     distance_m     = coalesce($22,     distance_m)
 WHERE id = $23
-RETURNING id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at, search, published_at
+RETURNING id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at, search, published_at, removed_at, removed_by, removed_reason
 `
 
 type UpdateListingParams struct {
@@ -837,6 +867,9 @@ func (q *Queries) UpdateListing(ctx context.Context, arg UpdateListingParams) (L
 		&i.UpdatedAt,
 		&i.Search,
 		&i.PublishedAt,
+		&i.RemovedAt,
+		&i.RemovedBy,
+		&i.RemovedReason,
 	)
 	return i, err
 }

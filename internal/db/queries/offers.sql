@@ -28,6 +28,9 @@ JOIN users u    ON u.id = o.owner_id
 WHERE o.request_id = sqlc.arg('request_id')
   AND o.withdrawn_at IS NULL
   AND l.status = 'published'
+  AND l.removed_at IS NULL
+  -- An offer from a suspended owner is hidden like one whose listing is down.
+  AND u.suspended_at IS NULL
 ORDER BY o.created_at DESC;
 
 -- The same count the read queries compute inline, for the write path's
@@ -36,9 +39,12 @@ ORDER BY o.created_at DESC;
 SELECT count(*)
 FROM request_offers o
 JOIN listings l ON l.id = o.listing_id
+JOIN users u    ON u.id = o.owner_id
 WHERE o.request_id = sqlc.arg('request_id')
   AND o.withdrawn_at IS NULL
-  AND l.status = 'published';
+  AND l.status = 'published'
+  AND l.removed_at IS NULL
+  AND u.suspended_at IS NULL;
 
 -- Any offer by id, for the ownership check before a withdrawal. "Not yours" and
 -- "does not exist" answer alike in the handler.

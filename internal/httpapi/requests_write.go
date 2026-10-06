@@ -243,6 +243,9 @@ func (s *Server) ownedRequest(ctx context.Context, id uuid.UUID) (auth.Principal
 	if row.PosterID != principal.UserID {
 		return principal, sqlcgen.HousingRequest{}, &refusal{message: "No request with that id."}
 	}
+	if row.RemovedAt != nil {
+		return principal, sqlcgen.HousingRequest{}, removedRefusal("request", row.RemovedReason)
+	}
 
 	return principal, row, nil
 }
@@ -272,6 +275,9 @@ func (s *Server) requestResponse(ctx context.Context, row sqlcgen.HousingRequest
 // to be expressed once per operation: no session gives 401, anything else 404.
 
 func updateRequestRefusal(r *refusal) gen.UpdateRequestResponseObject {
+	if r.conflict {
+		return gen.UpdateRequest409JSONResponse(errorBody(apierror.CodeConflict, r.message))
+	}
 	if r.unauthorised {
 		return gen.UpdateRequest401JSONResponse{
 			UnauthorizedJSONResponse: gen.UnauthorizedJSONResponse(
@@ -285,6 +291,9 @@ func updateRequestRefusal(r *refusal) gen.UpdateRequestResponseObject {
 }
 
 func requestStatusRefusal(r *refusal) gen.SetRequestStatusResponseObject {
+	if r.conflict {
+		return gen.SetRequestStatus409JSONResponse(errorBody(apierror.CodeConflict, r.message))
+	}
 	if r.unauthorised {
 		return gen.SetRequestStatus401JSONResponse{
 			UnauthorizedJSONResponse: gen.UnauthorizedJSONResponse(
@@ -298,6 +307,9 @@ func requestStatusRefusal(r *refusal) gen.SetRequestStatusResponseObject {
 }
 
 func deleteRequestRefusal(r *refusal) gen.DeleteRequestResponseObject {
+	if r.conflict {
+		return gen.DeleteRequest409JSONResponse(errorBody(apierror.CodeConflict, r.message))
+	}
 	if r.unauthorised {
 		return gen.DeleteRequest401JSONResponse{
 			UnauthorizedJSONResponse: gen.UnauthorizedJSONResponse(
