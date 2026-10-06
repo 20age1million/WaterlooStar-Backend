@@ -118,6 +118,10 @@ func toListing(row sqlcgen.Listing, owner gen.ListingOwner, photos []sqlcgen.Lis
 			Position: int(photo.Position),
 		})
 	}
+	out.ShorterStays = row.ShorterStays
+	out.MinStayMonths = nullableInt(row.MinStayMonths)
+	out.BillsEstimateCents = nullableInt(row.BillsEstimateCents)
+	out.AllInCents = nullableInt(allInCents(row))
 	out.Removal = removalFrom(row.RemovedAt, row.RemovedReason)
 
 	return out
@@ -209,4 +213,15 @@ func removalFrom(at *time.Time, reason *string) *gen.PostRemoval {
 		r.Reason = *reason
 	}
 	return &r
+}
+
+// allInCents is what a student pays a month: rent plus the owner's bill
+// estimate. Nil when the estimate is not stated — the API never guesses one,
+// and an unknown estimate is not zero.
+func allInCents(row sqlcgen.Listing) *int32 {
+	if row.BillsEstimateCents == nil {
+		return nil
+	}
+	sum := row.PriceCents + *row.BillsEstimateCents
+	return &sum
 }

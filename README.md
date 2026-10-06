@@ -85,6 +85,7 @@ Everything is described in `api/openapi.yaml`; this is the summary.
 | GET | `/me` | session | The signed-in user |
 | GET | `/listings` | — | Browse Housing Available, paginated |
 | GET | `/listings/{id}` | — | One listing in full |
+| GET | `/listings/availability` | — | Listings open in each month of a year, under the browse filters |
 | POST | `/listings` | verified | Post a place |
 | PATCH | `/listings/{id}` | owner | Edit it |
 | POST | `/listings/{id}/status` | owner | Publish, pause or archive |
@@ -154,6 +155,20 @@ Four things about it are deliberate:
 
 The state lives in the process, so a restart forgets the counters and a second
 replica would double every limit. Both are recorded rather than hidden.
+
+## Listing terms
+
+An owner can allow **shorter stays**: any stay of at least `min_stay_months`
+inside the listed dates, at the same rent. Without it a listing is whole lease
+only. Search still returns only listings that cover the whole window asked for;
+with a window, `sort=match` puts the ones a student can take for exactly that
+window first.
+
+An owner can also give a **bill estimate**: the tenant's monthly share of the
+bills the rent does not include. `all_in_cents` is rent plus that estimate, and is
+null when the owner has not given one. The API never guesses a figure, so
+`all_in_max_cents` and `sort=allInAsc` treat an unstated estimate as unknown, not
+as zero.
 
 ## Admin
 

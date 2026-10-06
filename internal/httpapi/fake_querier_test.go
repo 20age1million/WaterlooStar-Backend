@@ -347,6 +347,8 @@ func (f *fakeQuerier) CreateListing(_ context.Context, arg sqlcgen.CreateListing
 		MinutesToTransit: arg.MinutesToTransit, MinutesToGrocery: arg.MinutesToGrocery,
 		Status: arg.Status, Views: arg.Views, Replies: arg.Replies,
 		CreatedAt: arg.CreatedAt, UpdatedAt: arg.CreatedAt,
+		ShorterStays: arg.ShorterStays, MinStayMonths: arg.MinStayMonths,
+		BillsEstimateCents: arg.BillsEstimateCents,
 	}
 	if l.Conditions == nil {
 		l.Conditions = []string{}
@@ -428,7 +430,21 @@ func (f *fakeQuerier) matches(l sqlcgen.Listing, p sqlcgen.ListListingsParams) b
 	if p.VerifiedOnly != nil && *p.VerifiedOnly && !owner.Verified {
 		return false
 	}
+	// An unstated estimate never meets an all-in ceiling.
+	if p.AllInMax != nil && (l.BillsEstimateCents == nil || l.PriceCents+*l.BillsEstimateCents > *p.AllInMax) {
+		return false
+	}
 	return true
+}
+
+// exactWindow mirrors the SQL's match predicate: the listing can be taken for
+// exactly the window — the same dates, or shorter stays and a long enough window.
+func exactWindow(l sqlcgen.Listing, start, end time.Time) bool {
+	if l.StartDate.Equal(start) && l.EndDate.Equal(end) {
+		return true
+	}
+	return l.ShorterStays && l.MinStayMonths != nil &&
+		!start.AddDate(0, int(*l.MinStayMonths), -1).After(end)
 }
 
 func (f *fakeQuerier) filtered(p sqlcgen.ListListingsParams) []sqlcgen.Listing {
@@ -454,7 +470,22 @@ func (f *fakeQuerier) filtered(p sqlcgen.ListListingsParams) []sqlcgen.Listing {
 			}
 			return *out[i].DistanceM < *out[j].DistanceM
 		})
-	default: // new, match
+	case "allInAsc":
+		sort.SliceStable(out, func(i, j int) bool {
+			ai, aj := out[i].BillsEstimateCents, out[j].BillsEstimateCents
+			if ai == nil || aj == nil {
+				return ai != nil && aj == nil
+			}
+			return out[i].PriceCents+*ai < out[j].PriceCents+*aj
+		})
+	case "match":
+		sort.SliceStable(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
+		if p.StartAfter != nil && p.EndBefore != nil {
+			sort.SliceStable(out, func(i, j int) bool {
+				return exactWindow(out[i], *p.StartAfter, *p.EndBefore) && !exactWindow(out[j], *p.StartAfter, *p.EndBefore)
+			})
+		}
+	default: // new
 		sort.SliceStable(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
 	}
 	return out
@@ -468,7 +499,7 @@ func (f *fakeQuerier) CountListings(_ context.Context, arg sqlcgen.CountListings
 		PriceMin: arg.PriceMin, PriceMax: arg.PriceMax, DistanceMax: arg.DistanceMax,
 		BedroomsMin: arg.BedroomsMin, Furnished: arg.Furnished, Parking: arg.Parking,
 		Pets: arg.Pets, Laundry: arg.Laundry, Utilities: arg.Utilities,
-		VerifiedOnly: arg.VerifiedOnly,
+		VerifiedOnly: arg.VerifiedOnly, AllInMax: arg.AllInMax,
 	}))), nil
 }
 
@@ -638,6 +669,16 @@ func (f *fakeQuerier) UpdateListing(_ context.Context, arg sqlcgen.UpdateListing
 		if arg.DistanceM != nil {
 			l.DistanceM = arg.DistanceM
 		}
+		if arg.ShorterStays != nil {
+			l.ShorterStays = *arg.ShorterStays
+		}
+		// Explicitly set, NULL included — the SQL's CASE, not COALESCE.
+		if arg.SetMinStay {
+			l.MinStayMonths = arg.MinStayMonths
+		}
+		if arg.SetBillsEstimate {
+			l.BillsEstimateCents = arg.BillsEstimateCents
+		}
 		l.UpdatedAt = time.Now()
 		f.listings[i] = l
 		return l, nil
@@ -664,4 +705,29 @@ func (f *fakeQuerier) SetListingStatus(_ context.Context, arg sqlcgen.SetListing
 		return l, nil
 	}
 	return sqlcgen.Listing{}, pgx.ErrNoRows
+}
+
+// ListingAvailabilityByMonth mirrors the SQL: the browse's filters without a
+// window, counted per month a listing is open in at any point.
+func (f *fakeQuerier) ListingAvailabilityByMonth(_ context.Context, arg sqlcgen.ListingAvailabilityByMonthParams) ([]sqlcgen.ListingAvailabilityByMonthRow, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	open := f.filtered(sqlcgen.ListListingsParams{
+		Search: arg.Search, PriceMin: arg.PriceMin, PriceMax: arg.PriceMax, DistanceMax: arg.DistanceMax,
+		BedroomsMin: arg.BedroomsMin, Furnished: arg.Furnished, Parking: arg.Parking, Pets: arg.Pets,
+		Laundry: arg.Laundry, Utilities: arg.Utilities, VerifiedOnly: arg.VerifiedOnly, AllInMax: arg.AllInMax,
+	})
+	rows := []sqlcgen.ListingAvailabilityByMonthRow{}
+	for m := 1; m <= 12; m++ {
+		first := time.Date(int(arg.Year), time.Month(m), 1, 0, 0, 0, 0, time.UTC)
+		last := first.AddDate(0, 1, -1)
+		var n int32
+		for _, l := range open {
+			if !l.StartDate.After(last) && !l.EndDate.Before(first) {
+				n++
+			}
+		}
+		rows = append(rows, sqlcgen.ListingAvailabilityByMonthRow{Month: int32(m), Open: n})
+	}
+	return rows, nil
 }

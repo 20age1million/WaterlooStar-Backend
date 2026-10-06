@@ -73,7 +73,7 @@ func (q *Queries) CountRequestsForAdmin(ctx context.Context, arg CountRequestsFo
 const listListingsForAdmin = `-- name: ListListingsForAdmin :many
 
 SELECT
-    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.search, l.published_at, l.removed_at, l.removed_by, l.removed_reason,
+    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.search, l.published_at, l.removed_at, l.removed_by, l.removed_reason, l.shorter_stays, l.min_stay_months, l.bills_estimate_cents,
     u.username     AS owner_username,
     u.email        AS owner_email,
     u.avatar_url   AS owner_avatar_url,
@@ -179,6 +179,9 @@ func (q *Queries) ListListingsForAdmin(ctx context.Context, arg ListListingsForA
 			&i.Listing.RemovedAt,
 			&i.Listing.RemovedBy,
 			&i.Listing.RemovedReason,
+			&i.Listing.ShorterStays,
+			&i.Listing.MinStayMonths,
+			&i.Listing.BillsEstimateCents,
 			&i.OwnerUsername,
 			&i.OwnerEmail,
 			&i.OwnerAvatarUrl,
@@ -308,7 +311,7 @@ const removeListing = `-- name: RemoveListing :one
 UPDATE listings
 SET removed_at = now(), removed_by = $1, removed_reason = $2
 WHERE id = $3 AND removed_at IS NULL
-RETURNING id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at, search, published_at, removed_at, removed_by, removed_reason
+RETURNING id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at, search, published_at, removed_at, removed_by, removed_reason, shorter_stays, min_stay_months, bills_estimate_cents
 `
 
 type RemoveListingParams struct {
@@ -364,6 +367,9 @@ func (q *Queries) RemoveListing(ctx context.Context, arg RemoveListingParams) (L
 		&i.RemovedAt,
 		&i.RemovedBy,
 		&i.RemovedReason,
+		&i.ShorterStays,
+		&i.MinStayMonths,
+		&i.BillsEstimateCents,
 	)
 	return i, err
 }
@@ -418,7 +424,7 @@ const restoreListing = `-- name: RestoreListing :one
 UPDATE listings
 SET removed_at = NULL, removed_by = NULL, removed_reason = NULL
 WHERE id = $1 AND removed_at IS NOT NULL
-RETURNING id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at, search, published_at, removed_at, removed_by, removed_reason
+RETURNING id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at, search, published_at, removed_at, removed_by, removed_reason, shorter_stays, min_stay_months, bills_estimate_cents
 `
 
 func (q *Queries) RestoreListing(ctx context.Context, id uuid.UUID) (Listing, error) {
@@ -466,6 +472,9 @@ func (q *Queries) RestoreListing(ctx context.Context, id uuid.UUID) (Listing, er
 		&i.RemovedAt,
 		&i.RemovedBy,
 		&i.RemovedReason,
+		&i.ShorterStays,
+		&i.MinStayMonths,
+		&i.BillsEstimateCents,
 	)
 	return i, err
 }

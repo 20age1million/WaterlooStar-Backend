@@ -1,6 +1,6 @@
 # Listing Terms — API Phase 12
 
-**Status:** Ready
+**Status:** Complete
 **Branch:** `feature/listing-terms`
 **Ticket / Work Item:** N/A
 **Owner(s):** WaterlooStar backend
@@ -140,7 +140,7 @@ window and paging. It is public, like browsing.
 
 | Phase | Title | Status | Location |
 |---|---|---|---|
-| 12 — Listing terms | Shorter stays, bill estimates, all-in cost, match ranking, monthly availability | Ready | `docs/specs/active/listing-terms/` |
+| 12 — Listing terms | Shorter stays, bill estimates, all-in cost, match ranking, monthly availability | Complete | `docs/specs/implemented/listing-terms/` |
 
 Single phase; the checklist is below.
 
@@ -148,101 +148,168 @@ Single phase; the checklist is below.
 
 ## Implementation Steps
 
-- [ ] **Preparation**
-  - [ ] Confirm the migration number: the next free number after `main` and
-        every branch that merges before this one. At writing, that is 10
-  - [ ] Set this feature to In Progress in `docs/specs/INDEX.md`
+- [x] **Preparation**
+  - [x] Confirm the migration number: the next free number after `main` and
+        every branch that merges before this one. At writing, that is 10 —
+        confirmed: `main` holds 1–9 after Admin and Moderation merged
+  - [x] Set this feature to In Progress in `docs/specs/INDEX.md` (went straight to
+        Implemented in the phase commit)
 
-- [ ] **Schema**
-  - [ ] `migrations/000010_listing_terms.up.sql`: `shorter_stays boolean NOT NULL
+- [x] **Schema**
+  - [x] `migrations/000010_listing_terms.up.sql`: `shorter_stays boolean NOT NULL
         DEFAULT false`, `min_stay_months integer`, `bills_estimate_cents integer`
-  - [ ] CHECK: `min_stay_months` is null exactly when `shorter_stays` is false
-  - [ ] CHECK: `min_stay_months` between 1 and `lease_months`
-  - [ ] CHECK: `bills_estimate_cents` null or between 0 and 100000 ($1,000)
-  - [ ] Existing rows take the defaults: whole lease only, estimate unknown.
+  - [x] CHECK: `min_stay_months` is null exactly when `shorter_stays` is false
+  - [x] CHECK: `min_stay_months` between 1 and `lease_months`
+  - [x] CHECK: `bills_estimate_cents` null or between 0 and 100000 ($1,000)
+  - [x] Existing rows take the defaults: whole lease only, estimate unknown.
         No backfill
-  - [ ] Down migration drops the three columns and nothing else
-  - [ ] Verify: `up`, `down-one`, `up` on the development database. Not `down`,
+  - [x] Down migration drops the three columns and nothing else
+  - [x] Verify: `up`, `down-one`, `up` on the development database. Not `down`,
         which rolls back every migration
 
-- [ ] **Contract**
-  - [ ] `Listing`: `shorter_stays` (required), `min_stay_months` (nullable),
+- [x] **Contract**
+  - [x] `Listing`: `shorter_stays` (required), `min_stay_months` (nullable),
         `bills_estimate_cents` (nullable), `all_in_cents` (nullable, read-only)
-  - [ ] `ListingInput` and `ListingUpdate`: the three writable fields,
+  - [x] `ListingInput` and `ListingUpdate`: the three writable fields,
         optional, with the rules in their descriptions
-  - [ ] `GET /listings`: `all_in_max_cents`; `allInAsc` added to the `sort` enum;
+  - [x] `GET /listings`: `all_in_max_cents`; `allInAsc` added to the `sort` enum;
         the `match` description states the window ranking
-  - [ ] `GET /listings/availability`: `year` (required, 2020–2100) and every
+  - [x] `GET /listings/availability`: `year` (required, 2020–2100) and every
         `GET /listings` filter except `start_after`, `end_before`, `page`,
         `per_page`, `sort`; returns `ListingAvailability`,
         `{year, months: [{month: 1..12, open: int}]}`, always twelve entries
-  - [ ] Verify: both generators run cleanly and twice without a diff
+  - [x] Verify: both generators run cleanly and twice without a diff
 
-- [ ] **Queries**
-  - [ ] `ListListings` / `CountListings`: `all_in_max` filter excluding unknown
+- [x] **Queries**
+  - [x] `ListListings` / `CountListings`: `all_in_max` filter excluding unknown
         all-in; `allInAsc` ordering, unknown last; `match` ordering by the
         exact-window predicate when both dates are given
-  - [ ] Create and update statements carry the three columns
-  - [ ] `ListingAvailabilityByMonth`: published listings under the shared
+  - [x] Create and update statements carry the three columns
+  - [x] `ListingAvailabilityByMonth`: published listings under the shared
         filters, counted per month of the year where
         `start_date <= last day of month AND end_date >= first day of month`,
         with months that have none returned as zero
-  - [ ] Verify: query tests; `TestEveryQueryIsExercised` names nothing new
+  - [x] Verify: query tests; `TestEveryQueryIsExercised` names nothing new
 
-- [ ] **Validation and handlers**
-  - [ ] `shorter_stays: true` without `min_stay_months` → 400 `validation_failed` on
+- [x] **Validation and handlers**
+  - [x] `shorter_stays: true` without `min_stay_months` → 400 `validation_failed` on
         `min_stay_months`; `min_stay_months` with `shorter_stays: false`, or
         outside 1..`lease_months`, likewise
-  - [ ] `bills_estimate_cents` below 0 or above 100000 → 400 `validation_failed`
-  - [ ] A partial update is validated against the whole listing as it would
+  - [x] `bills_estimate_cents` below 0 or above 100000 → 400 `validation_failed`
+  - [x] A partial update is validated against the whole listing as it would
         stand, so shortening `lease_months` below an existing minimum stay is
         refused
-  - [ ] Map the four fields; `all_in_cents` computed in one place
-  - [ ] The availability handler, public, reusing the listing filter mapping
-  - [ ] Verify by hand: post a listing with each combination; browse with a
+  - [x] Map the four fields; `all_in_cents` computed in one place
+  - [x] The availability handler, public, reusing the listing filter mapping
+  - [x] Verify by hand: post a listing with each combination; browse with a
         window and `sort=match`; read availability with and without filters
 
-- [ ] **Seed data**
-  - [ ] At least two seeded listings take shorter stays with different minimums;
+- [x] **Seed data**
+  - [x] At least two seeded listings take shorter stays with different minimums;
         at least three carry an estimate, one of them `0`; one stays unknown
 
-- [ ] **Tests**
-  - [ ] Query: full-cover filter unchanged for both kinds of listing; the
+- [x] **Tests**
+  - [x] Query: full-cover filter unchanged for both kinds of listing; the
         match ranking puts exact-window listings first, and a flexible listing
         whose minimum exceeds the window does not count as exact; `all_in_max`
         and `allInAsc` with unknown estimates; availability counts at month
         boundaries (a listing ending Jan 31 is not open in February) and the
         twelve-entry shape
-  - [ ] Handler: every validation rule; the partial-update rule; mapping of
+  - [x] Handler: every validation rule; the partial-update rule; mapping of
         `all_in_cents` including null; availability is public
-  - [ ] Extend the in-memory fake querier
-  - [ ] Verify: `go test ./...` passes with and without `PG_TEST_DSN`
+  - [x] Extend the in-memory fake querier
+  - [x] Verify: `go test ./...` passes with and without `PG_TEST_DSN`
 
-- [ ] **Documentation**
-  - [ ] `README.md`: the endpoint table and a paragraph on shorter stays and
+- [x] **Documentation**
+  - [x] `README.md`: the endpoint table and a paragraph on shorter stays and
         all-in cost
-  - [ ] `CLAUDE.md`: the phase table; the rule that the API never invents a bill
+  - [x] `CLAUDE.md`: the phase table; the rule that the API never invents a bill
         figure
 
-- [ ] **Final verification**
-  - [ ] `go build ./...`, `go vet ./...`, all tests pass
-  - [ ] Update this file's Phase Tracker to Complete
-  - [ ] Move `docs/specs/active/listing-terms/index.md` →
+- [x] **Final verification**
+  - [x] `go build ./...`, `go vet ./...`, all tests pass
+  - [x] Update this file's Phase Tracker to Complete
+  - [x] Move `docs/specs/active/listing-terms/index.md` →
         `docs/specs/implemented/listing-terms/index.md`
-  - [ ] Update `docs/specs/INDEX.md`
+  - [x] Update `docs/specs/INDEX.md`
 
 ---
 
 ## Completion Criteria
 
-- [ ] All checklist items completed and verified
-- [ ] An owner can offer shorter stays with a minimum, and whole-lease-only is the default
-- [ ] Every listing response carries the three fields and `all_in_cents`
-- [ ] A windowed `match` search ranks exact-window listings first
-- [ ] `all_in_max_cents` and `allInAsc` behave with unknown estimates as specified
-- [ ] `/listings/availability` returns twelve months under the shared filters
-- [ ] No regressions: existing filters, sorts and responses unchanged apart from the added fields
-- [ ] Spec moved to `implemented/`, `INDEX.md` updated
+- [x] All checklist items completed and verified
+- [x] An owner can offer shorter stays with a minimum, and whole-lease-only is the default
+- [x] Every listing response carries the three fields and `all_in_cents`
+- [x] A windowed `match` search ranks exact-window listings first
+- [x] `all_in_max_cents` and `allInAsc` behave with unknown estimates as specified
+- [x] `/listings/availability` returns twelve months under the shared filters
+- [x] No regressions: existing filters, sorts and responses unchanged apart from the added fields
+- [x] Spec moved to `implemented/`, `INDEX.md` updated
+
+---
+
+## Implementation Notes
+
+**Key files changed:**
+- `migrations/000010_listing_terms.{up,down}.sql`: the three columns and three
+  named CHECKs.
+- `internal/db/queries/listings.sql`: `all_in_max` on `ListListings` and
+  `CountListings`; `allInAsc` and the window-aware `match` in the ordering;
+  the three columns in `CreateListing` and `UpdateListing`; the new
+  `ListingAvailabilityByMonth`.
+- `api/openapi.yaml`: four fields on `Listing`, three on `ListingInput` and
+  `ListingUpdate`, `all_in_max_cents`, `allInAsc`, the `match` description,
+  `GET /listings/availability` and `ListingAvailability`.
+- `internal/httpapi/listings_validate.go`: the cross-field rules,
+  `minStayChange`, and the update mapping. `listings_write.go`: create.
+  `mapping.go`: the four fields and `allInCents`. `listings.go`: the filter
+  and `GetListingAvailability`.
+- `internal/db/seed/seed.go`: shorter stays from 2 and from 4 months; estimates
+  of $15, $95, $0 and $85; two listings left unstated.
+- `internal/db/dbtest/fixtures.go`: `LeaseMonths` and the three terms as
+  options.
+- Tests: `internal/db/queries_listing_terms_test.go`,
+  `internal/httpapi/listing_terms_test.go`; the fake mirrors the new SQL;
+  `queries_listings_test.go`'s `browse` passes the new filter to the count.
+- `README.md`, `CLAUDE.md`, `docs/specs/INDEX.md`.
+
+**Divergences from plan:**
+- **The two nullable columns are updated through explicit "set" flags, not
+  COALESCE.** `UpdateListing` COALESCEs every column, so a PATCH could never
+  clear one. Turning shorter stays off has to set `min_stay_months` to NULL or
+  the CHECK refuses the row, so `set_min_stay` and `set_bills_estimate` were
+  added. The same flaw already affects `deposit_cents` and `distance_m`, which
+  cannot be cleared once set. That is recorded in `CLAUDE.md` and left for the
+  developer: it predates this feature and is outside its spec.
+- **Turning shorter stays off clears the minimum without being told to.** The
+  spec's rule ("a minimum with shorter stays off is refused") holds for what is
+  stored, but a PATCH of `{"shorter_stays": false}` alone now succeeds rather
+  than demanding `min_stay_months: null` as well.
+- **The listing test fixture gained a lease-length option.** It hard-coded 4
+  months, which the new minimum-stay CHECK would refuse for longer leases.
+- **`all_in_cents` is required in the schema and always present**, null
+  included, so a client never has to tell "absent" from "unknown".
+
+**Verification run:**
+- `go build ./...`, `go vet ./...`: clean. Both generators idempotent.
+- `go test ./...` with and without `PG_TEST_DSN`: pass, including
+  `TestEveryQueryIsExercised`. The `browse` helper's list-and-count check caught
+  that it was not passing the new filter to the count; fixed in the helper.
+- Mutation check: making `allInCents` treat an unstated estimate as $0 fails
+  `TestListingTermsAreStoredAndReported`. Restored.
+- Migrations on the development database: `up` to 10, `down-one` to 9 (columns
+  and constraints identical to before, compared by name), `up` to 10, then the
+  seed reloaded.
+- By hand against a running API on the reseeded data:
+  - A Jan–Apr `match` browse lists the three exact-window listings first; a
+    Jan–Feb browse puts only the 2-month minimum first.
+  - `allInAsc` orders $760, $785, $860, $1,195, then the two unstated.
+  - Availability for 2027 is 4/4/4/4, 3/3/3/3, 2/2/2/2, and 2/2/2/2, 1/1/1/1,
+    0/0/0/0 under an all-in ceiling of $900.
+  - Posting shorter stays from 3 months with a $60 estimate reported an all-in
+    of $780. A minimum past the lease was refused on `min_stay_months`. One
+    PATCH turning both off cleared the minimum, the estimate and the all-in.
+  - The check listing was archived.
 
 ---
 

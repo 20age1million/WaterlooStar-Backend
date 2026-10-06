@@ -52,7 +52,7 @@ func browse(t *testing.T, q *sqlcgen.Queries, list sqlcgen.ListListingsParams) (
 		PriceMin: list.PriceMin, PriceMax: list.PriceMax, DistanceMax: list.DistanceMax,
 		BedroomsMin: list.BedroomsMin, Furnished: list.Furnished, Parking: list.Parking,
 		Pets: list.Pets, Laundry: list.Laundry, Utilities: list.Utilities,
-		VerifiedOnly: list.VerifiedOnly,
+		VerifiedOnly: list.VerifiedOnly, AllInMax: list.AllInMax,
 	})
 	if err != nil {
 		t.Fatalf("CountListings: %v", err)

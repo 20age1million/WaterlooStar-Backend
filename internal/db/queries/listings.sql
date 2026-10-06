@@ -43,13 +43,31 @@ WHERE l.status = 'published'
   AND (sqlc.narg('verified_only')::bool IS NULL
        OR sqlc.narg('verified_only')::bool = false
        OR u.verified = true)
+  -- What a student pays a month, rent plus the owner's bill estimate. An
+  -- unstated estimate is unknown, never zero, so it cannot meet a ceiling.
+  AND (sqlc.narg('all_in_max')::int IS NULL
+       OR (l.bills_estimate_cents IS NOT NULL
+           AND l.price_cents + l.bills_estimate_cents <= sqlc.narg('all_in_max')::int))
 ORDER BY
     CASE WHEN sqlc.arg('sort')::text = 'priceAsc'  THEN l.price_cents END ASC,
     CASE WHEN sqlc.arg('sort')::text = 'priceDesc' THEN l.price_cents END DESC,
     -- NULLS LAST: a listing with no distance should not lead a distance sort.
     CASE WHEN sqlc.arg('sort')::text = 'distance'  THEN l.distance_m END ASC NULLS LAST,
-    -- 'new' and 'match' both fall through to newest first. Real match scoring
-    -- needs the viewer's own request, which does not exist yet.
+    -- An unknown estimate makes the sum NULL, which sorts last: a listing that
+    -- has not said what the bills cost should not lead a cost sort.
+    CASE WHEN sqlc.arg('sort')::text = 'allInAsc'  THEN l.price_cents + l.bills_estimate_cents END ASC NULLS LAST,
+    -- With a window, 'match' ranks the listings a student can take for exactly
+    -- those dates first: the same dates, or shorter stays allowed and the window
+    -- at least the minimum long. The rest are whole lease only. Without a
+    -- window, and within each group, newest first.
+    CASE WHEN sqlc.arg('sort')::text = 'match'
+              AND sqlc.narg('start_after')::date IS NOT NULL
+              AND sqlc.narg('end_before')::date IS NOT NULL
+         THEN ((l.start_date = sqlc.narg('start_after')::date AND l.end_date = sqlc.narg('end_before')::date)
+               OR (l.shorter_stays
+                   AND sqlc.narg('start_after')::date + make_interval(months => l.min_stay_months) - interval '1 day'
+                       <= sqlc.narg('end_before')::date))
+    END DESC NULLS LAST,
     l.created_at DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
@@ -78,7 +96,12 @@ WHERE l.status = 'published'
   AND (sqlc.narg('utilities')::text[]  IS NULL OR l.utilities @> sqlc.narg('utilities')::text[])
   AND (sqlc.narg('verified_only')::bool IS NULL
        OR sqlc.narg('verified_only')::bool = false
-       OR u.verified = true);
+       OR u.verified = true)
+  -- What a student pays a month, rent plus the owner's bill estimate. An
+  -- unstated estimate is unknown, never zero, so it cannot meet a ceiling.
+  AND (sqlc.narg('all_in_max')::int IS NULL
+       OR (l.bills_estimate_cents IS NOT NULL
+           AND l.price_cents + l.bills_estimate_cents <= sqlc.narg('all_in_max')::int));
 
 -- name: GetPublishedListing :one
 SELECT
@@ -114,7 +137,8 @@ INSERT INTO listings (
     furnished, utilities, parking, pets, laundry,
     address_line, neighbourhood, lat, lng, distance_m,
     commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery,
-    status, views, replies, created_at
+    status, views, replies, created_at,
+    shorter_stays, min_stay_months, bills_estimate_cents
 ) VALUES (
     $1, $2, $3, $4,
     $5, $6,
@@ -123,7 +147,8 @@ INSERT INTO listings (
     $16, $17, $18, $19, $20,
     $21, $22, $23, $24, $25,
     $26, $27, $28, $29,
-    $30, $31, $32, $33
+    $30, $31, $32, $33,
+    $34, $35, $36
 )
 RETURNING *;
 
@@ -176,7 +201,15 @@ UPDATE listings SET
     laundry        = coalesce(sqlc.narg('laundry'),        laundry),
     address_line   = coalesce(sqlc.narg('address_line'),   address_line),
     neighbourhood  = coalesce(sqlc.narg('neighbourhood'),  neighbourhood),
-    distance_m     = coalesce(sqlc.narg('distance_m'),     distance_m)
+    distance_m     = coalesce(sqlc.narg('distance_m'),     distance_m),
+    shorter_stays  = coalesce(sqlc.narg('shorter_stays'),  shorter_stays),
+    -- These two can be set back to NULL — "whole lease only", "estimate not
+    -- stated" — which COALESCE cannot express, so each says whether it is
+    -- being set at all.
+    min_stay_months = CASE WHEN sqlc.arg('set_min_stay')::bool
+                           THEN sqlc.narg('min_stay_months')::int ELSE min_stay_months END,
+    bills_estimate_cents = CASE WHEN sqlc.arg('set_bills_estimate')::bool
+                                THEN sqlc.narg('bills_estimate_cents')::int ELSE bills_estimate_cents END
 WHERE id = sqlc.arg('id')
 RETURNING *;
 
@@ -194,3 +227,44 @@ SET status = sqlc.arg('status')::text,
     END
 WHERE id = sqlc.arg('id')
 RETURNING *;
+
+-- How many published listings are open in each month of a year, under the same
+-- filters as the browse except the date window, which this replaces. A listing
+-- is open in a month if it starts by the month's last day and ends on or after
+-- its first. Every month is returned, with zero where nothing is open.
+-- name: ListingAvailabilityByMonth :many
+WITH months AS (
+    SELECT m,
+           make_date(sqlc.arg('year')::int, m, 1) AS first_day,
+           (make_date(sqlc.arg('year')::int, m, 1) + interval '1 month' - interval '1 day')::date AS last_day
+    FROM generate_series(1, 12) AS m
+), open_listings AS (
+    SELECT l.start_date, l.end_date
+    FROM listings l
+    JOIN users u ON u.id = l.owner_id
+    WHERE l.status = 'published'
+      AND u.suspended_at IS NULL
+      AND l.removed_at IS NULL
+      AND (sqlc.narg('search')::text IS NULL
+           OR l.search @@ websearch_to_tsquery('english', sqlc.narg('search')::text))
+      AND (sqlc.narg('price_min')::int     IS NULL OR l.price_cents >= sqlc.narg('price_min')::int)
+      AND (sqlc.narg('price_max')::int     IS NULL OR l.price_cents <= sqlc.narg('price_max')::int)
+      AND (sqlc.narg('distance_max')::int  IS NULL OR l.distance_m <= sqlc.narg('distance_max')::int)
+      AND (sqlc.narg('bedrooms_min')::int  IS NULL OR l.bedrooms_total >= sqlc.narg('bedrooms_min')::int)
+      AND (sqlc.narg('furnished')::bool    IS NULL OR l.furnished = sqlc.narg('furnished')::bool)
+      AND (sqlc.narg('parking')::bool      IS NULL OR l.parking   = sqlc.narg('parking')::bool)
+      AND (sqlc.narg('pets')::bool         IS NULL OR l.pets      = sqlc.narg('pets')::bool)
+      AND (sqlc.narg('laundry')::bool      IS NULL OR l.laundry   = sqlc.narg('laundry')::bool)
+      AND (sqlc.narg('utilities')::text[]  IS NULL OR l.utilities @> sqlc.narg('utilities')::text[])
+      AND (sqlc.narg('verified_only')::bool IS NULL
+           OR sqlc.narg('verified_only')::bool = false
+           OR u.verified = true)
+      AND (sqlc.narg('all_in_max')::int IS NULL
+           OR (l.bills_estimate_cents IS NOT NULL
+               AND l.price_cents + l.bills_estimate_cents <= sqlc.narg('all_in_max')::int))
+)
+SELECT months.m::int AS month, count(o.start_date)::int AS open
+FROM months
+LEFT JOIN open_listings o ON o.start_date <= months.last_day AND o.end_date >= months.first_day
+GROUP BY months.m
+ORDER BY months.m;
