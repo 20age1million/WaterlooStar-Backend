@@ -54,6 +54,13 @@ type ListingOptions struct {
 	Bedrooms   int32
 	UnitType   string
 	Neighbour  string
+
+	// Listing terms (Phase 12). LeaseMonths defaults to 4, matching the default
+	// Jan–Apr dates; set it with longer dates, or a minimum stay may exceed it.
+	LeaseMonths        int32
+	ShorterStays       bool
+	MinStayMonths      *int32
+	BillsEstimateCents *int32
 }
 
 // Listing inserts a listing owned by owner.
@@ -68,7 +75,7 @@ func Listing(t *testing.T, q *sqlcgen.Queries, owner uuid.UUID, opts ListingOpti
 		PriceCents:    orInt32(opts.PriceCents, 90000),
 		StartDate:     orTime(opts.StartDate, date(2027, 1, 1)),
 		EndDate:       orTime(opts.EndDate, date(2027, 4, 30)),
-		LeaseMonths:   4,
+		LeaseMonths:   orInt32(opts.LeaseMonths, 4),
 		TermTag:       "Winter term",
 		UnitType:      orString(opts.UnitType, "room"),
 		BedroomsTotal: orInt32(opts.Bedrooms, 4),
@@ -82,6 +89,10 @@ func Listing(t *testing.T, q *sqlcgen.Queries, owner uuid.UUID, opts ListingOpti
 		CommuteMode:   "walk",
 		Status:        orString(opts.Status, "published"),
 		CreatedAt:     time.Now(),
+
+		ShorterStays:       opts.ShorterStays,
+		MinStayMonths:      opts.MinStayMonths,
+		BillsEstimateCents: opts.BillsEstimateCents,
 	}
 
 	listing, err := q.CreateListing(context.Background(), params)

@@ -161,6 +161,11 @@ type Querier interface {
 	// email or the username, because an operator looking someone up has whichever
 	// one the complaint quoted, and often only part of it.
 	ListUsersForAdmin(ctx context.Context, arg ListUsersForAdminParams) ([]ListUsersForAdminRow, error)
+	// How many published listings are open in each month of a year, under the same
+	// filters as the browse except the date window, which this replaces. A listing
+	// is open in a month if it starts by the month's last day and ends on or after
+	// its first. Every month is returned, with zero where nothing is open.
+	ListingAvailabilityByMonth(ctx context.Context, arg ListingAvailabilityByMonthParams) ([]ListingAvailabilityByMonthRow, error)
 	MarkUserVerified(ctx context.Context, id uuid.UUID) (User, error)
 	// Health check. Trivial on purpose: it exists to prove the whole chain — pool,
 	// sqlc codegen, generated method, real round-trip — works end to end, before any

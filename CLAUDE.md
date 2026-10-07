@@ -99,27 +99,20 @@ only thing that calls it.
 | 9 | Admin identity: `cmd/admin`, the `admin_actions` ledger, read-only `/admin` surface |
 | 10 | Account management: suspend, reinstate, verify by hand, change role |
 | 11 | Post moderation: every post in any state, takedown and restore |
+| 12 | Listing terms: shorter stays, bill estimate and all-in cost, window ranking, monthly availability |
 
-Forty endpoints exist, fourteen of them admin-only; `README.md` has the table, and the rate limits with
+Forty-one endpoints exist, fourteen of them admin-only; `README.md` has the table, and the rate limits with
 it.
 
-Phases 5–7 are merged into `main` (pull requests #6–#8).
+Phases 5–11 are merged into `main` (pull requests #6–#10).
 
-**Branches in flight**, oldest first — each is based on the one above it, so they
-merge in this order:
-
-| Branch | Holds |
-|---|---|
-| `feature/rate-limiting` | Phase 8, complete; not yet merged into `main` |
-| `feature/admin-moderation` | Phase 8 merged in, and Admin and Moderation complete (9–11) |
-| `feature/listing-terms` | The accepted spec for Phase 12; merges after the above (migration 10) |
+**In flight:** `feature/listing-terms` holds Phase 12, complete, with migration 10.
 
 ### What comes next
 
-**Specified and accepted:** Listing Terms (Phase 12), on `feature/listing-terms`,
-which merges after Admin and Moderation because of migration order. Then email
-delivery as Phase 13, agreed 2026-09-27. The admin portal is a separate feature in
-the frontend repository.
+Email delivery as Phase 13, agreed 2026-09-27; it needs a spec first. The admin
+portal and the housing rework's remaining phases are separate features in the
+frontend repository, and the rework's phases 10–11 consume Phase 12.
 
 Unspecified, in the order I would take it:
 
@@ -133,6 +126,10 @@ Unspecified, in the order I would take it:
 ---
 
 ## Rules that bind
+
+- **The API never invents a bill figure.** `bills_estimate_cents` is the owner's
+  number or null; `all_in_cents` is null when it is. Filters and sorts on all-in
+  cost treat null as unknown, never as zero.
 
 - **The contract comes first.** `api/openapi.yaml` is authoritative and is edited
   *before* the handler that serves a new shape. Then regenerate. A handler that
@@ -210,6 +207,13 @@ These were all found the hard way and will silently regress if undone.
   response types encode differently (bare `application/json`, trailing newline),
   so using them leaks which paths exist. A new admin operation needs a `Visit`
   method on `unrouted`.
+- **`UpdateListing` uses COALESCE, so a PATCH cannot set a column to NULL** —
+  except `min_stay_months` and `bills_estimate_cents`, which carry explicit
+  `set_min_stay`/`set_bills_estimate` flags so they can be cleared. `deposit_cents`
+  and `distance_m` still cannot be cleared once set: a known gap, found in Phase
+  12, not yet fixed.
+- **Turning `shorter_stays` off clears the minimum.** `minStayChange` does it, so
+  a client need not send `min_stay_months: null` as well.
 - **Every admin change goes through `db.Audited`**, which runs the change and its
   `admin_actions` row in one transaction. `db.ChangeRole` is the role change, with
   the last-admin guard, for both `cmd/admin` and the portal.

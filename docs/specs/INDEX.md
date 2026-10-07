@@ -14,9 +14,7 @@ across both; everything from Phase 4 onward is not.
 
 ## Active
 
-*None on this branch.* Listing Terms (Phase 12) is specified on
-`feature/listing-terms` and merges after this feature, because of migration
-order.
+*None.*
 
 ## Implemented
 
@@ -28,6 +26,7 @@ order.
 | [Housing Requests](./implemented/housing-requests/index.md) | 3 (5–7) | `docs/specs/implemented/housing-requests/` |
 | [Rate Limiting](./implemented/rate-limiting/index.md) | 1 (Phase 8) | `docs/specs/implemented/rate-limiting/` |
 | [Admin and Moderation](./implemented/admin-moderation/index.md) | 3 (9–11) | `docs/specs/implemented/admin-moderation/` |
+| [Listing Terms](./implemented/listing-terms/index.md) | 1 (Phase 12) | `docs/specs/implemented/listing-terms/` |
 
 ### Platform Foundation
 
@@ -87,6 +86,14 @@ Every action needs a reason, writes one ledger row in the same transaction, and
 has an inverse. `/admin` answers exactly as an unknown path does to anyone who
 is not an admin.
 
+### Listing Terms
+
+An owner can allow shorter stays, with a minimum, and give an estimate of the
+bills the rent leaves out. Listings report `all_in_cents`, null when no estimate
+was given. `GET /listings` gains `all_in_max_cents`, `sort=allInAsc`, and a `match`
+ranking that puts exact-window listings first. `GET /listings/availability`
+counts what is open in each month of a year. Search stays full-cover.
+
 ## Decisions carried forward
 
 Recorded in the Platform Foundation `index.md` and still in force:
@@ -108,9 +115,8 @@ Recorded in the Platform Foundation `index.md` and still in force:
 
 ## What comes next
 
-**Listing Terms** (Phase 12) is specified on `feature/listing-terms`. The admin
-portal, specified in the frontend repository, can now be built against this
-contract. Next, agreed 2026-09-27:
+The admin portal and the housing rework's phases 10–11, specified in the frontend
+repository, can be built against this contract. Next, agreed 2026-09-27:
 
 - **Email delivery** (Phase 13). Verification and reset links only reach the log, so on the
   live site nobody can finish signing up. The provider is chosen (Clerk's

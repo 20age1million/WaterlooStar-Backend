@@ -61,9 +61,15 @@ type listing struct {
 	commuteMode      string
 	minutesToTransit *int32
 	minutesToGrocery *int32
-	views            int32
-	replies          int32
-	postedDaysAgo    int
+	// Listing terms (Phase 12). Varied so development shows every state: two
+	// take shorter stays with different minimums; estimates include a $0 and
+	// two are left unstated.
+	shorterStays       bool
+	minStayMonths      *int32
+	billsEstimateCents *int32
+	views              int32
+	replies            int32
+	postedDaysAgo      int
 }
 
 func ptr[T any](v T) *T { return &v }
@@ -79,8 +85,9 @@ var posters = []poster{
 
 var listings = []listing{
 	{
-		poster: "meil",
-		title:  "Bright room in a 4-bed student house",
+		poster:       "meil",
+		title:        "Bright room in a 4-bed student house",
+		shorterStays: true, minStayMonths: ptr(int32(2)), billsEstimateCents: ptr(int32(1500)),
 		body: "I am heading to Ottawa for a Winter co-op and need someone to take my room from January. " +
 			"It is the back bedroom on the second floor, so you get the quiet side of the house — no street " +
 			"noise, and the room holds a double bed, a desk and a dresser with room left over.\n\n" +
@@ -103,8 +110,9 @@ var listings = []listing{
 		views: 214, replies: 6, postedDaysAgo: 2,
 	},
 	{
-		poster: "danielo",
-		title:  "Quiet 1-bedroom basement apartment",
+		poster:       "danielo",
+		title:        "Quiet 1-bedroom basement apartment",
+		shorterStays: true, minStayMonths: ptr(int32(4)), billsEstimateCents: ptr(int32(9500)),
 		body: "Separate entrance at the side of the house, so you come and go without passing anyone. " +
 			"The ceiling is a little low at the far end but the bedroom itself is a good size and the " +
 			"windows are above ground.",
@@ -119,8 +127,9 @@ var listings = []listing{
 		views: 98, replies: 3, postedDaysAgo: 1,
 	},
 	{
-		poster: "priyas",
-		title:  "Private room, sound-isolated corner unit",
+		poster:             "priyas",
+		title:              "Private room, sound-isolated corner unit",
+		billsEstimateCents: ptr(int32(0)),
 		body: "Corner room on the top floor with no shared walls to another bedroom. I put acoustic panels " +
 			"on the one wall that adjoins the hallway and they are staying. Ensuite bathroom, so no queue " +
 			"in the morning.",
@@ -150,8 +159,9 @@ var listings = []listing{
 		views: 142, replies: 2, postedDaysAgo: 6,
 	},
 	{
-		poster: "kaylam",
-		title:  "Room in a townhouse with three grad students",
+		poster:             "kaylam",
+		title:              "Room in a townhouse with three grad students",
+		billsEstimateCents: ptr(int32(8500)),
 		body: "Quiet house — everyone here is writing a thesis and keeps sensible hours. In-unit laundry, " +
 			"and the landlord is fine with cats.",
 		conditions: []string{"Cats are fine, dogs would need a conversation.", "Shared cleaning rota."},
@@ -262,15 +272,18 @@ func Run(ctx context.Context, pool *pgxpool.Pool) (int, error) {
 			DistanceM:     ptr(l.distanceM),
 			// Coordinates need a geocoding provider, which is deliberately
 			// deferred. The map placeholder does not read them yet.
-			Lat:              nil,
-			Lng:              nil,
-			CommuteMinutes:   ptr(l.commuteMinutes),
-			CommuteMode:      l.commuteMode,
-			MinutesToTransit: l.minutesToTransit,
-			MinutesToGrocery: l.minutesToGrocery,
-			Status:           "published",
-			Views:            l.views,
-			Replies:          l.replies,
+			Lat:                nil,
+			Lng:                nil,
+			CommuteMinutes:     ptr(l.commuteMinutes),
+			CommuteMode:        l.commuteMode,
+			MinutesToTransit:   l.minutesToTransit,
+			MinutesToGrocery:   l.minutesToGrocery,
+			ShorterStays:       l.shorterStays,
+			MinStayMonths:      l.minStayMonths,
+			BillsEstimateCents: l.billsEstimateCents,
+			Status:             "published",
+			Views:              l.views,
+			Replies:            l.replies,
 			// Backdated so "posted 2 days ago" is true of the data rather than
 			// of the moment the seed ran.
 			CreatedAt: now.AddDate(0, 0, -l.postedDaysAgo),

@@ -107,6 +107,7 @@ func (f listingFilters) count() sqlcgen.CountListingsParams {
 		Laundry:      f.Laundry,
 		Utilities:    f.Utilities,
 		VerifiedOnly: f.VerifiedOnly,
+		AllInMax:     f.AllInMax,
 	}
 }
 
@@ -140,6 +141,7 @@ func filtersFrom(p gen.ListListingsParams) (listingFilters, string) {
 		return f, "The maximum rent cannot be below the minimum."
 	}
 
+	f.AllInMax = int32Ptr(p.AllInMaxCents)
 	f.DistanceMax = int32Ptr(p.DistanceMaxM)
 	f.BedroomsMin = int32Ptr(p.BedroomsMin)
 	f.Furnished = p.Furnished
@@ -263,4 +265,66 @@ func pageMeta(page, perPage int, total int64) gen.PageMeta {
 		Total:      int(total),
 		TotalPages: totalPages,
 	}
+}
+
+// GetListingAvailability counts the published listings open in each month of a
+// year, under the browse's filters except the date window. Public, like
+// browsing; it is what the hub's month strip draws.
+func (s *Server) GetListingAvailability(ctx context.Context, request gen.GetListingAvailabilityRequestObject) (gen.GetListingAvailabilityResponseObject, error) {
+	p := request.Params
+	if p.Year < 2020 || p.Year > 2100 {
+		return gen.GetListingAvailability400JSONResponse{
+			BadRequestJSONResponse: gen.BadRequestJSONResponse(
+				errorBody(apierror.CodeValidation, "Choose a year between 2020 and 2100.")),
+		}, nil
+	}
+
+	params := sqlcgen.ListingAvailabilityByMonthParams{
+		Year:         int32(p.Year),
+		PriceMin:     int32Ptr(p.PriceMinCents),
+		PriceMax:     int32Ptr(p.PriceMaxCents),
+		AllInMax:     int32Ptr(p.AllInMaxCents),
+		DistanceMax:  int32Ptr(p.DistanceMaxM),
+		BedroomsMin:  int32Ptr(p.BedroomsMin),
+		Furnished:    p.Furnished,
+		Parking:      p.Parking,
+		Pets:         p.Pets,
+		Laundry:      p.Laundry,
+		VerifiedOnly: p.VerifiedOnly,
+	}
+	if p.Q != nil {
+		if trimmed := strings.TrimSpace(*p.Q); trimmed != "" {
+			params.Search = &trimmed
+		}
+	}
+	if p.PriceMinCents != nil && p.PriceMaxCents != nil && *p.PriceMaxCents < *p.PriceMinCents {
+		return gen.GetListingAvailability400JSONResponse{
+			BadRequestJSONResponse: gen.BadRequestJSONResponse(
+				errorBody(apierror.CodeValidation, "The maximum rent cannot be below the minimum.")),
+		}, nil
+	}
+	if p.Utilities != nil && len(*p.Utilities) > 0 {
+		params.Utilities = utilityStrings(p.Utilities)
+	}
+
+	rows, err := s.queries.ListingAvailabilityByMonth(ctx, params)
+	if err != nil {
+		s.log.Error("listing availability", slog.String("error", err.Error()))
+		return nil, err
+	}
+
+	out := gen.ListingAvailability{Year: p.Year}
+	// Twelve entries whatever the query returned, January first: the contract
+	// promises it, and the hub draws a strip of exactly twelve.
+	open := map[int32]int32{}
+	for _, r := range rows {
+		open[r.Month] = r.Open
+	}
+	for m := int32(1); m <= 12; m++ {
+		out.Months = append(out.Months, struct {
+			Month int `json:"month"`
+			Open  int `json:"open"`
+		}{Month: int(m), Open: int(open[m])})
+	}
+	return gen.GetListingAvailability200JSONResponse(out), nil
 }

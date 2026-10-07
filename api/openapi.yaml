@@ -335,6 +335,13 @@ paths:
         - name: price_max_cents
           in: query
           schema: { type: integer, minimum: 0 }
+        - name: all_in_max_cents
+          in: query
+          description: |
+            Only listings whose rent plus bill estimate is at most this. A
+            listing that has not stated an estimate is excluded: its monthly
+            cost is unknown, not equal to its rent.
+          schema: { type: integer, minimum: 0 }
         - name: distance_max_m
           in: query
           description: |
@@ -373,12 +380,15 @@ paths:
         - name: sort
           in: query
           description: |
-            `match` is accepted and currently orders by newest — real match
-            scoring compares against the viewer's own housing request, which
-            does not exist yet.
+            With both `start_after` and `end_before`, `match` ranks first the
+            listings a student can take for exactly that window — the same
+            dates, or shorter stays allowed and the window at least the
+            minimum stay — then the rest, newest first within each. Without a
+            window it orders by newest. `allInAsc` orders by rent plus bill
+            estimate, cheapest first, with unknown estimates last.
           schema:
             type: string
-            enum: [match, new, priceAsc, priceDesc, distance]
+            enum: [match, new, priceAsc, priceDesc, distance, allInAsc]
             default: new
       responses:
         "200":
@@ -422,6 +432,74 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /listings/availability:
+    get:
+      tags: [housing]
+      operationId: getListingAvailability
+      summary: How many places are open in each month
+      description: |
+        For each month of `year`, how many published listings are open at any
+        point in it, under the same filters as `GET /listings` except the date
+        window, which this replaces. Always twelve months; a month with nothing
+        open is 0. Public, like browsing.
+      security: []
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema: { type: integer, minimum: 2020, maximum: 2100 }
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: price_min_cents
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: price_max_cents
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: all_in_max_cents
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: distance_max_m
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: bedrooms_min
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: furnished
+          in: query
+          schema: { type: boolean }
+        - name: parking
+          in: query
+          schema: { type: boolean }
+        - name: pets
+          in: query
+          schema: { type: boolean }
+        - name: laundry
+          in: query
+          schema: { type: boolean }
+        - name: utilities
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [internet, hydro, water, heat, gas]
+          style: form
+          explode: true
+        - name: verified_only
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Twelve months, January first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListingAvailability"
+        "400": { $ref: "#/components/responses/BadRequest" }
         "500": { $ref: "#/components/responses/InternalError" }
 
   /listings/{id}:
@@ -1614,6 +1692,10 @@ components:
         - created_at
         - owner
         - photos
+        - shorter_stays
+        - min_stay_months
+        - bills_estimate_cents
+        - all_in_cents
       properties:
         id:
           type: string
@@ -1720,8 +1802,50 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ListingPhoto"
+        shorter_stays:
+          type: boolean
+          description: |
+            Whether a student may rent part of the listed dates, for at least
+            `min_stay_months`, at the same monthly rent. False means whole
+            lease only: the listed dates are the only dates on offer.
+        min_stay_months:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: The shortest stay accepted. Set exactly when `shorter_stays` is true.
+        bills_estimate_cents:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: |
+            The owner's estimate of the tenant's monthly share of every bill the
+            rent does not include. 0 means nothing extra; null means not stated,
+            and is never read as 0.
+        all_in_cents:
+          type: integer
+          nullable: true
+          readOnly: true
+          description: |
+            `price_cents` plus `bills_estimate_cents` — what a student pays a
+            month. Null when the estimate is not stated; never guessed.
         removal:
           $ref: "#/components/schemas/PostRemoval"
+
+    ListingAvailability:
+      type: object
+      required: [year, months]
+      properties:
+        year: { type: integer }
+        months:
+          type: array
+          minItems: 12
+          maxItems: 12
+          items:
+            type: object
+            required: [month, open]
+            properties:
+              month: { type: integer, minimum: 1, maximum: 12 }
+              open: { type: integer, minimum: 0 }
 
     ListingInput:
       type: object
@@ -1766,6 +1890,26 @@ components:
         address_line: { type: string, maxLength: 200 }
         neighbourhood: { type: string, maxLength: 80 }
         distance_m: { type: integer, minimum: 0, nullable: true }
+        shorter_stays:
+          type: boolean
+          description: Allow stays shorter than the listed dates. Defaults to false.
+        min_stay_months:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 24
+          description: |
+            Required when `shorter_stays` is true, and at most `lease_months`.
+            Must be absent or null otherwise.
+        bills_estimate_cents:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 100000
+          description: |
+            Your estimate of the tenant's monthly share of the bills not in the
+            rent. 0 when everything is included; null or absent when you would
+            rather not say.
         status:
           type: string
           enum: [draft, published]
@@ -1805,6 +1949,26 @@ components:
         address_line: { type: string, maxLength: 200 }
         neighbourhood: { type: string, maxLength: 80 }
         distance_m: { type: integer, minimum: 0, nullable: true }
+        shorter_stays:
+          type: boolean
+          description: Allow stays shorter than the listed dates. Defaults to false.
+        min_stay_months:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 24
+          description: |
+            Required when `shorter_stays` is true, and at most `lease_months`.
+            Must be absent or null otherwise.
+        bills_estimate_cents:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 100000
+          description: |
+            Your estimate of the tenant's monthly share of the bills not in the
+            rent. 0 when everything is included; null or absent when you would
+            rather not say.
 
     ListingOwner:
       type: object

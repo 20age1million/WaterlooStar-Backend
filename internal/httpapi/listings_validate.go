@@ -25,6 +25,7 @@ func validateListing(p sqlcgen.CreateListingParams) map[string]string {
 		UnitType: p.UnitType, BedroomsTotal: p.BedroomsTotal, BedroomOf: p.BedroomOf,
 		Bathrooms: p.Bathrooms, BathType: p.BathType, AddressLine: p.AddressLine,
 		Conditions: p.Conditions, Status: p.Status,
+		ShorterStays: p.ShorterStays, MinStayMonths: p.MinStayMonths, BillsEstimateCents: p.BillsEstimateCents,
 	})
 }
 
@@ -72,6 +73,20 @@ func validateListingRow(l sqlcgen.Listing) map[string]string {
 	// A studio has no separate bedroom, so numbering one is incoherent.
 	if l.UnitType == "studio" && l.BedroomOf != nil {
 		problems["bedroom_of"] = "A studio has no separate bedroom to number."
+	}
+	// Shorter stays: a minimum exactly when they are allowed, and no longer than
+	// the lease itself. Checked against the whole row, so shortening the lease
+	// below an existing minimum is caught too.
+	switch {
+	case l.ShorterStays && l.MinStayMonths == nil:
+		problems["min_stay_months"] = "Say the shortest stay you would accept."
+	case !l.ShorterStays && l.MinStayMonths != nil:
+		problems["min_stay_months"] = "A minimum stay only applies when shorter stays are allowed."
+	case l.MinStayMonths != nil && (*l.MinStayMonths < 1 || *l.MinStayMonths > l.LeaseMonths):
+		problems["min_stay_months"] = fmt.Sprintf("The minimum stay must be between 1 and %d months, the length of the lease.", l.LeaseMonths)
+	}
+	if l.BillsEstimateCents != nil && (*l.BillsEstimateCents < 0 || *l.BillsEstimateCents > maxBillsEstimateCents) {
+		problems["bills_estimate_cents"] = "The bill estimate must be between $0 and $1,000 a month."
 	}
 	if l.Status != "" && l.Status != "draft" && l.Status != "published" &&
 		l.Status != "paused" && l.Status != "archived" {
@@ -126,6 +141,32 @@ func applyUpdate(l *sqlcgen.Listing, in gen.ListingUpdate) {
 	if in.AddressLine != nil {
 		l.AddressLine = *in.AddressLine
 	}
+	if in.ShorterStays != nil {
+		l.ShorterStays = *in.ShorterStays
+	}
+	if v, ok := minStayChange(in); ok {
+		l.MinStayMonths = int32Ptr(v)
+	}
+	if v, ok := nullableValue(in.BillsEstimateCents); ok {
+		l.BillsEstimateCents = int32Ptr(v)
+	}
+}
+
+// maxBillsEstimateCents is the database's ceiling on a bill estimate: $1,000.
+const maxBillsEstimateCents = 100000
+
+// minStayChange reports what an edit does to the minimum stay. Turning shorter
+// stays off without mentioning the minimum clears it: the minimum means
+// nothing for a whole-lease-only listing, and making the caller send both
+// would only produce a refusal they did not need.
+func minStayChange(in gen.ListingUpdate) (*int, bool) {
+	if v, ok := nullableValue(in.MinStayMonths); ok {
+		return v, true
+	}
+	if in.ShorterStays != nil && !*in.ShorterStays {
+		return nil, true
+	}
+	return nil, false
 }
 
 // updateParams maps a partial edit onto the query's parameters. A nil stays
@@ -179,6 +220,15 @@ func updateParams(id uuid.UUID, in gen.ListingUpdate) sqlcgen.UpdateListingParam
 	p.Neighbourhood = trimmedPtr(in.Neighbourhood)
 	if v, ok := nullableValue(in.DistanceM); ok {
 		p.DistanceM = int32Ptr(v)
+	}
+	p.ShorterStays = in.ShorterStays
+	if v, ok := minStayChange(in); ok {
+		p.SetMinStay = true
+		p.MinStayMonths = int32Ptr(v)
+	}
+	if v, ok := nullableValue(in.BillsEstimateCents); ok {
+		p.SetBillsEstimate = true
+		p.BillsEstimateCents = int32Ptr(v)
 	}
 
 	return p
