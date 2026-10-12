@@ -4,7 +4,7 @@
 **Branch:** `feature/email-delivery`
 **Ticket / Work Item:** N/A
 **Owner(s):** WaterlooStar backend
-**Date:** 2026-10-07
+**Date:** 2026-10-07 (provider changed 2026-10-11)
 
 ---
 
@@ -36,9 +36,9 @@ whose link is lost or expired can ask for a new one.
 
 Two phases.
 
-1. **Phase 13 — Clerk sender.** A `ClerkSender` in `internal/email` implements
-   the existing `Sender` interface through Clerk's transactional email
-   endpoint. It is chosen at startup when `CLERK_SECRET_KEY` is set. Without a
+1. **Phase 13 — Resend sender.** A `ResendSender` in `internal/email` implements
+   the existing `Sender` interface through Resend's public email API. It is
+   chosen at startup when `RESEND_API_KEY` is set. Without a
    key the service keeps `LogSender`, in production too, with a loud warning at
    startup. The From address comes from configuration.
 2. **Phase 14 — A new verification link.** `POST /auth/verify/resend` takes an
@@ -46,19 +46,29 @@ Two phases.
    unverified, unsuspended account, it spends the outstanding link and sends a
    new one. It is rate-limited like the password-reset request.
 
-Clerk is a sender only. Authentication stays the custom auth built in Phases 1
-and 5 (the developer's decision, 2026-09-25).
+Resend is a sender only. Authentication stays the custom auth built in Phases 1
+and 5.
+
+**The provider changed on 2026-10-11, from Clerk to Resend** (the developer's
+decision). Clerk was chosen on 2026-09-25 with its risk stated: its
+transactional email endpoint is internal and not yet public. That risk came
+true. With the developer's development key and then a production key on
+`clerk.waterloostar.com`, `POST /v1/email` answered 404 `resource_not_found`,
+while other calls with the same keys succeeded. The endpoint is not enabled for
+the account. Clerk's trace IDs: `d70d5c63e09f4634c79d491e0747e500` and
+`17066ea14e0bac5cd0e1b4c67f567840`.
 
 ### Key Components
 
-- **`internal/email/clerk.go`** (new): `ClerkSender`. It maps a `Message` to the
-  SDK's send parameters: the recipient by address, the configured From
-  mailbox, the subject and a plain-text body. A message's ID is passed as the
-  idempotency key. The send has its own timeout. An error names Clerk's error
-  code and never carries the key or the message body.
+- **`internal/email/resend.go`** (new): `ResendSender`. It posts a `Message` to
+  Resend's `/emails` with `net/http`: the configured From mailbox, the
+  recipient, the subject and a plain-text body. A message's ID is sent as the
+  idempotency key. The send has its own timeout. An error names Resend's status
+  and error name, and never carries the key, the link, the body or the
+  recipient.
 - **`internal/email/sender.go`**: `Message` gains an `ID`. The package comment
   stops saying no provider is chosen.
-- **`internal/config`**: `CLERK_SECRET_KEY` (optional) and `EMAIL_FROM`
+- **`internal/config`**: `RESEND_API_KEY` (optional) and `EMAIL_FROM`
   (defaults to `WaterlooStar <no-reply@waterloostar.com>`), parsed and
   validated at startup like every other setting.
 - **`cmd/api`**: picks the sender from the configuration and logs which one.
@@ -71,9 +81,9 @@ and 5 (the developer's decision, 2026-09-25).
 
 - Registration, a reset request and a resend request each create a token, build
   a `Message` and call `Sender.Send` inside the request, as today.
-- `ClerkSender.Send` calls Clerk with a short timeout. Success means Clerk
+- `ResendSender.Send` calls Resend with a short timeout. Success means Resend
   accepted the message, not that it was delivered.
-- A failed send is logged with the user's ID and Clerk's error. The response
+- A failed send is logged with the user's ID and Resend's error. The response
   does not change: registration still answers 201, and a reset or resend
   request still answers 202. The student asks for a new link (Phase 14).
 - The message's ID is derived from its token, so a send repeated for the same
@@ -85,15 +95,15 @@ and 5 (the developer's decision, 2026-09-25).
 
 | Layer / Area | Change |
 |---|---|
-| Email | `ClerkSender` (new); `Message.ID`; package comment |
-| Configuration | `CLERK_SECRET_KEY`, `EMAIL_FROM`; `.env.example` |
+| Email | `ResendSender` (new); `Message.ID`; package comment |
+| Configuration | `RESEND_API_KEY`, `EMAIL_FROM`; `.env.example` |
 | Wiring | `cmd/api` chooses the sender |
 | API contract | `POST /auth/verify/resend` (Phase 14) |
 | Handlers | `ResendVerification`; `Register`'s comment names it |
 | Rate limiting | Per-email and global allowances for the resend |
 | Database | None. The existing token queries cover it; no migration |
-| Dependencies | `github.com/clerk/clerk-sdk-go/v3`, pinned to an exact version |
-| Tests | The sender against a fake Clerk server; config; the resend handler and its limit |
+| Dependencies | None. Resend's API is called with `net/http` |
+| Tests | The sender against a fake Resend server; config; the resend handler and its limit |
 | Deployment | `deploy/docker-compose.yml` passes the two settings; `.drone.yml`'s setup notes list them |
 | Docs | `README.md` (endpoints, rate limits, running it), `CLAUDE.md` |
 
@@ -103,7 +113,7 @@ and 5 (the developer's decision, 2026-09-25).
 
 | Phase | Title | Status | Location |
 |---|---|---|---|
-| [13 — Clerk sender](./phase-13-clerk-sender.md) | Verification and reset emails delivered through Clerk; the log stays the fallback | Ready | `docs/specs/active/email-delivery/` |
+| [13 — Resend sender](./phase-13-resend-sender.md) | Verification and reset emails delivered through Resend; the log stays the fallback | Ready | `docs/specs/active/email-delivery/` |
 | [14 — A new verification link](./phase-14-resend-verification.md) | `POST /auth/verify/resend`, rate-limited, the same answer for any address | Ready | `docs/specs/active/email-delivery/` |
 
 ---
@@ -111,8 +121,8 @@ and 5 (the developer's decision, 2026-09-25).
 ## Out of scope
 
 - **HTML email.** Bodies stay plain text, as they are written today.
-- **Delivery status.** The SDK's `Get` reports whether Clerk accepted a message.
-  Nothing reads it.
+- **Delivery status.** Resend can report bounces and deliveries through
+  webhooks. Nothing listens yet.
 - **An outbox with retries.** Sending stays inside the request (the
   developer's decision). A failure is recovered by asking for a new link.
 - **Notification emails** (offers, contact requests, messages). These come with
@@ -124,21 +134,23 @@ and 5 (the developer's decision, 2026-09-25).
 
 ## Trade-offs / Alternatives Considered
 
-- **Clerk's transactional endpoint** rather than a dedicated provider (Resend,
-  Postmark, SES). This was the developer's choice on 2026-09-25, with the risks
-  stated. Clerk's documentation calls the endpoint internal, not yet public and
-  subject to change, so the SDK version is pinned exactly. If Clerk changes the
-  endpoint, only `clerk.go` changes, because everything else sees `Sender`.
+- **Resend** rather than Clerk, Postmark or SES. Clerk was the first choice
+  and its endpoint is not open to the account (see above). Resend's email API
+  is public, documented and has a free tier. Postmark and SES were the other
+  dedicated options offered. A future switch replaces only `resend.go`,
+  because everything else sees `Sender`.
+- **No SDK.** Resend's Go SDK reports most errors as bare strings without a
+  status, and pulls in a large client for one call. A direct `net/http` call
+  keeps the dependency list unchanged and decides exactly what an error may
+  contain.
 - **Sending inside the request** rather than from an outbox: the developer's
-  decision. No table and no worker. The cost is that a Clerk outage costs a
+  decision. No table and no worker. The cost is that a Resend outage costs a
   student one link. The resend endpoint is how they recover.
 - **Falling back to the log in production** rather than refusing to start: the
   developer's decision. A deploy without the key keeps working as it does
   today, and the startup warning says so. While it does, verification and
   reset links are credentials sitting in the API log. That is today's
   situation, and it ends once the key is set.
-- **The recipient by address,** not a Clerk user ID. WaterlooStar's accounts
-  are not Clerk users.
 - **The resend takes an email address,** not a session, like the reset request.
   A student who closed the tab after registering has no session to use.
 
@@ -146,22 +158,17 @@ and 5 (the developer's decision, 2026-09-25).
 
 ## Assumptions
 
-- Clerk sends to addresses that are not Clerk users. The SDK's recipient takes
-  a plain address, which suggests it does, but only a real key can confirm it.
-  Phase 13 checks this by hand.
-- `waterloostar.com` can be verified as a production sending domain in the
-  developer's Clerk dashboard. Clerk requires it for the From address.
-- The SDK's client configuration accepts a custom backend URL and HTTP client,
-  so the sender can be tested against a local fake server. Phase 13 confirms
-  this first.
+- `waterloostar.com` can be verified as a sending domain in Resend, through
+  DNS records the developer adds. Resend refuses a From address on an
+  unverified domain.
+- Resend's free tier is enough for verification and reset email at
+  WaterlooStar's volume.
 
 ---
 
 ## Constraints
 
-- **The SDK version is pinned exactly** and is not upgraded in passing.
-  Upgrading it is its own change, tested against a real key.
-- **No test may call Clerk.** CI has no key, and every test runs against a fake
+- **No test may call Resend.** CI has no key, and every test runs against a fake
   server.
 - **Neither the key nor a link appears in an error.** The link is a credential.
   `LogSender` is the only thing that prints one, and it is used only when
