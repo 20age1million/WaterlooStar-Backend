@@ -42,6 +42,22 @@ curl localhost:8080/healthz
 
 `make help` lists every target.
 
+### Email
+
+Verification and password-reset emails go through Resend when `RESEND_API_KEY`
+is set, from `EMAIL_FROM` (by default `WaterlooStar <no-reply@waterloostar.com>`,
+a domain that must be verified for sending in Resend). `internal/email/resend.go`
+calls Resend's public API with `net/http`; there is no SDK.
+
+**Without a key, links are printed to the API log.** That is the usual way to
+complete a signup in development. With a key, real emails go out, so register
+only addresses you can read. Startup logs which sender is in use, and production
+without a key starts anyway with a warning, since nothing will be delivered.
+
+Clerk's transactional endpoint was the first choice and proved closed to the
+account (404 with both keys); `docs/specs/active/email-delivery/index.md` has
+the record.
+
 ## Layout
 
 ```
@@ -58,7 +74,7 @@ internal/db/sqlcgen      Generated. Do not edit.
 internal/httpapi         Router and handlers.
 internal/httpapi/gen     Generated from openapi.yaml. Do not edit.
 internal/db/seed         Development fixtures: 6 prototype listings and 5 requests.
-internal/email           Sender interface; log-only implementation, no provider yet.
+internal/email           Sender interface; Resend delivery, or the log without a key.
 internal/middleware      Request id, logging, recovery, CORS, auth, CSRF.
 internal/ratelimit       Token buckets and the limits, in policy.go.
 internal/db/dbtest       Harness that runs queries against a real PostgreSQL.
@@ -202,8 +218,8 @@ sees it with the moderator's reason, and the owner cannot edit, republish or
 archive it (409) until it is restored. Restoring returns it in whatever status
 the owner had left it.
 
-**Verifying by hand** is how a real student gets in while verification emails
-only reach the log.
+**Verifying by hand** is how a real student gets in when verification emails
+only reach the log — a deploy without `RESEND_API_KEY`.
 
 Every admin change, from the CLI or the portal, is written to
 `admin_actions` in the same transaction as the change itself, with a reason.
@@ -255,10 +271,6 @@ make check               # generate, vet, test, build
 
 Deliberately deferred, with placeholders in their place:
 
-- **Email provider.** `internal/email` defines a `Sender` interface whose only
-  implementation writes to the log. In development that is how you complete a
-  signup: the verification link is printed there. Plug a real provider in behind
-  that interface and swap it at the wiring point in `cmd/api`.
 - **Image hosting** and **map/geocoding provider**.
 - **Whether a listing's street address stays public.** It is public by default
   for now; the design implies a private exact address revealed after contact.

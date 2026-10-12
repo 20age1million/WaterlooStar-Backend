@@ -57,7 +57,7 @@ func run() error {
 
 	srv := &http.Server{
 		Addr:              cfg.Addr(),
-		Handler:           httpapi.NewRouter(cfg, log, httpapi.NewServer(cfg, log, pool, email.NewLogSender(log), buildVersion)),
+		Handler:           httpapi.NewRouter(cfg, log, httpapi.NewServer(cfg, log, pool, newMailer(cfg, log), buildVersion)),
 		ReadHeaderTimeout: readHeaderTimeout,
 	}
 
@@ -91,4 +91,21 @@ func run() error {
 
 	log.Info("stopped")
 	return nil
+}
+
+// newMailer chooses how email leaves the service: through Resend when a key is
+// configured, and into the log otherwise. Production starts without a key too
+// (the developer's decision), but says plainly that nothing will be delivered.
+func newMailer(cfg config.Config, log *slog.Logger) email.Sender {
+	if cfg.ResendAPIKey == "" {
+		if cfg.IsDevelopment() {
+			log.Info("email: no RESEND_API_KEY, so verification and reset links are written to this log")
+		} else {
+			log.Warn("email: no RESEND_API_KEY — verification and reset links are written to this log and reach nobody")
+		}
+		return email.NewLogSender(log)
+	}
+
+	log.Info("email: sending through Resend", slog.String("from", cfg.EmailFrom.String()))
+	return email.NewResendSender(cfg.ResendAPIKey, cfg.EmailFrom)
 }

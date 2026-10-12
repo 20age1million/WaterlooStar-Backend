@@ -18,6 +18,7 @@
 # - On the host, once: /opt/repo/env/waterloostar-backend.env with
 #     POSTGRES_PASSWORD=<openssl rand -hex 24>
 #     JWT_SECRET=<openssl rand -base64 48>
+#     RESEND_API_KEY=<re_…>   (optional: without it, emails only reach the log)
 #   It lives outside the git checkout, which is reset on every deploy.
 #
 # WHAT IS DEPLOYED: deploy/docker-compose.yml — Postgres and the API, neither

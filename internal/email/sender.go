@@ -1,22 +1,37 @@
 // Package email delivers transactional mail.
 //
-// No provider is chosen yet — that decision is deliberately deferred. Everything
-// goes through the Sender interface, and the only implementation today writes to
-// the log. When a provider is picked (Resend, Postmark, SES), it implements
-// Sender and is swapped in at wiring time in cmd/api; nothing else changes.
+// Everything goes through the Sender interface. ResendSender delivers through
+// Resend's email API and is used when RESEND_API_KEY is set (Phase 13). Without a key, LogSender writes each message to the log instead —
+// in development that is how you complete a signup, and in production it means
+// nothing is delivered. cmd/api chooses between them at startup.
 package email
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 )
 
 // Message is one outbound email.
 type Message struct {
+	// ID names this message so a repeated send of it is delivered once. It is
+	// derived from the link's token (see MessageID), so a new link is a new
+	// message.
+	ID      string
 	To      string
 	Subject string
 	Body    string
+}
+
+// MessageID derives a message's ID from the hash of the token its link
+// carries. It is hashed again so that the value stored in the database never
+// leaves the service, and it uses only characters that are safe in an
+// idempotency key.
+func MessageID(kind string, tokenHash []byte) string {
+	sum := sha256.Sum256(tokenHash)
+	return kind + "-" + hex.EncodeToString(sum[:16])
 }
 
 // Sender delivers messages.
@@ -49,8 +64,9 @@ func (s *LogSender) Send(_ context.Context, msg Message) error {
 }
 
 // VerificationMessage builds the address-confirmation email.
-func VerificationMessage(to, link string) Message {
+func VerificationMessage(id, to, link string) Message {
 	return Message{
+		ID:      id,
 		To:      to,
 		Subject: "Confirm your WaterlooStar account",
 		Body: fmt.Sprintf(
@@ -62,8 +78,9 @@ func VerificationMessage(to, link string) Message {
 }
 
 // PasswordResetMessage builds the password-reset email.
-func PasswordResetMessage(to, link string) Message {
+func PasswordResetMessage(id, to, link string) Message {
 	return Message{
+		ID:      id,
 		To:      to,
 		Subject: "Reset your WaterlooStar password",
 		Body: fmt.Sprintf(

@@ -16,7 +16,7 @@ across both; everything from Phase 4 onward is not.
 
 | Feature | Phases | Status | Location |
 |---|---|---|---|
-| [Email Delivery](./active/email-delivery/index.md) | 2 (13–14) | Ready | `docs/specs/active/email-delivery/` |
+| [Email Delivery](./active/email-delivery/index.md) | 2 (13–14) | In Progress: 13 complete | `docs/specs/active/email-delivery/` |
 
 ## Implemented
 

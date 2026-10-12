@@ -100,28 +100,31 @@ only thing that calls it.
 | 10 | Account management: suspend, reinstate, verify by hand, change role |
 | 11 | Post moderation: every post in any state, takedown and restore |
 | 12 | Listing terms: shorter stays, bill estimate and all-in cost, window ranking, monthly availability |
+| 13 | Resend sender: verification and reset emails delivered through Resend; the log without a key |
 
 Forty-one endpoints exist, fourteen of them admin-only; `README.md` has the table, and the rate limits with
 it.
 
-Phases 5–11 are merged into `main` (pull requests #6–#10).
+Phases 5–12 are merged into `main` (pull requests #6–#11).
 
-**In flight:** `feature/listing-terms` holds Phase 12, complete, with migration 10.
+**In flight:** Email Delivery (phases 13–14) on `feature/email-delivery`. Phase 13
+is done; 14, `POST /auth/verify/resend`, remains. Spec:
+`docs/specs/active/email-delivery/`.
+
+**Email goes through Resend**, called with `net/http` (no SDK). Clerk's
+transactional endpoint was chosen first (2026-09-25) and answered 404 with both a
+development and a production key, so the developer switched to Resend on
+2026-10-11. Clerk was never used for sign-in: do not run Clerk's "Add Clerk
+Authentication" prompt (`clerk init`, `@clerk/nextjs`) in either repository.
 
 ### What comes next
 
-Email delivery as Phase 13, agreed 2026-09-27; it needs a spec first. The admin
-portal and the housing rework's remaining phases are separate features in the
-frontend repository, and the rework's phases 10–11 consume Phase 12.
+Phase 14. The live site sends real email once `RESEND_API_KEY` is in the host env
+file and `waterloostar.com` is verified for sending in Resend;
+until then an admin verifying accounts by hand is how a real student gets in.
 
-Unspecified, in the order I would take it:
-
-1. **Email delivery.** Verification and reset links only reach the log, so on the
-   live site nobody can finish signing up. The developer has chosen Clerk's
-   transactional endpoint; `internal/email` already has the `Sender` seam. Until
-   it lands, an admin verifying accounts by hand is how a real student gets in.
-2. Saves, views and the question thread → messaging with contact privacy →
-   matching and real maps.
+Unspecified, in the order I would take it: saves, views and the question thread →
+messaging with contact privacy → matching and real maps.
 
 ---
 
@@ -256,8 +259,9 @@ Checks: `go build ./...`, `go vet ./...`, `go test ./...`.
 Regenerate: `go tool oapi-codegen -config api/oapi-codegen.yaml api/openapi.yaml`
 and `go tool sqlc generate`.
 
-No email provider is configured — verification and reset links are printed to
-the API log. That is how you complete a signup in development.
+Without `RESEND_API_KEY`, verification and reset links are printed to the API
+log — the usual way to complete a signup in development. With it, real emails
+go out through Resend: register only addresses you can read.
 
 ---
 
@@ -268,5 +272,5 @@ Do not quietly decide these; they are the developer's calls.
 - **Whether a listing's street address stays public.** Public today.
   `address_line` is separate from `neighbourhood` so a private field can be added
   without moving data.
-- **Email, image-hosting and map/geocoding providers.** Placeholders behind
-  interfaces.
+- **Image-hosting and map/geocoding providers.** Placeholders behind
+  interfaces. (Email is Resend, behind `email.Sender`.)

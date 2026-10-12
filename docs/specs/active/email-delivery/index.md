@@ -1,6 +1,6 @@
 # Email Delivery — API Phases 13–14
 
-**Status:** Ready
+**Status:** In Progress
 **Branch:** `feature/email-delivery`
 **Ticket / Work Item:** N/A
 **Owner(s):** WaterlooStar backend
@@ -113,7 +113,7 @@ the account. Clerk's trace IDs: `d70d5c63e09f4634c79d491e0747e500` and
 
 | Phase | Title | Status | Location |
 |---|---|---|---|
-| [13 — Resend sender](./phase-13-resend-sender.md) | Verification and reset emails delivered through Resend; the log stays the fallback | Ready | `docs/specs/active/email-delivery/` |
+| [13 — Resend sender](../../implemented/email-delivery/phase-13-resend-sender.md) | Verification and reset emails delivered through Resend; the log stays the fallback | Complete | `docs/specs/implemented/email-delivery/` |
 | [14 — A new verification link](./phase-14-resend-verification.md) | `POST /auth/verify/resend`, rate-limited, the same answer for any address | Ready | `docs/specs/active/email-delivery/` |
 
 ---

@@ -1,7 +1,8 @@
 # Production stack for the WaterlooStar API. Used by the Drone deploy step.
 #
-# NOT the file in the repository root — that one is for local development and
-# runs Postgres alone.
+# NOT the file in the repository root — that one is for local development: it
+# builds the image from source and publishes the API on localhost:8080 for a
+# frontend on localhost:3000.
 #
 # The API has no public URL on purpose. Visitors reach waterloostar.com, the
 # reverse proxy hands them to the Next.js server on localhost:3000, and that
@@ -13,6 +14,12 @@
 #
 #     POSTGRES_PASSWORD=<openssl rand -hex 24>
 #     JWT_SECRET=<openssl rand -base64 48>
+#     RESEND_API_KEY=<re_… from the Resend dashboard>   # optional, see below
+#
+# Without RESEND_API_KEY the API still starts, but verification and reset
+# links only reach its log, and it says so at startup. EMAIL_FROM may also be
+# set there; it defaults to WaterlooStar <no-reply@waterloostar.com>, and its
+# domain must be verified for sending in Resend.
 #
 # The password is hex because it is embedded in a connection URL below, where
 # characters like @ / : would need escaping.
@@ -57,6 +64,9 @@ services:
       LOG_LEVEL: info
       # Used to build the links in verification and password-reset emails.
       APP_URL: https://waterloostar.com
+      # Email goes through Resend when the key is set, and to the log when not.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
       # Only a browser calling the API directly would be checked against this,
       # and none does. Set to the site so that stays true if one ever does.
       CORS_ORIGIN: https://waterloostar.com
