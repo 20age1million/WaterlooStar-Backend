@@ -1,15 +1,19 @@
 .DEFAULT_GOAL := help
-.PHONY: help up down run build test vet generate sqlc openapi migrate-up migrate-down migrate-version seed tidy check
+.PHONY: help up stack down run build test vet generate sqlc openapi migrate-up migrate-down migrate-version seed tidy check
 
 ## help: list available targets
 help:
 	@grep -E '^## ' $(MAKEFILE_LIST) | sed 's/## /  /'
 
-## up: start PostgreSQL in the background
+## up: start PostgreSQL alone, for running the API from source
 up:
-	docker compose up -d
+	docker compose up -d postgres
 
-## down: stop PostgreSQL, keeping its data volume
+## stack: build and start PostgreSQL, migrations and the API on :8080
+stack:
+	docker compose up -d --build
+
+## down: stop the stack, keeping the database volume
 down:
 	docker compose down
 

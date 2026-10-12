@@ -241,14 +241,33 @@ These were all found the hard way and will silently regress if undone.
 - **sqlc's nullable-uuid override names the type `UUID`, not `uuid.UUID`**,
   because `import` already supplies the package. The doubled form went unnoticed
   until migration 8 added the first nullable uuid column.
+- **The `waterloostar-api` container holds port 8080.** With the Docker stack up,
+  `go run ./cmd/api` fails to bind, says so once in its own output, and every
+  request goes to the container instead — running whatever code it was built
+  from. Phase 13's first real send was lost that way. Before a hand check, make
+  sure the process answering `:8080` is the one you think: `docker compose stop
+  api` to run from source.
+- **The container reads `.env` when it is created, not when it starts.** A key
+  added to `.env` afterwards is ignored until `docker compose up -d api`
+  recreates it; startup logs which email sender it chose.
 
 ---
 
 ## Running it
 
+The whole service, for working on the frontend — PostgreSQL, migrations and the
+API on `:8080`, wired for a frontend on `localhost:3000`:
+
+```bash
+docker compose up -d --build
+docker compose run --rm api seed   # fixtures; deletes every listing first
+```
+
+From source:
+
 ```bash
 cp .env.example .env
-docker compose up -d       # PostgreSQL 18 on :5433
+docker compose up -d postgres   # PostgreSQL 18 on :5433, alone
 go run ./cmd/migrate up
 go run ./cmd/seed          # 6 development listings and 5 requests
 go run ./cmd/admin promote meil@uwaterloo.ca   # an admin, if you need one

@@ -1,6 +1,50 @@
+# Local development stack: PostgreSQL, migrations, and the API, wired for the
+# frontend's defaults. With WaterlooStar-Frontend running `npm run dev` on
+# localhost:3000, nothing in either repository needs changing:
+#
+#     docker compose up -d --build        # API on localhost:8080
+#     docker compose run --rm api seed    # optional: the development fixtures
+#
+# The frontend's NEXT_PUBLIC_API_URL and API_URL both default to
+# http://localhost:8080, and the API allows credentialed requests from
+# http://localhost:3000 and builds email links to it.
+#
+# Not the production stack — that is deploy/docker-compose.yml.
+#
+# To run the API from source instead (`go run ./cmd/api`), start the database
+# alone so the two do not contend for port 8080:
+#
+#     docker compose up -d postgres
+
 # Pinned so the project name does not follow the directory name. Without it,
 # renaming this folder orphans the container and creates a new empty volume.
 name: waterloostar
+
+# One image and one configuration for every command it carries, so `migrate`,
+# `seed` and `api` always agree on the database and the schema. Only `api`
+# builds it: two services building one tag race, and the loser fails.
+x-backend: &backend
+  image: waterloostar-backend:dev
+  depends_on:
+    postgres:
+      condition: service_healthy
+  environment:
+    # The service name, not localhost: inside the network, 5432 is Postgres
+    # itself. The host's 5433 mapping is only for tools running on the host.
+    PG_DSN: postgres://waterloostar:waterloostar@postgres:5432/waterloostar?sslmode=disable
+    PORT: "8080"
+    # The Next.js dev server.
+    CORS_ORIGIN: http://localhost:3000
+    APP_URL: http://localhost:3000
+    # Leaves the session cookies non-Secure, so they work over plain http.
+    ENVIRONMENT: development
+    LOG_LEVEL: ${LOG_LEVEL:-info}
+    JWT_SECRET: dev-only-secret-not-for-production-use-abc123
+    # Read from .env, as `go run` would. Unset, verification and reset links
+    # are printed to the API log (`docker compose logs api`); set, real email
+    # goes out through Resend.
+    RESEND_API_KEY: ${RESEND_API_KEY:-}
+    EMAIL_FROM: ${EMAIL_FROM:-}
 
 services:
   postgres:
@@ -28,6 +72,34 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+
+  # Runs once per `up` and exits. Applying no migrations is a success, so this
+  # is safe to repeat; the API waits for it to finish.
+  migrate:
+    <<: *backend
+    command: ["migrate", "up"]
+    restart: "no"
+    # Built by `api`, never on a registry.
+    pull_policy: never
+
+  api:
+    <<: *backend
+    build: .
+    container_name: waterloostar-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 
 volumes:
   waterloostar-pgdata:

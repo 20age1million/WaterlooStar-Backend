@@ -15,9 +15,34 @@ The frontend lives in a separate repository (`WaterlooStar-Frontend`).
 Requires Go 1.26+ and Docker Desktop. No other tooling to install — sqlc and
 oapi-codegen are pinned as `go.mod` tool dependencies.
 
+### The whole service in Docker
+
+To work on the frontend, or to run the backend without Go installed, one command
+builds the API and starts it with PostgreSQL, applying migrations first:
+
+```bash
+docker compose up -d --build         # API on localhost:8080
+docker compose run --rm api seed     # the development fixtures: 6 listings, 5 requests
+```
+
+That is wired for `WaterlooStar-Frontend` on its defaults: `npm run dev` there
+serves `localhost:3000`, calls the API at `localhost:8080`, and the API allows
+it and builds email links to it. Verification and reset links appear in
+`docker compose logs api` unless `RESEND_API_KEY` is set in `.env`. Rebuild with
+`--build` after pulling or editing the backend.
+
+The container takes `RESEND_API_KEY` and `EMAIL_FROM` from `.env` when it is
+created. After changing either, `docker compose up -d api` recreates it; its log
+then says which sender it uses (`docker compose logs api | grep email`).
+
+Seeding deletes every listing before writing the fixtures, so it is a step you
+take, not one `up` takes for you.
+
+### The API from source
+
 ```bash
 cp .env.example .env     # defaults match docker-compose.yml
-make up                  # start PostgreSQL 18
+make up                  # start PostgreSQL 18 alone
 make migrate-up          # apply migrations
 make seed                # load the development fixtures: 6 listings, 5 requests
 make run                 # start the API on :8080
@@ -27,11 +52,14 @@ make run                 # start the API on :8080
 Windows. Every target is a one-line Go or Docker command, and the equivalents are:
 
 ```bash
-docker compose up -d
+docker compose up -d postgres
 go run ./cmd/migrate up
 go run ./cmd/seed
 go run ./cmd/api
 ```
+
+Start `postgres` by name: a bare `docker compose up` also starts the API
+container, which holds port 8080. `docker compose stop api` frees it.
 
 Then:
 
