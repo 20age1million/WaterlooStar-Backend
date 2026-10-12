@@ -661,3 +661,43 @@ func TestUnsafeRequestWithoutSessionSkipsCSRF(t *testing.T) {
 		t.Fatalf("status = %d, want 201", res.StatusCode)
 	}
 }
+
+// Each email names itself with an ID derived from its token, which Resend uses
+// to deliver a repeated send once. The raw token is a credential and appears in
+// the link only.
+func TestEmailsCarryAMessageIDAndTheTokenOnlyInTheLink(t *testing.T) {
+	h := newHarness(t)
+	h.registerAndVerify(t)
+	verify, _ := h.mail.last()
+	verifyToken := linkPattern.FindString(verify.Body)
+	verifyToken = verifyToken[strings.LastIndex(verifyToken, "/")+1:]
+
+	if res := h.do(t, http.MethodPost, "/auth/password-reset",
+		map[string]string{"email": testEmail}); res.StatusCode != http.StatusAccepted {
+		t.Fatalf("request reset: status = %d, want 202", res.StatusCode)
+	}
+	reset, _ := h.mail.last()
+	resetToken := h.mail.token(t)
+
+	for _, tc := range []struct {
+		msg    email.Message
+		prefix string
+		token  string
+	}{
+		{verify, "verify-", verifyToken},
+		{reset, "reset-", resetToken},
+	} {
+		if !strings.HasPrefix(tc.msg.ID, tc.prefix) {
+			t.Errorf("%q: ID = %q, want it to start %q", tc.msg.Subject, tc.msg.ID, tc.prefix)
+		}
+		if strings.Contains(tc.msg.ID, tc.token) || strings.Contains(tc.msg.Subject, tc.token) {
+			t.Errorf("%q: the raw token appears outside the link", tc.msg.Subject)
+		}
+		if n := strings.Count(tc.msg.Body, tc.token); n != 1 {
+			t.Errorf("%q: the token appears %d times in the body, want once, in the link", tc.msg.Subject, n)
+		}
+	}
+	if verify.ID == reset.ID {
+		t.Error("two different emails share an ID")
+	}
+}

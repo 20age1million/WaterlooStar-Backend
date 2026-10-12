@@ -15,9 +15,34 @@ The frontend lives in a separate repository (`WaterlooStar-Frontend`).
 Requires Go 1.26+ and Docker Desktop. No other tooling to install — sqlc and
 oapi-codegen are pinned as `go.mod` tool dependencies.
 
+### The whole service in Docker
+
+To work on the frontend, or to run the backend without Go installed, one command
+builds the API and starts it with PostgreSQL, applying migrations first:
+
+```bash
+docker compose up -d --build         # API on localhost:8080
+docker compose run --rm api seed     # the development fixtures: 6 listings, 5 requests
+```
+
+That is wired for `WaterlooStar-Frontend` on its defaults: `npm run dev` there
+serves `localhost:3000`, calls the API at `localhost:8080`, and the API allows
+it and builds email links to it. Verification and reset links appear in
+`docker compose logs api` unless `RESEND_API_KEY` is set in `.env`. Rebuild with
+`--build` after pulling or editing the backend.
+
+The container takes `RESEND_API_KEY` and `EMAIL_FROM` from `.env` when it is
+created. After changing either, `docker compose up -d api` recreates it; its log
+then says which sender it uses (`docker compose logs api | grep email`).
+
+Seeding deletes every listing before writing the fixtures, so it is a step you
+take, not one `up` takes for you.
+
+### The API from source
+
 ```bash
 cp .env.example .env     # defaults match docker-compose.yml
-make up                  # start PostgreSQL 18
+make up                  # start PostgreSQL 18 alone
 make migrate-up          # apply migrations
 make seed                # load the development fixtures: 6 listings, 5 requests
 make run                 # start the API on :8080
@@ -27,11 +52,14 @@ make run                 # start the API on :8080
 Windows. Every target is a one-line Go or Docker command, and the equivalents are:
 
 ```bash
-docker compose up -d
+docker compose up -d postgres
 go run ./cmd/migrate up
 go run ./cmd/seed
 go run ./cmd/api
 ```
+
+Start `postgres` by name: a bare `docker compose up` also starts the API
+container, which holds port 8080. `docker compose stop api` frees it.
 
 Then:
 
@@ -41,6 +69,22 @@ curl localhost:8080/healthz
 ```
 
 `make help` lists every target.
+
+### Email
+
+Verification and password-reset emails go through Resend when `RESEND_API_KEY`
+is set, from `EMAIL_FROM` (by default `WaterlooStar <no-reply@waterloostar.com>`,
+a domain that must be verified for sending in Resend). `internal/email/resend.go`
+calls Resend's public API with `net/http`; there is no SDK.
+
+**Without a key, links are printed to the API log.** That is the usual way to
+complete a signup in development. With a key, real emails go out, so register
+only addresses you can read. Startup logs which sender is in use, and production
+without a key starts anyway with a warning, since nothing will be delivered.
+
+Clerk's transactional endpoint was the first choice and proved closed to the
+account (404 with both keys); `docs/specs/active/email-delivery/index.md` has
+the record.
 
 ## Layout
 
@@ -58,7 +102,7 @@ internal/db/sqlcgen      Generated. Do not edit.
 internal/httpapi         Router and handlers.
 internal/httpapi/gen     Generated from openapi.yaml. Do not edit.
 internal/db/seed         Development fixtures: 6 prototype listings and 5 requests.
-internal/email           Sender interface; log-only implementation, no provider yet.
+internal/email           Sender interface; Resend delivery, or the log without a key.
 internal/middleware      Request id, logging, recovery, CORS, auth, CSRF.
 internal/ratelimit       Token buckets and the limits, in policy.go.
 internal/db/dbtest       Harness that runs queries against a real PostgreSQL.
@@ -202,8 +246,8 @@ sees it with the moderator's reason, and the owner cannot edit, republish or
 archive it (409) until it is restored. Restoring returns it in whatever status
 the owner had left it.
 
-**Verifying by hand** is how a real student gets in while verification emails
-only reach the log.
+**Verifying by hand** is how a real student gets in when verification emails
+only reach the log — a deploy without `RESEND_API_KEY`.
 
 Every admin change, from the CLI or the portal, is written to
 `admin_actions` in the same transaction as the change itself, with a reason.
@@ -255,10 +299,6 @@ make check               # generate, vet, test, build
 
 Deliberately deferred, with placeholders in their place:
 
-- **Email provider.** `internal/email` defines a `Sender` interface whose only
-  implementation writes to the log. In development that is how you complete a
-  signup: the verification link is printed there. Plug a real provider in behind
-  that interface and swap it at the wiring point in `cmd/api`.
 - **Image hosting** and **map/geocoding provider**.
 - **Whether a listing's street address stays public.** It is public by default
   for now; the design implies a private exact address revealed after contact.

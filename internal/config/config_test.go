@@ -16,7 +16,7 @@ const validDSN = "postgres://waterloostar:waterloostar@localhost:5433/waterloost
 // leak into another's. t.Setenv restores the previous value when the test ends.
 func isolate(t *testing.T) {
 	t.Helper()
-	for _, key := range []string{"PG_DSN", "PORT", "CORS_ORIGIN", "LOG_LEVEL", "ENVIRONMENT", "JWT_SECRET", "APP_URL"} {
+	for _, key := range []string{"PG_DSN", "PORT", "CORS_ORIGIN", "LOG_LEVEL", "ENVIRONMENT", "JWT_SECRET", "APP_URL", "RESEND_API_KEY", "EMAIL_FROM"} {
 		t.Setenv(key, "")
 	}
 }
@@ -123,5 +123,65 @@ func TestProductionIsNotDevelopment(t *testing.T) {
 	}
 	if cfg.IsDevelopment() {
 		t.Error("IsDevelopment() must be false in production — it gates cookie Secure in Phase 1")
+	}
+}
+
+func TestLoadEmailDefaults(t *testing.T) {
+	isolate(t)
+	t.Setenv("PG_DSN", validDSN)
+	t.Setenv("JWT_SECRET", validSecret)
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	// No key is normal: the log is the sender.
+	if cfg.ResendAPIKey != "" {
+		t.Errorf("ResendAPIKey = %q, want empty", cfg.ResendAPIKey)
+	}
+	if cfg.EmailFrom.Name != "WaterlooStar" || cfg.EmailFrom.Address != "no-reply@waterloostar.com" {
+		t.Errorf("EmailFrom = %+v, want WaterlooStar <no-reply@waterloostar.com>", cfg.EmailFrom)
+	}
+}
+
+func TestLoadEmailSettings(t *testing.T) {
+	isolate(t)
+	t.Setenv("PG_DSN", validDSN)
+	t.Setenv("JWT_SECRET", validSecret)
+	t.Setenv("RESEND_API_KEY", " re_abc123 ")
+	t.Setenv("EMAIL_FROM", "hello@example.org")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.ResendAPIKey != "re_abc123" {
+		t.Errorf("ResendAPIKey = %q, want it trimmed", cfg.ResendAPIKey)
+	}
+	// A bare address is a mailbox without a name.
+	if cfg.EmailFrom.Name != "" || cfg.EmailFrom.Address != "hello@example.org" {
+		t.Errorf("EmailFrom = %+v, want hello@example.org", cfg.EmailFrom)
+	}
+}
+
+func TestLoadRejectsBadEmailSettings(t *testing.T) {
+	isolate(t)
+	t.Setenv("PG_DSN", validDSN)
+	t.Setenv("JWT_SECRET", validSecret)
+	t.Setenv("RESEND_API_KEY", "sk_live_from_another_service")
+	t.Setenv("EMAIL_FROM", "WaterlooStar no-reply at waterloostar")
+
+	_, err := config.Load()
+	if err == nil {
+		t.Fatal("expected an error, got nil")
+	}
+	for _, want := range []string{"RESEND_API_KEY", "re_", "EMAIL_FROM"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error should mention %q, got: %v", want, err)
+		}
+	}
+	// The key is a secret; even a wrong one is not echoed.
+	if strings.Contains(err.Error(), "sk_live_from_another_service") {
+		t.Errorf("error echoes the key: %v", err)
 	}
 }

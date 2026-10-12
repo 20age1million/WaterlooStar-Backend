@@ -14,7 +14,9 @@ across both; everything from Phase 4 onward is not.
 
 ## Active
 
-*None.*
+| Feature | Phases | Status | Location |
+|---|---|---|---|
+| [Email Delivery](./active/email-delivery/index.md) | 2 (13–14) | In Progress: 13 complete | `docs/specs/active/email-delivery/` |
 
 ## Implemented
 
@@ -118,10 +120,11 @@ Recorded in the Platform Foundation `index.md` and still in force:
 The admin portal and the housing rework's phases 10–11, specified in the frontend
 repository, can be built against this contract. Next, agreed 2026-09-27:
 
-- **Email delivery** (Phase 13). Verification and reset links only reach the log, so on the
-  live site nobody can finish signing up. The provider is chosen (Clerk's
-  transactional endpoint); `internal/email` already has the seam. Until it lands,
-  an admin verifying accounts by hand (Phase 10) is how a real student gets in.
+- **Email delivery** (Phases 13–14, specified, Active above). Verification and
+  reset links only reach the log, so on the live site nobody can finish signing
+  up. The provider is Resend (Clerk's endpoint proved closed to the account).
+  Until it lands, an admin verifying accounts by hand (Phase 10) is how a real
+  student gets in.
 
 After those: saves, views and the question thread; then messaging with contact
 privacy, which is what "accept an offer" is waiting on. Each starts with a new

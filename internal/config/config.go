@@ -8,6 +8,7 @@ package config
 import (
 	"fmt"
 	"log/slog"
+	"net/mail"
 	"os"
 	"strconv"
 	"strings"
@@ -30,6 +31,10 @@ const (
 // reached production by accident.
 const minJWTSecretBytes = 32
 
+// DefaultEmailFrom is the mailbox emails come from unless EMAIL_FROM says
+// otherwise. Its domain must be verified as a sending domain with Resend.
+const DefaultEmailFrom = "WaterlooStar <no-reply@waterloostar.com>"
+
 // Config is the validated configuration for one process.
 type Config struct {
 	DatabaseURL string
@@ -42,6 +47,11 @@ type Config struct {
 	// AppURL is the frontend's public origin, used to build the links that go
 	// into verification and password-reset emails.
 	AppURL string
+	// ResendAPIKey sends email through Resend when set. Empty means the log is
+	// the sender, and nothing is delivered.
+	ResendAPIKey string
+	// EmailFrom is the mailbox emails are sent from.
+	EmailFrom mail.Address
 }
 
 // IsDevelopment reports whether the service is running locally.
@@ -118,6 +128,24 @@ func Load() (Config, error) {
 		cfg.AppURL = cfg.CORSOrigin
 	}
 	cfg.AppURL = strings.TrimRight(cfg.AppURL, "/")
+
+	cfg.ResendAPIKey = strings.TrimSpace(os.Getenv("RESEND_API_KEY"))
+	if cfg.ResendAPIKey != "" && !strings.HasPrefix(cfg.ResendAPIKey, "re_") {
+		// The key is not echoed, even a wrong one: it may be a real secret from
+		// somewhere else, pasted into the wrong line.
+		problems = append(problems, "RESEND_API_KEY must be a Resend API key, starting re_")
+	}
+
+	from := strings.TrimSpace(os.Getenv("EMAIL_FROM"))
+	if from == "" {
+		from = DefaultEmailFrom
+	}
+	if addr, err := mail.ParseAddress(from); err != nil {
+		problems = append(problems, fmt.Sprintf(
+			"EMAIL_FROM %q is not a mailbox — write it as: WaterlooStar <no-reply@waterloostar.com>", from))
+	} else {
+		cfg.EmailFrom = *addr
+	}
 
 	if len(problems) > 0 {
 		return Config{}, fmt.Errorf("invalid configuration:\n  - %s", strings.Join(problems, "\n  - "))

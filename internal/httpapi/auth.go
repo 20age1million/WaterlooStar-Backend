@@ -151,7 +151,7 @@ func (s *Server) issueVerificationEmail(ctx context.Context, user sqlcgen.User) 
 	}
 
 	link := fmt.Sprintf("%s/verify/%s", s.cfg.AppURL, url.PathEscape(raw))
-	return s.mailer.Send(ctx, email.VerificationMessage(user.Email, link))
+	return s.mailer.Send(ctx, email.VerificationMessage(email.MessageID("verify", hash), user.Email, link))
 }
 
 // ---------------------------------------------------------------- verification
@@ -397,7 +397,7 @@ func (s *Server) issuePasswordResetEmail(ctx context.Context, user sqlcgen.User)
 	}
 
 	link := fmt.Sprintf("%s/password-reset/%s", s.cfg.AppURL, url.PathEscape(raw))
-	return s.mailer.Send(ctx, email.PasswordResetMessage(user.Email, link))
+	return s.mailer.Send(ctx, email.PasswordResetMessage(email.MessageID("reset", hash), user.Email, link))
 }
 
 func (s *Server) ConfirmPasswordReset(ctx context.Context, request gen.ConfirmPasswordResetRequestObject) (gen.ConfirmPasswordResetResponseObject, error) {
