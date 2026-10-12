@@ -150,6 +150,33 @@ paths:
         "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /auth/verify/resend:
+    post:
+      tags: [auth]
+      operationId: resendVerification
+      summary: Send a new confirmation email
+      description: |
+        For a student whose confirmation link is lost or expired. When the
+        address belongs to an account that is not yet verified and not
+        suspended, every outstanding link for it is spent and a new one is
+        sent. Otherwise nothing is sent.
+
+        Always answers 202, whatever the address - otherwise this endpoint
+        would reveal which addresses have accounts, and which are verified.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailRequest"
+      responses:
+        "202":
+          description: If that address has an unconfirmed account, a new link is on its way.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /auth/login:
     post:
       tags: [auth]

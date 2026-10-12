@@ -14,9 +14,7 @@ across both; everything from Phase 4 onward is not.
 
 ## Active
 
-| Feature | Phases | Status | Location |
-|---|---|---|---|
-| [Email Delivery](./active/email-delivery/index.md) | 2 (13–14) | In Progress: 13 complete | `docs/specs/active/email-delivery/` |
+*None.*
 
 ## Implemented
 
@@ -29,6 +27,7 @@ across both; everything from Phase 4 onward is not.
 | [Rate Limiting](./implemented/rate-limiting/index.md) | 1 (Phase 8) | `docs/specs/implemented/rate-limiting/` |
 | [Admin and Moderation](./implemented/admin-moderation/index.md) | 3 (9–11) | `docs/specs/implemented/admin-moderation/` |
 | [Listing Terms](./implemented/listing-terms/index.md) | 1 (Phase 12) | `docs/specs/implemented/listing-terms/` |
+| [Email Delivery](./implemented/email-delivery/index.md) | 2 (13–14) | `docs/specs/implemented/email-delivery/` |
 
 ### Platform Foundation
 
@@ -96,6 +95,14 @@ was given. `GET /listings` gains `all_in_max_cents`, `sort=allInAsc`, and a `mat
 ranking that puts exact-window listings first. `GET /listings/availability`
 counts what is open in each month of a year. Search stays full-cover.
 
+### Email Delivery
+
+Verification and reset emails reach the inbox, through Resend's API called with
+`net/http` (13); without `RESEND_API_KEY` the log stays the sender. A student
+whose link is lost or expired asks for a new one with `POST /auth/verify/resend`,
+which answers 202 for every address (14). Clerk was the first provider and its
+endpoint proved closed to the account.
+
 ## Decisions carried forward
 
 Recorded in the Platform Foundation `index.md` and still in force:
@@ -112,20 +119,14 @@ Recorded in the Platform Foundation `index.md` and still in force:
   the design implies an exact address revealed only after contact. The schema
   keeps `address_line` separate from `neighbourhood` so a private field can be
   added without moving data.
-- **Email, image-hosting and map/geocoding providers.** Placeholders behind
-  interfaces; see the API README.
+- **Image-hosting and map/geocoding providers.** Placeholders behind
+  interfaces; see the API README. (Email is Resend.)
 
 ## What comes next
 
 The admin portal and the housing rework's phases 10–11, specified in the frontend
 repository, can be built against this contract. Next, agreed 2026-09-27:
 
-- **Email delivery** (Phases 13–14, specified, Active above). Verification and
-  reset links only reach the log, so on the live site nobody can finish signing
-  up. The provider is Resend (Clerk's endpoint proved closed to the account).
-  Until it lands, an admin verifying accounts by hand (Phase 10) is how a real
-  student gets in.
-
-After those: saves, views and the question thread; then messaging with contact
+Email delivery is done (Phases 13–14). Next: saves, views and the question thread; then messaging with contact
 privacy, which is what "accept an offer" is waiting on. Each starts with a new
 specification.
