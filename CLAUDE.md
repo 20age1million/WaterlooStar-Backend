@@ -101,15 +101,15 @@ only thing that calls it.
 | 11 | Post moderation: every post in any state, takedown and restore |
 | 12 | Listing terms: shorter stays, bill estimate and all-in cost, window ranking, monthly availability |
 | 13 | Resend sender: verification and reset emails delivered through Resend; the log without a key |
+| 14 | A new verification link: `POST /auth/verify/resend`, rate-limited, the same answer for any address |
 
-Forty-one endpoints exist, fourteen of them admin-only; `README.md` has the table, and the rate limits with
+Forty-two endpoints exist, fourteen of them admin-only; `README.md` has the table, and the rate limits with
 it.
 
-Phases 5–12 are merged into `main` (pull requests #6–#11).
+Phases 5–13 are merged into `main` (pull requests #6–#12).
 
-**In flight:** Email Delivery (phases 13–14) on `feature/email-delivery`. Phase 13
-is done; 14, `POST /auth/verify/resend`, remains. Spec:
-`docs/specs/active/email-delivery/`.
+**In flight:** Phase 14 on `feature/email-delivery`, complete; with it the Email
+Delivery feature is done. Spec: `docs/specs/implemented/email-delivery/`.
 
 **Email goes through Resend**, called with `net/http` (no SDK). Clerk's
 transactional endpoint was chosen first (2026-09-25) and answered 404 with both a
@@ -119,9 +119,10 @@ Authentication" prompt (`clerk init`, `@clerk/nextjs`) in either repository.
 
 ### What comes next
 
-Phase 14. The live site sends real email once `RESEND_API_KEY` is in the host env
-file and `waterloostar.com` is verified for sending in Resend;
-until then an admin verifying accounts by hand is how a real student gets in.
+The frontend's "Send a new link" button, which calls `POST /auth/verify/resend`;
+today "Confirm your email" only opens an information page. The live site sends
+real email once `RESEND_API_KEY` is in the host env file; until then an admin
+verifying accounts by hand is how a real student gets in.
 
 Unspecified, in the order I would take it: saves, views and the question thread →
 messaging with contact privacy → matching and real maps.

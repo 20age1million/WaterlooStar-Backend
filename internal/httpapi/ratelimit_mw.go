@@ -95,6 +95,14 @@ var limitedRoutes = []limitedRoute{
 		message: "A reset link has already been requested for that address. Try again in %s.",
 	},
 	{
+		// Charged whether or not the address has an account, so the refusal
+		// says nothing about it either.
+		method: http.MethodPost, path: "/auth/verify/resend", kind: keyByEmail,
+		perKey:  ratelimit.ResendPerEmail,
+		global:  ratelimit.ResendGlobal,
+		message: "A new link has already been requested for that address. Try again in %s.",
+	},
+	{
 		method: http.MethodPost, path: "/auth/password-reset/confirm", kind: keyByToken,
 		perKey:  ratelimit.TokenPerToken,
 		global:  ratelimit.TokenGlobal,

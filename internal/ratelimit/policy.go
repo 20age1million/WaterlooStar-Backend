@@ -38,6 +38,13 @@ var (
 	// ResetRequestGlobal bounds the outbound mail bill.
 	ResetRequestGlobal = Rule{Name: "reset_request_global", Burst: 30, Window: time.Hour}
 
+	// ResendPerEmail caps new confirmation links per address, for the same
+	// reason as the reset request: each one is mail sent on demand.
+	ResendPerEmail = Rule{Name: "resend_per_email", Burst: 3, Window: time.Hour}
+
+	// ResendGlobal bounds the outbound mail bill for confirmation links.
+	ResendGlobal = Rule{Name: "resend_global", Burst: 30, Window: time.Hour}
+
 	// TokenPerToken caps attempts against one confirmation or reset token. The
 	// tokens are 32 random bytes, so this is not what stops brute force — it
 	// stops a replay loop against a token someone has.

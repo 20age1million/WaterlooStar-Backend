@@ -82,9 +82,13 @@ complete a signup in development. With a key, real emails go out, so register
 only addresses you can read. Startup logs which sender is in use, and production
 without a key starts anyway with a warning, since nothing will be delivered.
 
+A student whose link is lost or expired asks for a new one with
+`POST /auth/verify/resend`. It spends the old link, sends only to an unverified,
+unsuspended account, and answers 202 for every address.
+
 Clerk's transactional endpoint was the first choice and proved closed to the
-account (404 with both keys); `docs/specs/active/email-delivery/index.md` has
-the record.
+account (404 with both keys); `docs/specs/implemented/email-delivery/index.md`
+has the record.
 
 ## Layout
 
@@ -121,6 +125,7 @@ Everything is described in `api/openapi.yaml`; this is the summary.
 | GET | `/healthz` | — | Service and database health |
 | POST | `/auth/register` | — | Create an account (uwaterloo.ca only) |
 | POST | `/auth/verify` | — | Redeem a confirmation token |
+| POST | `/auth/verify/resend` | — | Send a new confirmation link; the same 202 for any address |
 | POST | `/auth/login` | — | Start a session; sets the cookies |
 | POST | `/auth/refresh` | refresh cookie | Rotate the session |
 | POST | `/auth/logout` | session | End the session |
@@ -179,6 +184,7 @@ The authentication endpoints and the three write endpoints answer **429** with a
 | `POST /auth/login` | the email address | 5 **failed** attempts per 15 minutes |
 | `POST /auth/register` | the email address | 3 per hour, 30 per 10 minutes overall |
 | `POST /auth/password-reset` | the email address | 3 per hour, 30 per hour overall |
+| `POST /auth/verify/resend` | the email address | 3 per hour, 30 per hour overall |
 | `POST /auth/verify`, `POST /auth/password-reset/confirm` | the token | 10 per hour, 60 per 10 minutes overall |
 | `POST /listings`, `POST /requests`, `POST /requests/{id}/offers` | the user | 30 per hour |
 

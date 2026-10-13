@@ -89,7 +89,8 @@ func (s *Server) Register(ctx context.Context, request gen.RegisterRequestObject
 
 	if err := s.issueVerificationEmail(ctx, user); err != nil {
 		// The account exists; failing the whole request would leave the user
-		// unable to retry. Log it and let them request a new link.
+		// unable to retry. Log it; they can ask for a new link through
+		// POST /auth/verify/resend.
 		s.log.Error("send verification email",
 			slog.String("user_id", user.ID.String()),
 			slog.String("error", err.Error()))
@@ -187,6 +188,51 @@ func (s *Server) VerifyEmail(ctx context.Context, request gen.VerifyEmailRequest
 
 	s.log.Info("account verified", slog.String("user_id", user.ID.String()))
 	return gen.VerifyEmail200JSONResponse(toUser(user, true)), nil
+}
+
+// ResendVerification sends a new confirmation link when the address belongs to
+// an unverified, unsuspended account. Every other case — no account, already
+// verified, suspended, or a send that failed — answers the same 202, so the
+// endpoint reveals nothing about the address. The log says which case it was,
+// by user ID, never by address.
+func (s *Server) ResendVerification(ctx context.Context, request gen.ResendVerificationRequestObject) (gen.ResendVerificationResponseObject, error) {
+	// A malformed address is refused by the generated decoder; a missing one
+	// decodes as empty and is refused here.
+	if request.Body == nil || strings.TrimSpace(string(request.Body.Email)) == "" {
+		return gen.ResendVerification400JSONResponse{
+			BadRequestJSONResponse: gen.BadRequestJSONResponse(
+				errorBody(apierror.CodeBadRequest, "An email address is required.")),
+		}, nil
+	}
+
+	emailAddr := strings.TrimSpace(string(request.Body.Email))
+	user, err := s.queries.GetUserByEmail(ctx, emailAddr)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			s.log.Info("new confirmation link requested for unknown address")
+			return gen.ResendVerification202Response{}, nil
+		}
+		s.log.Error("look up user for new confirmation link", slog.String("error", err.Error()))
+		return nil, err
+	}
+
+	switch {
+	case user.Verified:
+		s.log.Info("new confirmation link requested for a verified account",
+			slog.String("user_id", user.ID.String()))
+	case user.SuspendedAt != nil:
+		s.log.Info("new confirmation link requested for a suspended account",
+			slog.String("user_id", user.ID.String()))
+	default:
+		// issueVerificationEmail spends every outstanding link first, so only the
+		// newest one works.
+		if err := s.issueVerificationEmail(ctx, user); err != nil {
+			s.log.Error("send new confirmation link",
+				slog.String("user_id", user.ID.String()),
+				slog.String("error", err.Error()))
+		}
+	}
+	return gen.ResendVerification202Response{}, nil
 }
 
 // ----------------------------------------------------------------------- login

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -34,13 +35,31 @@ const (
 type capturingMailer struct {
 	mu   sync.Mutex
 	sent []email.Message
+	// fail makes every send fail, as a provider outage would; nothing is
+	// recorded.
+	fail bool
 }
 
 func (m *capturingMailer) Send(_ context.Context, msg email.Message) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.fail {
+		return errors.New("provider unavailable")
+	}
 	m.sent = append(m.sent, msg)
 	return nil
+}
+
+func (m *capturingMailer) count() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.sent)
+}
+
+func (m *capturingMailer) failing(fail bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.fail = fail
 }
 
 func (m *capturingMailer) last() (email.Message, bool) {
