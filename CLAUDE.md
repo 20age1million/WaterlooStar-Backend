@@ -103,13 +103,13 @@ only thing that calls it.
 | 13 | Resend sender: verification and reset emails delivered through Resend; the log without a key |
 | 14 | A new verification link: `POST /auth/verify/resend`, rate-limited, the same answer for any address |
 
-Forty-two endpoints exist, fourteen of them admin-only; `README.md` has the table, and the rate limits with
-it.
+Forty-two endpoints exist, fourteen of them admin-only. Read
+[API surface](docs/api.md) for student endpoints and rate limits, and
+[Admin](docs/admin.md) for admin endpoints and `cmd/admin` usage.
 
-Phases 5–13 are merged into `main` (pull requests #6–#12).
-
-**In flight:** Phase 14 on `feature/email-delivery`, complete; with it the Email
-Delivery feature is done. Spec: `docs/specs/implemented/email-delivery/`.
+Phases 5–14 are merged into `main` (pull requests #6–#13). Email Delivery is
+complete; its [spec](docs/specs/implemented/email-delivery/index.md) is implemented.
+No backend feature is currently in flight; messaging needs a new accepted spec.
 
 **Email goes through Resend**, called with `net/http` (no SDK). Clerk's
 transactional endpoint was chosen first (2026-09-25) and answered 404 with both a
@@ -119,13 +119,45 @@ Authentication" prompt (`clerk init`, `@clerk/nextjs`) in either repository.
 
 ### What comes next
 
-The frontend's "Send a new link" button, which calls `POST /auth/verify/resend`;
-today "Confirm your email" only opens an information page. The live site sends
-real email once `RESEND_API_KEY` is in the host env file; until then an admin
-verifying accounts by hand is how a real student gets in.
+Read [the project roadmap](docs/ROADMAP.md) before choosing or specifying the
+next feature. On 2026-10-14 the developer moved messaging with contact privacy
+first, ahead of saves, views and the question thread, replacing the order agreed
+on 2026-09-27. It starts in parallel with the frontend Admin Portal and overhaul;
+“accept an offer” waits on it. The frontend's new verification-link form has
+already shipped. Real email needs `RESEND_API_KEY` in the host env file; until
+then an admin can verify accounts by hand.
 
-Unspecified, in the order I would take it: saves, views and the question thread →
-messaging with contact privacy → matching and real maps.
+### Developer decisions — 2026-10-14
+
+[The project roadmap](docs/ROADMAP.md) is authoritative for the full plan:
+
+- The MVP is finding and posting housing, promoted after the frontend Admin
+  Portal and Phase 16 clean-up. Target: before Winter 2027 (January); cut scope
+  rather than move the date. Until messaging, use the listing's phone bar.
+  The community forum is outside this roadmap.
+- Address privacy is settled: approximate location publicly, exact address once
+  contact is confirmed, designed with messaging. The current public address is
+  an implementation gap, not an open product decision.
+- Create the first admin on the host with `cmd/admin promote`; existing admins
+  grant every later admin through the portal's `POST /admin/users/{id}/role`.
+  Both backend paths already exist.
+- Frontend order: Admin Portal (new spec; lost `feature/admin-portal` branch;
+  Phases 13–15), UI/UX Overhaul from Phase 16, messaging after the backend,
+  photos, question thread, poster profiles, saved searches, real maps. The
+  portal guard returns 404 to non-admins. Phase 16 removes fake data and header
+  links to absent features; mobile layout ends the overhaul. Small UI fixes
+  happen any time.
+- The signed-in home is variant A, “Desk”: waiting offers, the student's places
+  and requests with status, then new places for their dates and students
+  looking. Messages, questions, saved places and saved searches use labelled
+  skeletons until they exist. Frontend prototype: local branch
+  `t3/signed-in-home-prototypes`, commit `0761309`; build it in Phase 16.
+- Backend order: messaging with contact privacy now, alongside the frontend
+  portal and overhaul; then saves, views and questions. This supersedes the
+  2026-09-27 order.
+- The developer chooses image hosting and map/geocoding providers when their
+  features start. Each repo keeps its own specs and phase numbering; only
+  `api/openapi.yaml` coordinates them.
 
 ---
 
@@ -170,7 +202,8 @@ These were all found the hard way and will silently regress if undone.
   refresh path alone, the browser never sends it to `/auth/logout`, so logout
   cannot revoke the token it exists to revoke.
 - **`make` is not installed on the current development machine.** Every target is
-  a one-line command; the README lists the equivalents.
+  a one-line command; [Setup](docs/setup.md#the-api-from-source) and
+  [Development](docs/development.md#working-on-it) list the equivalents.
 - **Docker maps PostgreSQL to host port 5433**, because a local PostgreSQL
   already occupies 5432 on that machine.
 - **Every query needs a test in `internal/db`.** `TestEveryQueryIsExercised`
@@ -256,41 +289,15 @@ These were all found the hard way and will silently regress if undone.
 
 ## Running it
 
-The whole service, for working on the frontend — PostgreSQL, migrations and the
-API on `:8080`, wired for a frontend on `localhost:3000`:
-
-```bash
-docker compose up -d --build
-docker compose run --rm api seed   # fixtures; deletes every listing first
-```
-
-From source:
-
-```bash
-cp .env.example .env
-docker compose up -d postgres   # PostgreSQL 18 on :5433, alone
-go run ./cmd/migrate up
-go run ./cmd/seed          # 6 development listings and 5 requests
-go run ./cmd/admin promote meil@uwaterloo.ca   # an admin, if you need one
-go run ./cmd/api           # :8080
-```
-
-Checks: `go build ./...`, `go vet ./...`, `go test ./...`.
-Regenerate: `go tool oapi-codegen -config api/oapi-codegen.yaml api/openapi.yaml`
-and `go tool sqlc generate`.
-
-Without `RESEND_API_KEY`, verification and reset links are printed to the API
-log — the usual way to complete a signup in development. With it, real emails
-go out through Resend: register only addresses you can read.
+Read [Setup](docs/setup.md) when starting Docker, running the API from source or
+configuring email. Read [Development](docs/development.md) when regenerating
+code or running checks; it includes the commands without `make` and the query
+test database requirement. The rules and gotchas above apply to every change.
 
 ---
 
 ## Deliberately deferred
 
-Do not quietly decide these; they are the developer's calls.
-
-- **Whether a listing's street address stays public.** Public today.
-  `address_line` is separate from `neighbourhood` so a private field can be added
-  without moving data.
-- **Image-hosting and map/geocoding providers.** Placeholders behind
-  interfaces. (Email is Resend, behind `email.Sender`.)
+Read [the roadmap's provider decision](docs/ROADMAP.md#providers-still-to-be-chosen)
+before starting photos or maps. Image hosting and map/geocoding providers are
+the developer's calls at that time.
