@@ -115,18 +115,22 @@ Recorded in the Platform Foundation `index.md` and still in force:
 
 ## Open, deliberately deferred
 
-- **Whether a listing's street address stays public.** Public by default today;
-  the design implies an exact address revealed only after contact. The schema
-  keeps `address_line` separate from `neighbourhood` so a private field can be
-  added without moving data.
-- **Image-hosting and map/geocoding providers.** Placeholders behind
-  interfaces; see the API README. (Email is Resend.)
+- **Image-hosting and map/geocoding providers.** The developer chooses them when
+  those features start; [the roadmap](../ROADMAP.md#providers-still-to-be-chosen)
+  records the decision. Placeholders remain behind interfaces. Email is Resend.
+
+## Decisions settled — 2026-10-14
+
+**Address privacy:** show only an approximate location; reveal the exact address
+once contact is confirmed. This is designed and implemented as part of messaging,
+so the current public address remains a known implementation gap. See
+[the roadmap](../ROADMAP.md#address-privacy).
 
 ## What comes next
 
-The admin portal and the housing rework's phases 10–11, specified in the frontend
-repository, can be built against this contract. Next, agreed 2026-09-27:
-
-Email delivery is done (Phases 13–14). Next: saves, views and the question thread; then messaging with contact
-privacy, which is what "accept an offer" is waiting on. Each starts with a new
-specification.
+Email Delivery is implemented (Phases 13–14). On **2026-10-14** the developer
+reordered backend work: messaging with contact privacy first, in parallel with
+the frontend Admin Portal and overhaul; then saves, views and the question
+thread. This replaces the **2026-09-27** order. “Accept an offer” waits on
+messaging. Each feature starts with a new spec. Read
+[the project roadmap](../ROADMAP.md) for the full sequence and launch goal.
