@@ -30,6 +30,9 @@ Works across all project and repository types.
   State the exact command, then stop and wait.
 - Never diverge silently. If a planned approach proves unworkable, surface it, agree
   a revision with the developer, update the spec, then continue.
+- **Every pull request leaves the documentation current.** The next agent starts from
+  the repository's files, not from this conversation. `CLAUDE.md` above all must let
+  someone with no other context pick the work up seamlessly (Step 4, item 4).
 
 ---
 
@@ -84,8 +87,23 @@ In order, before committing:
 1. Move the phase file: `active/<feature-slug>/phase-N-*.md` → `implemented/<feature-slug>/`
 2. Update `index.md` — set phase status to `Complete`
 3. Update `docs/specs/INDEX.md` if present
-4. Update `memory-bank/` if present — `activeContext.md` and `progress.md` if a milestone
-5. Commit everything in one commit, following the project's commit message convention.
+4. **Update the handoff documentation — required, every phase, because every phase ends
+   in a pull request.** Another agent must be able to pick the work up from the files
+   alone:
+   - `CLAUDE.md` (or the repository's agent entry point), above all:
+     - what is built, including this phase;
+     - what is in flight: the branch, the pull request, what remains;
+     - what comes next;
+     - decisions the developer made during the phase, with the date and why;
+     - gotchas learned, with what they cost and how to avoid them.
+   - `README.md`: the routes or endpoints, commands, configuration and environment
+     variables the phase changed.
+   - Any other document the phase made stale. Search the docs for the names, paths,
+     counts and statements the phase changed.
+
+   Correct or remove a stale statement; do not leave it beside the new one.
+5. Update `memory-bank/` if present — `activeContext.md` and `progress.md` if a milestone
+6. Commit everything in one commit, following the project's commit message convention.
    If no convention is established, use conventional commits format:
    ```
    <type>(<feature-slug>): implement <phase-title>
@@ -101,3 +119,7 @@ Read `index.md`. Further phases in `active/`?
 
 - **Yes** — present the next phase. Run this skill again from Step 0.
 - **No** — confirm all files are in `implemented/` and `INDEX.md` is current.
+
+**After a pull request merges,** the documents still describe it as in flight. The next
+piece of work in the repository starts by bringing `CLAUDE.md` up to date: record the
+merge and its pull request number, and clear or replace the "in flight" entry.
