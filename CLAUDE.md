@@ -32,6 +32,19 @@ Also read whichever of these the task touches:
 - `.claude/skills/implementation-breakdown/SKILL.md` — splitting work into phases
 - `.claude/skills/release/SKILL.md` — release process
 
+**Every pull request leaves the documentation current — this file above all.**
+Another agent must be able to pick the work up from the repository alone, with no
+access to the conversation that produced it. Before opening or updating any pull
+request, spec work or not, update:
+- this file: what is built, what is in flight (branch, pull request), what comes next,
+  the developer's decisions with their dates, and the gotchas learned;
+- `README.md` and its linked guides under `docs/`, `docs/ROADMAP.md` among them;
+- `docs/specs/INDEX.md`;
+- anything else the change made stale.
+
+After a merge, the next piece of work starts by recording it here. The rule is in
+`feature-implement` (Step 4, item 4) and in every phase doc's checklist.
+
 The commit and pull-request conventions come from the skill library too:
 conventional commits as `<type>(<slug>): <description>`, branches as
 `<type>/<slug>`. The spec commit that opens a feature takes **no trailer lines** —
@@ -110,6 +123,12 @@ Forty-two endpoints exist, fourteen of them admin-only. Read
 Phases 5–14 are merged into `main` (pull requests #6–#13). Email Delivery is
 complete; its [spec](docs/specs/implemented/email-delivery/index.md) is implemented.
 No backend feature is currently in flight; messaging needs a new accepted spec.
+The roadmap and README split merged in #14.
+
+**In flight:** `chore/handoff-docs`
+([pull request #15](https://github.com/20age1million/WaterlooStar-Backend/pull/15))
+adds the documentation rule above to the skill library, and a `.gitattributes`
+that keeps `go.mod`/`go.sum` on LF.
 
 **Email goes through Resend**, called with `net/http` (no SDK). Clerk's
 transactional endpoint was chosen first (2026-09-25) and answered 404 with both a
@@ -204,6 +223,10 @@ These were all found the hard way and will silently regress if undone.
 - **`make` is not installed on the current development machine.** Every target is
   a one-line command; [Setup](docs/setup.md#the-api-from-source) and
   [Development](docs/development.md#working-on-it) list the equivalents.
+- **`go.mod` and `go.sum` are pinned to LF in `.gitattributes`.** The go tool
+  always writes LF, and with `core.autocrlf=true` on the development machine
+  every `go mod tidy` otherwise left both files showing as modified with no
+  change in content.
 - **Docker maps PostgreSQL to host port 5433**, because a local PostgreSQL
   already occupies 5432 on that machine.
 - **Every query needs a test in `internal/db`.** `TestEveryQueryIsExercised`

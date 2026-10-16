@@ -169,6 +169,10 @@ When generating phase docs, apply the following rules unconditionally:
 - **Every phase doc** — include a checklist item in Final Verification to move the phase
   spec doc from `docs/specs/active/<feature-slug>/` to `docs/specs/implemented/<feature-slug>/`
   and a corresponding Completion Criteria item.
+- **Every phase doc** — include a checklist item in Final Verification to update the
+  handoff documentation, `CLAUDE.md` above all, then `README.md` and `docs/specs/INDEX.md`,
+  so that another agent can pick the work up from the files alone. Include a
+  corresponding Completion Criteria item. See `feature-implement`, Step 4, item 4.
 - **Final phase doc only** — include a checklist item to move `index.md` from
   `docs/specs/active/<feature-slug>/` to `docs/specs/implemented/<feature-slug>/`.
 - **Final phase doc only, if `CHANGELOG present: true`** — include a checklist item to

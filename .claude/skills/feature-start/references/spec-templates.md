@@ -187,6 +187,10 @@ question is a last resort, not a placeholder for things that can be worked out n
   - [ ] Build or compile step passes with no errors (adapt to project type: compile, lint,
         bundle, type-check, etc.)
   - [ ] All relevant tests pass
+  - [ ] Update the handoff documentation so another agent can pick up from the files
+        alone: `CLAUDE.md` (what is built, what is in flight, what comes next, decisions
+        and gotchas from this phase), `README.md`, `docs/specs/INDEX.md`, and any other
+        document this phase made stale
   - [ ] Update `index.md` — set Phase <n> to Complete
   - [ ] Move `docs/specs/active/<feature-slug>/phase-<n>-<title>.md` →
         `docs/specs/implemented/<feature-slug>/phase-<n>-<title>.md`
@@ -205,6 +209,7 @@ question is a last resort, not a placeholder for things that can be worked out n
 
 - [ ] All checklist items completed and verified
 - [ ] No regressions in related areas
+- [ ] Handoff documentation current: `CLAUDE.md`, `README.md`, `docs/specs/INDEX.md`
 - [ ] `index.md` phase status set to Complete
 - [ ] Phase spec doc moved to `docs/specs/implemented/<feature-slug>/`
 - [ ] *(Final phase only)* `CHANGELOG.md` updated under `Unreleased`
