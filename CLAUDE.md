@@ -138,8 +138,12 @@ the `.gitattributes` that keeps `go.mod`/`go.sum` on LF merged in #15
 [Messaging with Contact Privacy spec](docs/specs/active/messaging/index.md)
 (Phases 15–18) is accepted (2026-10-16), and Phase 15, conversations and
 messages, is complete on the branch: migration 11, eight `messages`-tag
-endpoints, two new rate limits. No pull request yet. Next is Phase 16, contact
-privacy and address sharing, which needs the frontend to stop reading
+endpoints, two new rate limits. It is open as
+[pull request #17](https://github.com/20age1million/WaterlooStar-Backend/pull/17).
+Each later phase is a stacked pull request (decided by Claude under the
+developer's delegation, 2026-10-16): Phase 16 on `feature/messaging-privacy`
+with `feature/messaging` as its base, then 17 and 18 the same way. Next is
+Phase 16, contact privacy and address sharing, which needs the frontend to stop reading
 `address_line` from public reads before it merges (see that phase's
 Dependencies); then 17 (offers open conversations) and 18 (email
 notifications).
