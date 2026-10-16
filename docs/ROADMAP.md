@@ -4,7 +4,10 @@
 
 **Backend:** Phases 0–14 are shipped: accounts, housing discovery and posting,
 requests and offers, rate limits, admin moderation, listing terms and email
-delivery. [Backend specs index](specs/INDEX.md).
+delivery. Messaging with contact privacy is in progress on `feature/messaging`:
+Phase 15, conversations and messages, is built and not yet merged; Phases
+16–18 (address privacy and sharing, offers opening conversations, email
+notifications) follow. [Backend specs index](specs/INDEX.md).
 
 **Frontend:** housing discovery and posting, requests and offers, session refresh,
 the housing rework and Phase 12's new verification link are shipped.

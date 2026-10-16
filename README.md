@@ -22,7 +22,7 @@ docker compose logs api             # verification and reset links without RESEN
 ## Further reading
 
 - [Setup](docs/setup.md) — Docker, running from source and email configuration.
-- [API surface](docs/api.md) — student endpoints, rate limits and listing terms.
+- [API surface](docs/api.md) — student endpoints, messages, rate limits and listing terms.
 - [Admin](docs/admin.md) — admin endpoints, role creation, moderation and `cmd/admin` usage.
 - [Development](docs/development.md) — code layout, workflow, generators, checks and technical decisions.
 - [Project roadmap](docs/ROADMAP.md) — the goal, feature order and decisions for both repositories.

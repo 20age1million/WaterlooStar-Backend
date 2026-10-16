@@ -16,18 +16,20 @@ across both; everything from Phase 4 onward is not.
 
 | Feature | Phases | Status | Location |
 |---|---|---|---|
-| [Messaging with Contact Privacy](./active/messaging/index.md) | 4 (15–18) | Ready | `docs/specs/active/messaging/` |
+| [Messaging with Contact Privacy](./active/messaging/index.md) | 4 (15–18) | In progress: 15 complete | `docs/specs/active/messaging/` |
 
 ### Messaging with Contact Privacy
 
 A verified student messages a listing's owner inside WaterlooStar, and an owner
 answers a housing request with a conversation. Nobody's email or phone is ever
 shown; the exact address reaches a student only when the owner shares it in
-their conversation.
+their conversation. Phase 15 is built on `feature/messaging` and not yet
+merged; its phase doc is under `implemented/messaging/`, while `index.md` and
+the later phases stay in `active/` until the feature is done.
 
 | Phase | Title | Status |
 |---|---|---|
-| 15 | [Conversations and messages](./active/messaging/phase-15-conversations.md) | Ready |
+| 15 | [Conversations and messages](./implemented/messaging/phase-15-conversations.md) | Complete: start, inbox, unread counts, close; migration 11; eight endpoints |
 | 16 | [Contact privacy and address sharing](./active/messaging/phase-16-contact-privacy.md) | Ready |
 | 17 | [Offers open conversations](./active/messaging/phase-17-offer-conversations.md) | Ready |
 | 18 | [Message notifications](./active/messaging/phase-18-message-notifications.md) | Ready |

@@ -121,9 +121,11 @@ only thing that calls it.
 | 12 | Listing terms: shorter stays, bill estimate and all-in cost, window ranking, monthly availability |
 | 13 | Resend sender: verification and reset emails delivered through Resend; the log without a key |
 | 14 | A new verification link: `POST /auth/verify/resend`, rate-limited, the same answer for any address |
+| 15 | Conversations and messages: message a listing's owner, the inbox, unread counts, closing (on `feature/messaging`, not yet merged) |
 
-Forty-two endpoints exist, fourteen of them admin-only. Read
-[API surface](docs/api.md) for student endpoints and rate limits, and
+Fifty endpoints exist, fourteen of them admin-only; eight of them are Phase
+15's messaging endpoints, not yet on `main`. Read
+[API surface](docs/api.md) for student endpoints, messages and rate limits, and
 [Admin](docs/admin.md) for admin endpoints and `cmd/admin` usage.
 
 Phases 5–14 are merged into `main` (pull requests #6–#13). Email Delivery is
@@ -134,8 +136,13 @@ the `.gitattributes` that keeps `go.mod`/`go.sum` on LF merged in #15
 
 **In flight:** `feature/messaging` — the
 [Messaging with Contact Privacy spec](docs/specs/active/messaging/index.md)
-(Phases 15–18) is accepted, and Phase 15, conversations and messages, is in
-progress. No pull request yet.
+(Phases 15–18) is accepted (2026-10-16), and Phase 15, conversations and
+messages, is complete on the branch: migration 11, eight `messages`-tag
+endpoints, two new rate limits. No pull request yet. Next is Phase 16, contact
+privacy and address sharing, which needs the frontend to stop reading
+`address_line` from public reads before it merges (see that phase's
+Dependencies); then 17 (offers open conversations) and 18 (email
+notifications).
 
 **Email goes through Resend**, called with `net/http` (no SDK). Clerk's
 transactional endpoint was chosen first (2026-09-25) and answered 404 with both a
@@ -212,6 +219,10 @@ then an admin can verify accounts by hand.
   address shared and first unread reply, with an opt-out and caps. The
   frontend messaging phase goes straight after frontend Phase 16, under the
   same delegation. The spec's `index.md`, Decisions, has the table.
+  During Phase 15, also decided by Claude under the developer's delegation:
+  a listing its owner paused or archived does not stop a conversation; only a
+  moderator's takedown or a suspended counterpart makes it read-only (the
+  phase doc's Implementation Notes say why).
 
 ---
 
@@ -316,6 +327,26 @@ These were all found the hard way and will silently regress if undone.
   owner's. Sharing a column would let an owner republish over a moderator and
   lose what the status was. `ownedListing`/`ownedRequest` refuse a removed post
   with a 409, so every owner write path inherits the rule.
+- **Conversation reads are the participants' own, so they do not hide.** Like
+  `/me/...`, `GetConversationForParticipant` and `ListConversationsForUser` do
+  not filter out a suspended counterpart or a taken-down listing; they return
+  `counterpart_suspended`, `listing_removed` and `listing_available`, and
+  `sendRefusal` in `internal/httpapi/messages.go` turns those into a read-only
+  conversation (`can_send: false`, 409 on send). Hiding it would erase what the
+  other student might be reporting. Starting one still goes through
+  `GetPublishedListing`, so the public filters apply there. A paused or
+  archived listing does *not* stop a conversation: only a takedown does.
+- **sqlc types a `LEFT JOIN LATERAL (subquery)` column as non-null.** The first
+  draft of the conversation reads did, and a conversation with no messages
+  would have failed to scan its NULL last message into a `string`. Join the
+  table itself (`LEFT JOIN messages lm ON lm.id = (SELECT ... LIMIT 1)`) and
+  sqlc makes the columns pointers. Check the generated row type whenever a
+  query left-joins anything other than a table.
+- **The fake's conversations run on a strictly increasing clock** (`tick` in
+  `internal/httpapi/fake_querier_conversations_test.go`). Unread counts compare
+  a message's time with a read marker, and with the wall clock two calls in a
+  row can read the same instant, making an unread message look read. Use
+  `f.tick()` for any new timestamp the unread rule compares.
 - **The admin post lists are the one exception to the published-only rule.**
   `ListListingsForAdmin` and `ListRequestsForAdmin` read every row on purpose,
   behind the `/admin` guard. Every other read of a post filters on `status`,

@@ -294,7 +294,7 @@ is "a frontend messaging phase" here.
 
 | Phase | Title | Status | Location |
 |---|---|---|---|
-| [15 — Conversations and messages](./phase-15-conversations.md) | Start a conversation about a listing, the inbox, messages, closing, unread counts | Ready | `docs/specs/active/messaging/` |
+| [15 — Conversations and messages](../../implemented/messaging/phase-15-conversations.md) | Start a conversation about a listing, the inbox, messages, closing, unread counts | Complete | `docs/specs/implemented/messaging/` |
 | [16 — Contact privacy and address sharing](./phase-16-contact-privacy.md) | Exact address and coordinates off every public read and out of search; the owner shares the address in a conversation | Ready | `docs/specs/active/messaging/` |
 | [17 — Offers open conversations](./phase-17-offer-conversations.md) | An offer opens or joins a conversation with the request's poster, who answers it there | Ready | `docs/specs/active/messaging/` |
 | [18 — Message notifications](./phase-18-message-notifications.md) | Email when a conversation is opened, the address is shared, or a first reply waits unread | Ready | `docs/specs/active/messaging/` |
