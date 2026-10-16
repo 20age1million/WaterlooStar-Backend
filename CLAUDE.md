@@ -45,6 +45,12 @@ request, spec work or not, update:
 After a merge, the next piece of work starts by recording it here. The rule is in
 `feature-implement` (Step 4, item 4) and in every phase doc's checklist.
 
+**Every pull request carries a description of what it changes.** A title alone is
+not one. The description says what changed and why, grouped by area; the commits it
+contains; how it was verified; and what it leaves open. When more commits land on the
+branch, edit the description to cover them. `feature-implement` ("The pull request
+description") has the full rule.
+
 The commit and pull-request conventions come from the skill library too:
 conventional commits as `<type>(<slug>): <description>`, branches as
 `<type>/<slug>`. The spec commit that opens a feature takes **no trailer lines** —
@@ -123,12 +129,12 @@ Forty-two endpoints exist, fourteen of them admin-only. Read
 Phases 5–14 are merged into `main` (pull requests #6–#13). Email Delivery is
 complete; its [spec](docs/specs/implemented/email-delivery/index.md) is implemented.
 No backend feature is currently in flight; messaging needs a new accepted spec.
-The roadmap and README split merged in #14.
+The roadmap and README split merged in #14. The documentation-current rule and
+the `.gitattributes` that keeps `go.mod`/`go.sum` on LF merged in #15
+(2026-10-15).
 
-**In flight:** `chore/handoff-docs`
-([pull request #15](https://github.com/20age1million/WaterlooStar-Backend/pull/15))
-adds the documentation rule above to the skill library, and a `.gitattributes`
-that keeps `go.mod`/`go.sum` on LF.
+**In flight:** `chore/pr-descriptions` adds the pull-request-description rule above
+to the skill library.
 
 **Email goes through Resend**, called with `net/http` (no SDK). Clerk's
 transactional endpoint was chosen first (2026-09-25) and answered 404 with both a
