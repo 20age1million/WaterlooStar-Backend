@@ -33,6 +33,8 @@ Works across all project and repository types.
 - **Every pull request leaves the documentation current.** The next agent starts from
   the repository's files, not from this conversation. `CLAUDE.md` above all must let
   someone with no other context pick the work up seamlessly (Step 4, item 4).
+- **Every pull request carries a description of what it changes.** A title alone is
+  not a description. See "The pull request description" below.
 
 ---
 
@@ -96,8 +98,8 @@ In order, before committing:
      - what comes next;
      - decisions the developer made during the phase, with the date and why;
      - gotchas learned, with what they cost and how to avoid them.
-   - `README.md`: the routes or endpoints, commands, configuration and environment
-     variables the phase changed.
+   - `README.md` and its linked guides under `docs/`: the routes or endpoints,
+     commands, configuration and environment variables the phase changed.
    - Any other document the phase made stale. Search the docs for the names, paths,
      counts and statements the phase changed.
 
@@ -123,3 +125,24 @@ Read `index.md`. Further phases in `active/`?
 **After a pull request merges,** the documents still describe it as in flight. The next
 piece of work in the repository starts by bringing `CLAUDE.md` up to date: record the
 merge and its pull request number, and clear or replace the "in flight" entry.
+
+---
+
+## The pull request description
+
+This skill stops at the commit and does not open the pull request. Whoever opens one,
+for a phase or for anything else, writes a description of what that pull request
+changes. A title, an empty body or a line of attribution is not one. A reviewer who
+reads only the description must know what they are about to review:
+
+- **What changed and why**, grouped by area (code, contract, schema, configuration,
+  documentation). Name the endpoints, routes, files or behaviours a reviewer should
+  look at, and the spec or phase it implements, if any.
+- **The commits it contains**, one line each, when there is more than one.
+- **How it was verified:** the commands run and their outcome, or that the change is
+  documentation-only and nothing was run.
+- **What it leaves open:** known gaps, deferred items, follow-up work and anything the
+  reviewer has to do, such as an environment variable to set on the host.
+
+The description covers the whole pull request as it stands. When further commits land
+on the branch, edit the description to match, not only the first commit.
