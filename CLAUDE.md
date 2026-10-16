@@ -128,13 +128,14 @@ Forty-two endpoints exist, fourteen of them admin-only. Read
 
 Phases 5–14 are merged into `main` (pull requests #6–#13). Email Delivery is
 complete; its [spec](docs/specs/implemented/email-delivery/index.md) is implemented.
-No backend feature is currently in flight; messaging needs a new accepted spec.
 The roadmap and README split merged in #14. The documentation-current rule and
 the `.gitattributes` that keeps `go.mod`/`go.sum` on LF merged in #15
-(2026-10-15).
+(2026-10-15). The pull-request-description rule merged in #16.
 
-**In flight:** `chore/pr-descriptions` adds the pull-request-description rule above
-to the skill library.
+**In flight:** `feature/messaging` — the
+[Messaging with Contact Privacy spec](docs/specs/active/messaging/index.md)
+(Phases 15–18) is accepted, and Phase 15, conversations and messages, is in
+progress. No pull request yet.
 
 **Email goes through Resend**, called with `net/http` (no SDK). Clerk's
 transactional endpoint was chosen first (2026-09-25) and answered 404 with both a
@@ -148,7 +149,9 @@ Read [the project roadmap](docs/ROADMAP.md) before choosing or specifying the
 next feature. On 2026-10-14 the developer moved messaging with contact privacy
 first, ahead of saves, views and the question thread, replacing the order agreed
 on 2026-09-27. It starts in parallel with the frontend Admin Portal and overhaul;
-“accept an offer” waits on it. The frontend's new verification-link form has
+answering an offer ships with it, and since 2026-10-16 promotion waits on it.
+The messaging spec is in `docs/specs/active/messaging/`. The frontend's new
+verification-link form has
 already shipped. Real email needs `RESEND_API_KEY` in the host env file; until
 then an admin can verify accounts by hand.
 
@@ -156,19 +159,19 @@ then an admin can verify accounts by hand.
 
 [The project roadmap](docs/ROADMAP.md) is authoritative for the full plan:
 
-- The MVP is finding and posting housing, promoted after the frontend Admin
-  Portal and Phase 16 clean-up. Target: before Winter 2027 (January); cut scope
-  rather than move the date. Until messaging, use the listing's phone bar.
-  The community forum is outside this roadmap.
-- Address privacy is settled: approximate location publicly, exact address once
-  contact is confirmed, designed with messaging. The current public address is
-  an implementation gap, not an open product decision.
+- The MVP is finding and posting housing. Target: before Winter 2027 (January);
+  cut scope rather than move the date. The community forum is outside this
+  roadmap. (The launch gate was revised on 2026-10-16; see below.)
+- Address privacy is settled: approximate location publicly, exact address
+  later, designed with messaging (how it is revealed: 2026-10-16, below). The
+  current public address is an implementation gap, not an open product decision.
 - Create the first admin on the host with `cmd/admin promote`; existing admins
   grant every later admin through the portal's `POST /admin/users/{id}/role`.
   Both backend paths already exist.
 - Frontend order: Admin Portal (new spec; lost `feature/admin-portal` branch;
-  Phases 13–15), UI/UX Overhaul from Phase 16, messaging after the backend,
-  photos, question thread, poster profiles, saved searches, real maps. The
+  Phases 13–15), UI/UX Overhaul from Phase 16, a minimal messaging phase before
+  promotion (2026-10-16), photos, question thread, poster profiles, saved
+  searches, real maps. The
   portal guard returns 404 to non-admins. Phase 16 removes fake data and header
   links to absent features; mobile layout ends the overhaul. Small UI fixes
   happen any time.
@@ -183,6 +186,32 @@ then an admin can verify accounts by hand.
 - The developer chooses image hosting and map/geocoding providers when their
   features start. Each repo keeps its own specs and phase numbering; only
   `api/openapi.yaml` coordinates them.
+
+### Developer decisions — 2026-10-16
+
+- **Messaging before launch.** Promotion waits on the frontend Admin Portal,
+  frontend Phase 16, this repository's messaging with contact privacy, and a
+  minimal frontend messaging phase. There is no interim contact path: no phone
+  number or email is published. The listing's "phone bar" is the frontend's
+  pinned mobile bar and holds no phone.
+- **The owner shares the exact address by hand.** An explicit “Share exact
+  address” action in the conversation, by the listing's owner, whenever they
+  choose. Nothing else reveals it — not a reply, not opening a conversation,
+  not an offer.
+- **Only the exact address is revealed.** No email, no phone, ever.
+- **The rest of messaging was delegated to Claude.** The developer delegated
+  the spec's open questions (Q-1 to Q-11) to Claude the same day. Each was
+  decided by Claude under the developer's delegation, 2026-10-16, taking the
+  drafted recommendation: no accept step; either side can close, no blocking;
+  suspension and takedown make a conversation read-only and withhold a shared
+  address without un-sharing it; every conversation is about a listing; admins
+  never read message bodies in this feature; messages are append-only and
+  kept; the public location is `neighbourhood` plus a new `cross_streets`; no
+  un-share; sharing is per conversation; an offer opens or joins a
+  conversation and replying is the answer; email on conversation opened,
+  address shared and first unread reply, with an opt-out and caps. The
+  frontend messaging phase goes straight after frontend Phase 16, under the
+  same delegation. The spec's `index.md`, Decisions, has the table.
 
 ---
 
