@@ -48,6 +48,25 @@ tags:
     description: |
       Housing Available - places students are offering. Public: browsing does
       not require an account.
+  - name: messages
+    description: |
+      Conversations between two students about one listing: its **owner**, and
+      the student asking about it, the **enquirer**. Every path here is for the
+      two participants only, and answers **404** - never 403 - to anyone else.
+
+      There is no accept step. Either participant can write from the first
+      message on, and either can **close** the conversation, after which
+      neither can send. It stays readable. There is one conversation per
+      listing and enquirer, so closing also stops that enquirer opening another
+      about the same listing.
+
+      A conversation never carries anyone's email or phone number. Opening one
+      reveals nothing: the exact address of a place is the owner's to share,
+      by hand, inside the conversation (a later phase adds that action). The
+      listing summary here carries no address.
+
+      While the listing is taken down by a moderator, or either participant's
+      account is suspended, the conversation stays visible but read-only.
 
   - name: admin
     description: |
@@ -1079,6 +1098,274 @@ paths:
                 items:
                   $ref: "#/components/schemas/HousingRequest"
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /listings/{id}/conversations:
+    post:
+      tags: [messages]
+      operationId: startConversation
+      summary: Message the owner of a listing
+      description: |
+        Opens a conversation with the listing's owner, with your first message
+        in it. Only a **verified** student may start one, and only about a
+        published listing that is not their own: a draft, paused or taken-down
+        listing, or one whose owner is suspended, answers 404 as it does
+        everywhere else.
+
+        There is one conversation per listing and enquirer. Starting a second
+        answers **409** with the existing conversation's id in
+        `details.conversation_id`, whether it is open or closed, so a client
+        can open that one instead.
+
+        Opening a conversation reveals nothing about either side: no email, no
+        phone number and no exact address.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageInput"
+      responses:
+        "201":
+          description: Started, with the first message sent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        "400":
+          description: |
+            The message is empty or too long, or the listing is your own.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: Signed in, but the address has not been confirmed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            You already have a conversation about this listing, open or closed.
+            `details.conversation_id` names it.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /me/conversations:
+    get:
+      tags: [messages]
+      operationId: listMyConversations
+      summary: Your conversations, newest activity first
+      description: |
+        Both sides: places you asked about, and conversations about your own
+        listings. Ordered by the latest message, or by when the conversation
+        was opened if it has none. A conversation whose listing was taken down
+        or whose other participant is suspended is still listed, marked by
+        `listing.available`, `counterpart_available` and `can_send`.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - name: status
+          in: query
+          description: Only open, or only closed, conversations.
+          schema:
+            type: string
+            enum: [open, closed]
+        - name: side
+          in: query
+          description: |
+            `owner`: conversations about your own listings. `enquirer`:
+            conversations you opened about someone else's.
+          schema:
+            type: string
+            enum: [owner, enquirer]
+      responses:
+        "200":
+          description: A page of conversations.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /me/conversations/unread:
+    get:
+      tags: [messages]
+      operationId: getUnreadCounts
+      summary: How much is waiting for you
+      description: |
+        The counts a header badge or the home page needs, without loading the
+        inbox. A message is unread when the other participant sent it after you
+        last marked the conversation read. Not rate limited, so a client may
+        poll it at a modest interval.
+      responses:
+        "200":
+          description: Your unread counts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnreadCounts"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /conversations/{id}:
+    get:
+      tags: [messages]
+      operationId: getConversation
+      summary: One of your conversations
+      description: |
+        Participants only. Anyone else gets 404, as for an id that does not
+        exist.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The conversation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /conversations/{id}/messages:
+    get:
+      tags: [messages]
+      operationId: listMessages
+      summary: The messages in one of your conversations
+      description: |
+        Newest first, paged like every other list. A message that arrives while
+        you read older pages shifts the offsets by one, so a client removes
+        duplicates by id. Participants only; anyone else gets 404.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: A page of messages, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessagePage"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+    post:
+      tags: [messages]
+      operationId: sendMessage
+      summary: Send a message
+      description: |
+        Either participant, from the first message on, while the conversation
+        is open. Refused with **409** once it is closed, while the other
+        participant's account is suspended, and while the listing is taken
+        down. Messages cannot be edited or deleted.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageInput"
+      responses:
+        "201":
+          description: Sent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: Signed in, but the address has not been confirmed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            Nothing can be sent here: the conversation is closed, the other
+            participant's account is no longer available, or the listing was
+            taken down. `message` says which.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /conversations/{id}/read:
+    post:
+      tags: [messages]
+      operationId: markConversationRead
+      summary: Mark a conversation read
+      description: |
+        Moves your read marker to now, so every message in it counts as read
+        for you. The other participant's marker is untouched. Participants
+        only; anyone else gets 404.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Marked read.
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /conversations/{id}/close:
+    post:
+      tags: [messages]
+      operationId: closeConversation
+      summary: Close a conversation
+      description: |
+        Either participant. After it, neither side can send, and the enquirer
+        cannot open another conversation about this listing. The conversation
+        stays readable. Closing a closed conversation answers 200 with it
+        unchanged. Participants only; anyone else gets 404.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Closed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
   /admin/overview:
@@ -2185,6 +2472,162 @@ components:
           $ref: "#/components/schemas/Listing"
         owner:
           $ref: "#/components/schemas/ListingOwner"
+
+    Conversation:
+      type: object
+      description: |
+        A conversation about one listing, as one of its two participants sees
+        it. Everything that depends on who is looking - which side you are,
+        who the other person is, what you may do next - is worked out for you,
+        so no other participant's id or email is ever exposed.
+      required:
+        - id
+        - status
+        - listing
+        - counterpart
+        - viewer_is_owner
+        - opened_by_viewer
+        - can_send
+        - last_message
+        - unread_count
+        - created_at
+        - closed_at
+        - closed_by_viewer
+        - counterpart_available
+      properties:
+        id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [open, closed]
+        listing:
+          $ref: "#/components/schemas/ConversationListing"
+        counterpart:
+          description: The other participant. Never their email.
+          allOf:
+            - $ref: "#/components/schemas/ListingOwner"
+        viewer_is_owner:
+          type: boolean
+          description: You own the listing; the counterpart is the enquirer.
+        opened_by_viewer:
+          type: boolean
+          description: You started this conversation.
+        can_send:
+          type: boolean
+          description: |
+            You may send a message now: the conversation is open, the other
+            participant's account is available, and the listing has not been
+            taken down.
+        last_message:
+          description: The newest message, or null when there is none yet.
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/MessagePreview"
+        unread_count:
+          type: integer
+          minimum: 0
+          description: Messages from the other participant you have not read.
+        created_at: { type: string, format: date-time }
+        closed_at:
+          type: string
+          format: date-time
+          nullable: true
+        closed_by_viewer:
+          type: boolean
+          nullable: true
+          description: Null while open; whether you were the one who closed it.
+        counterpart_available:
+          type: boolean
+          description: |
+            False while the other participant's account is suspended. The
+            conversation stays readable, and nothing can be sent.
+
+    ConversationListing:
+      type: object
+      description: |
+        The listing a conversation is about, summarised. It carries no address.
+        `available` is false when the public can no longer see the listing:
+        paused, archived, taken down, or its owner suspended.
+      required: [id, title, neighbourhood, price_cents, start_date, end_date, available]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        neighbourhood: { type: string }
+        price_cents: { type: integer }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        available: { type: boolean }
+
+    Message:
+      type: object
+      description: |
+        One message. Append-only: it cannot be edited or deleted.
+      required: [id, conversation_id, from_viewer, body, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        conversation_id: { type: string, format: uuid }
+        from_viewer:
+          type: boolean
+          description: You sent it.
+        body: { type: string }
+        created_at: { type: string, format: date-time }
+
+    MessagePreview:
+      type: object
+      description: The start of the newest message, for an inbox row.
+      required: [from_viewer, body, created_at]
+      properties:
+        from_viewer: { type: boolean }
+        body:
+          type: string
+          description: The first 140 characters of the message.
+        created_at: { type: string, format: date-time }
+
+    MessageInput:
+      type: object
+      required: [body]
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          description: |
+            1 to 4000 characters once surrounding whitespace is trimmed. The
+            trimmed text is what is stored.
+
+    ConversationPage:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Conversation"
+        meta:
+          $ref: "#/components/schemas/PageMeta"
+
+    MessagePage:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+        meta:
+          $ref: "#/components/schemas/PageMeta"
+
+    UnreadCounts:
+      type: object
+      required: [conversations, messages]
+      properties:
+        conversations:
+          type: integer
+          minimum: 0
+          description: Conversations with at least one unread message.
+        messages:
+          type: integer
+          minimum: 0
+          description: Unread messages across all your conversations.
 
     AdminUser:
       type: object

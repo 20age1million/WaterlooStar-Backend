@@ -2,7 +2,7 @@
 
 ## Endpoints
 
-The API has forty-two endpoints, fourteen of them admin-only. Everything is
+The API has fifty endpoints, fourteen of them admin-only. Everything is
 described in [the OpenAPI contract](../api/openapi.yaml); this is the public and
 student surface. The admin surface is in [Admin](admin.md#endpoints).
 
@@ -36,18 +36,51 @@ student surface. The admin surface is in [Admin](admin.md#endpoints).
 | POST | `/requests/{id}/offers` | verified | Answer with one of your listings |
 | GET | `/requests/{id}/offers` | poster or offerer | The offers on a request |
 | DELETE | `/offers/{id}` | offerer | Withdraw yours |
+| POST | `/listings/{id}/conversations` | verified | Message a listing's owner; opens a conversation |
+| GET | `/me/conversations` | session | Your conversations, both sides, newest activity first |
+| GET | `/me/conversations/unread` | session | Unread conversation and message counts |
+| GET | `/conversations/{id}` | participant | One conversation |
+| GET | `/conversations/{id}/messages` | participant | Its messages, newest first, paginated |
+| POST | `/conversations/{id}/messages` | verified participant | Send a message |
+| POST | `/conversations/{id}/read` | participant | Mark it read |
+| POST | `/conversations/{id}/close` | participant | Close it; nobody can send afterwards |
 
 Browsing is public by design: an account is only needed to post, to offer, or
-to message a poster once messaging ships.
+to message a poster.
 
 **Offers are not public.** The student who posted a request sees every live
 offer on it; an owner sees only their own. And an offer is only as alive as the
 listing behind it — taking a place down removes its offers from view, with no
 second step.
 
+## Messages
+
+A conversation is between two students about one listing: its **owner** and the
+student asking about it, the **enquirer**. Only those two can see it; anyone
+else gets 404, never 403.
+
+- **No accept step.** Either side can write from the first message on.
+- **Either side can close it.** After that nobody can send, and the enquirer
+  cannot open another about the same listing: there is one conversation per
+  listing and enquirer, and a second start answers 409 naming the first in
+  `details.conversation_id`.
+- **Opening a conversation reveals nothing.** No email, no phone number and no
+  exact address. The owner will share the address by hand inside the
+  conversation; that action comes in Phase 16, and until then the public
+  listing still carries the street.
+- **Moderation makes it read-only, never hidden.** While the listing is taken
+  down or the other side is suspended, the conversation stays readable and
+  nothing can be sent. Reinstating restores it. A listing its owner paused or
+  archived carries on: the two still need to talk about the lease.
+- **Messages are append-only.** They cannot be edited or deleted, and admins
+  have no surface for reading them.
+- **Unread counts are computed**, from the other side's messages and your own
+  read marker, never stored. Poll `GET /me/conversations/unread`; reads are not
+  rate limited.
+
 ## Rate limits
 
-The authentication endpoints and the three write endpoints answer **429** with a
+The authentication endpoints and the five write endpoints answer **429** with a
 `Retry-After` header when an allowance is spent. The limits are in
 `internal/ratelimit/policy.go`, each with a comment saying what it protects.
 
@@ -59,6 +92,8 @@ The authentication endpoints and the three write endpoints answer **429** with a
 | `POST /auth/verify/resend` | the email address | 3 per hour, 30 per hour overall |
 | `POST /auth/verify`, `POST /auth/password-reset/confirm` | the token | 10 per hour, 60 per 10 minutes overall |
 | `POST /listings`, `POST /requests`, `POST /requests/{id}/offers` | the user | 30 per hour |
+| `POST /listings/{id}/conversations` | the user | 10 per 2 hours, including attempts that find one already exists |
+| `POST /conversations/{id}/messages` | the user | 60 per 10 minutes |
 
 Four things about it are deliberate:
 

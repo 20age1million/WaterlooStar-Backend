@@ -149,6 +149,39 @@ func Request(t *testing.T, q *sqlcgen.Queries, poster uuid.UUID, opts RequestOpt
 	return request
 }
 
+// Conversation opens a conversation between a listing's owner and an enquirer,
+// opened by the enquirer, as starting one from the listing page does. It
+// inserts no message: call Message for that.
+func Conversation(t *testing.T, q *sqlcgen.Queries, listing sqlcgen.Listing, enquirer uuid.UUID) sqlcgen.Conversation {
+	t.Helper()
+
+	conversation, err := q.CreateConversation(context.Background(), sqlcgen.CreateConversationParams{
+		ListingID:  listing.ID,
+		OwnerID:    listing.OwnerID,
+		EnquirerID: enquirer,
+		OpenedBy:   enquirer,
+	})
+	if err != nil {
+		t.Fatalf("fixture conversation about %q: %v", listing.Title, err)
+	}
+	return conversation
+}
+
+// Message sends body into a conversation from sender.
+func Message(t *testing.T, q *sqlcgen.Queries, conversation uuid.UUID, sender uuid.UUID, body string) sqlcgen.Message {
+	t.Helper()
+
+	message, err := q.CreateMessage(context.Background(), sqlcgen.CreateMessageParams{
+		ConversationID: conversation,
+		SenderID:       sender,
+		Body:           body,
+	})
+	if err != nil {
+		t.Fatalf("fixture message %q: %v", body, err)
+	}
+	return message
+}
+
 // Metres is a shorthand for the distance fields, which are pointers because a
 // listing may have no recorded distance and a request may state no radius.
 func Metres(m int32) *int32 { return &m }

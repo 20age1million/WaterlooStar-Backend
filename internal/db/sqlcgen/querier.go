@@ -15,6 +15,10 @@ type Querier interface {
 	// with published broken out, because "how much is live" and "how much exists"
 	// are both questions an operator asks.
 	AdminOverviewCounts(ctx context.Context) (AdminOverviewCountsRow, error)
+	// Closing, by either participant. Only an open conversation matches, so the
+	// first close's time and closer stand; no row means already closed (or not
+	// yours), and the handler re-reads.
+	CloseConversation(ctx context.Context, arg CloseConversationParams) (Conversation, error)
 	// A fresh request invalidates earlier outstanding ones, so a forwarded old email
 	// cannot still be used.
 	ConsumeAllEmailVerificationTokensForUser(ctx context.Context, userID uuid.UUID) error
@@ -24,8 +28,11 @@ type Querier interface {
 	CountAdminActions(ctx context.Context) (int64, error)
 	// The last-admin guard reads this before any demotion.
 	CountAdmins(ctx context.Context) (int64, error)
+	// The same filters, counted, so the page total describes the whole inbox.
+	CountConversationsForUser(ctx context.Context, arg CountConversationsForUserParams) (int64, error)
 	CountListings(ctx context.Context, arg CountListingsParams) (int64, error)
 	CountListingsForAdmin(ctx context.Context, arg CountListingsForAdminParams) (int64, error)
+	CountMessages(ctx context.Context, conversationID uuid.UUID) (int64, error)
 	// The same count the read queries compute inline, for the write path's
 	// responses. Visible offers only, on the same two conditions.
 	CountOffersForRequest(ctx context.Context, requestID uuid.UUID) (int64, error)
@@ -36,10 +43,28 @@ type Querier interface {
 	CountUsersByEmailOrUsername(ctx context.Context, arg CountUsersByEmailOrUsernameParams) (CountUsersByEmailOrUsernameRow, error)
 	// The same filters, counted, so the page total describes the whole match.
 	CountUsersForAdmin(ctx context.Context, arg CountUsersForAdminParams) (int64, error)
+	// Conversations between a listing's owner and a student asking about it, and
+	// their messages.
+	//
+	// Two rules shape this file:
+	//
+	//   * Only the two participants can see a conversation. Every read by id takes
+	//     the asking user as well and returns no row for anyone else, so "not
+	//     yours" and "does not exist" are the same answer, decided here rather
+	//     than in a handler that might forget.
+	//   * These are the participants' own reads, like /me/..., so they do not hide
+	//     a conversation whose listing was taken down or whose other participant
+	//     is suspended. They report it instead (listing_removed, listing_available,
+	//     counterpart_suspended) and the handler makes the conversation read-only.
+	//
+	// Unread counts and last activity are computed here from messages and the read
+	// markers, never stored.
+	CreateConversation(ctx context.Context, arg CreateConversationParams) (Conversation, error)
 	// Every lookup here filters on consumed/revoked and expiry in SQL rather than in
 	// Go, so a caller cannot forget the check and accept a spent token.
 	CreateEmailVerificationToken(ctx context.Context, arg CreateEmailVerificationTokenParams) error
 	CreateListing(ctx context.Context, arg CreateListingParams) (Listing, error)
+	CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error)
 	// An owner's answer to a request: one of their own listings, with an optional
 	// note.
 	//
@@ -58,6 +83,16 @@ type Querier interface {
 	// What cmd/seed calls before reseeding.
 	DeleteAllRequests(ctx context.Context) error
 	DeleteExpiredTokens(ctx context.Context) error
+	// The existing conversation between this student and this listing, open or
+	// closed, so starting a second one can answer 409 and name it. The unique
+	// constraint is the real guarantee.
+	GetConversationByListingAndEnquirer(ctx context.Context, arg GetConversationByListingAndEnquirerParams) (Conversation, error)
+	// One conversation, as one of its participants sees it. No row unless user_id
+	// is the owner or the enquirer.
+	// The newest message. Joined as the messages table itself, rather than as a
+	// lateral subquery, so sqlc knows its columns are null for a conversation with
+	// no messages yet.
+	GetConversationForParticipant(ctx context.Context, arg GetConversationForParticipantParams) (GetConversationForParticipantRow, error)
 	// Fetch for an ownership check. Returns the row whatever its status, so a
 	// handler can tell "not yours" from "does not exist" — and then deliberately
 	// answer 404 for both.
@@ -90,6 +125,13 @@ type Querier interface {
 	ListAdminActions(ctx context.Context, arg ListAdminActionsParams) ([]ListAdminActionsRow, error)
 	// What has been done to one account or post, newest first.
 	ListAdminActionsForSubject(ctx context.Context, arg ListAdminActionsForSubjectParams) ([]ListAdminActionsForSubjectRow, error)
+	// The inbox: both sides, newest activity first. status is 'open' or 'closed';
+	// side is 'owner' (about your own listings) or 'enquirer' (ones you asked
+	// about). Either may be null for no filter.
+	// The newest message. Joined as the messages table itself, rather than as a
+	// lateral subquery, so sqlc knows its columns are null for a conversation with
+	// no messages yet.
+	ListConversationsForUser(ctx context.Context, arg ListConversationsForUserParams) ([]ListConversationsForUserRow, error)
 	// Only published rows are ever served. Filtering here rather than in Go means a
 	// handler cannot forget and expose somebody's draft.
 	// Filtered browse. Every parameter is optional and they compose: the
@@ -117,6 +159,9 @@ type Querier interface {
 	// operator has to see what the public cannot. Reached only through the /admin
 	// guard.
 	ListListingsForAdmin(ctx context.Context, arg ListListingsForAdminParams) ([]ListListingsForAdminRow, error)
+	// A conversation's messages, newest first. The handler has already checked the
+	// caller is a participant through GetConversationForParticipant.
+	ListMessages(ctx context.Context, arg ListMessagesParams) ([]Message, error)
 	// An owner's own offers, whatever became of them.
 	ListOffersByOwner(ctx context.Context, ownerID uuid.UUID) ([]ListOffersByOwnerRow, error)
 	// The offers on a request, as the student sees them: the listing comes with it,
@@ -166,6 +211,9 @@ type Querier interface {
 	// is open in a month if it starts by the month's last day and ends on or after
 	// its first. Every month is returned, with zero where nothing is open.
 	ListingAvailabilityByMonth(ctx context.Context, arg ListingAvailabilityByMonthParams) ([]ListingAvailabilityByMonthRow, error)
+	// Moves the asking participant's read marker to now. The other side's marker
+	// is untouched. No row affected means the user is not a participant.
+	MarkConversationRead(ctx context.Context, arg MarkConversationReadParams) (int64, error)
 	MarkUserVerified(ctx context.Context, id uuid.UUID) (User, error)
 	// Health check. Trivial on purpose: it exists to prove the whole chain — pool,
 	// sqlc codegen, generated method, real round-trip — works end to end, before any
@@ -201,6 +249,9 @@ type Querier interface {
 	// account matches, so suspending one already suspended keeps the original
 	// time and reason rather than overwriting them; no row back means that.
 	SuspendUser(ctx context.Context, arg SuspendUserParams) (User, error)
+	// What is waiting for a user across every conversation they are in: messages
+	// from the other side newer than the user's own read marker.
+	UnreadCountsForUser(ctx context.Context, userID uuid.UUID) (UnreadCountsForUserRow, error)
 	// Every field is optional: an edit form sends what changed, and COALESCE leaves
 	// the rest alone. A PUT would make every omitted field a deletion.
 	UpdateListing(ctx context.Context, arg UpdateListingParams) (Listing, error)

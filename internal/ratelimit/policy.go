@@ -58,6 +58,17 @@ var (
 	// posts an hour is far more than anyone has ever needed and still leaves a
 	// spammer with a number an admin can clear up by hand.
 	WritePerUser = Rule{Name: "write_per_user", Burst: 30, Window: time.Hour}
+
+	// ConversationStartPerUser is a student contacting places in an evening,
+	// not a script messaging every listing on the site. Each start lands in
+	// someone else's inbox, so this is tighter than posting. Charged for every
+	// attempt, including one that finds a conversation already exists.
+	ConversationStartPerUser = Rule{Name: "conversation_start_per_user", Burst: 10, Window: 2 * time.Hour}
+
+	// MessagePerUser is a conversation at typing speed. There is no accept
+	// step, so this and closing a conversation are what bound an unwanted
+	// correspondent; sixty in ten minutes is more than a real exchange needs.
+	MessagePerUser = Rule{Name: "message_per_user", Burst: 60, Window: 10 * time.Minute}
 )
 
 // GlobalKey is the key every service-wide backstop shares, one per rule name.
