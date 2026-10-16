@@ -125,8 +125,10 @@ complete; its [spec](docs/specs/implemented/email-delivery/index.md) is implemen
 No backend feature is currently in flight; messaging needs a new accepted spec.
 The roadmap and README split merged in #14.
 
-**In flight:** `chore/handoff-docs` adds the documentation rule above to the skill
-library, and a `.gitattributes` that keeps `go.mod`/`go.sum` on LF.
+**In flight:** `chore/handoff-docs`
+([pull request #15](https://github.com/20age1million/WaterlooStar-Backend/pull/15))
+adds the documentation rule above to the skill library, and a `.gitattributes`
+that keeps `go.mod`/`go.sum` on LF.
 
 **Email goes through Resend**, called with `net/http` (no SDK). Clerk's
 transactional endpoint was chosen first (2026-09-25) and answered 404 with both a
