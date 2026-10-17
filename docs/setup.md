@@ -74,6 +74,15 @@ A student whose link is lost or expired asks for a new one with
 `POST /auth/verify/resend`. It spends the old link, sends only to an unverified,
 unsuspended account, and answers 202 for every address.
 
+**Message notifications need nothing new to configure.** The emails for a
+conversation opened, an address shared and a reply waiting (messaging Phase 18)
+use the same `RESEND_API_KEY` and `EMAIL_FROM`, and link to `APP_URL`'s
+`/messages/{id}`. Without a key they are printed to the log like the links
+above, after a `notification sent` line. They count against the same Resend
+quota (100 a day and 3,000 a month on the free tier); a cap in the service
+keeps them to at most 60 in any 24 hours, so verification and reset links keep
+their share. [API surface](api.md#notification-emails) has the rules.
+
 Clerk's transactional endpoint was the first choice and proved closed to the
 account (404 with both keys); [the Email Delivery spec](specs/implemented/email-delivery/index.md)
 has the record.

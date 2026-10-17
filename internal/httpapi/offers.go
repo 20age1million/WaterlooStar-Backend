@@ -136,11 +136,11 @@ func (s *Server) CreateOffer(ctx context.Context, request gen.CreateOfferRequest
 	// Two offers at once can race to open the same conversation; the unique
 	// constraint refuses the second, and one retry finds the first's.
 	var (
-		offer   sqlcgen.RequestOffer
+		made    madeOffer
 		refusal *gen.Error
 	)
 	for attempt := 0; ; attempt++ {
-		offer, refusal, err = s.makeOffer(ctx, requestRow.HousingRequest, listing, note)
+		made, refusal, err = s.makeOffer(ctx, requestRow.HousingRequest, listing, note)
 		if err == nil || !isUniqueViolation(err) || attempt > 0 {
 			break
 		}
@@ -159,12 +159,27 @@ func (s *Server) CreateOffer(ctx context.Context, request gen.CreateOfferRequest
 	if refusal != nil {
 		return gen.CreateOffer409JSONResponse(*refusal), nil
 	}
+	offer := made.offer
 
 	s.log.Info("offer made",
 		slog.String("offer_id", offer.ID.String()),
 		slog.String("request_id", requestRow.HousingRequest.ID.String()),
 		slog.String("listing_id", listing.ID.String()),
 		slog.String("conversation_id", offer.ConversationID.String()))
+
+	// An offer that opened the conversation emails the poster that they were
+	// offered a place. One that joined a conversation emails as a message
+	// does, when its note is the first message the poster has not read.
+	switch {
+	case made.opened:
+		s.notify(ctx, notification{
+			kind: notifyOfferOpened, conversationID: made.conversationID, senderID: principal.UserID,
+		})
+	case made.noteID != nil:
+		s.notify(ctx, notification{
+			kind: notifyReplyWaiting, conversationID: made.conversationID, senderID: principal.UserID, messageID: made.noteID,
+		})
+	}
 
 	return gen.CreateOffer201JSONResponse(s.offerResponse(ctx, offer, listing, principal.UserID)), nil
 }
@@ -180,17 +195,21 @@ func (s *Server) CreateOffer(ctx context.Context, request gen.CreateOfferRequest
 //
 // A non-empty note is posted in it as a message from the owner. No branch
 // touches address_shared_at: an offer reveals nothing.
-func (s *Server) makeOffer(ctx context.Context, request sqlcgen.HousingRequest, listing sqlcgen.Listing, note string) (sqlcgen.RequestOffer, *gen.Error, error) {
+func (s *Server) makeOffer(ctx context.Context, request sqlcgen.HousingRequest, listing sqlcgen.Listing, note string) (madeOffer, *gen.Error, error) {
 	var (
-		offer   sqlcgen.RequestOffer
+		made    madeOffer
 		refusal *gen.Error
 	)
 	err := s.tx(ctx, func(q sqlcgen.Querier) error {
+		// Set afresh on every attempt: a retry after a unique violation
+		// starts over.
+		made = madeOffer{}
 		conversation, err := q.GetConversationByListingAndEnquirer(ctx, sqlcgen.GetConversationByListingAndEnquirerParams{
 			ListingID: listing.ID, EnquirerID: request.PosterID,
 		})
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
+			made.opened = true
 			conversation, err = q.CreateConversation(ctx, sqlcgen.CreateConversationParams{
 				ListingID:  listing.ID,
 				OwnerID:    listing.OwnerID,
@@ -219,7 +238,8 @@ func (s *Server) makeOffer(ctx context.Context, request sqlcgen.HousingRequest, 
 			}
 		}
 
-		offer, err = q.CreateOffer(ctx, sqlcgen.CreateOfferParams{
+		made.conversationID = conversation.ID
+		offer, err := q.CreateOffer(ctx, sqlcgen.CreateOfferParams{
 			RequestID: request.ID,
 			ListingID: listing.ID,
 			OwnerID:   listing.OwnerID,
@@ -228,7 +248,7 @@ func (s *Server) makeOffer(ctx context.Context, request sqlcgen.HousingRequest, 
 		if err != nil {
 			return err
 		}
-		offer, err = q.SetOfferConversation(ctx, sqlcgen.SetOfferConversationParams{
+		made.offer, err = q.SetOfferConversation(ctx, sqlcgen.SetOfferConversationParams{
 			ConversationID: conversation.ID, ID: offer.ID,
 		})
 		if err != nil {
@@ -236,15 +256,27 @@ func (s *Server) makeOffer(ctx context.Context, request sqlcgen.HousingRequest, 
 		}
 
 		if note != "" {
-			if _, err := q.CreateMessage(ctx, sqlcgen.CreateMessageParams{
+			message, err := q.CreateMessage(ctx, sqlcgen.CreateMessageParams{
 				ConversationID: conversation.ID, SenderID: listing.OwnerID, Body: note,
-			}); err != nil {
+			})
+			if err != nil {
 				return err
 			}
+			made.noteID = &message.ID
 		}
 		return nil
 	})
-	return offer, refusal, err
+	return made, refusal, err
+}
+
+// madeOffer is what makeOffer wrote: the offer, its conversation, whether the
+// offer opened that conversation, and the note's message if one was posted.
+// The notification after the commit is decided from it.
+type madeOffer struct {
+	offer          sqlcgen.RequestOffer
+	conversationID uuid.UUID
+	opened         bool
+	noteID         *uuid.UUID
 }
 
 // --------------------------------------------------------------------- read

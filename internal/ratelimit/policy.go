@@ -76,6 +76,33 @@ var (
 	// against a client looping on the one write that reveals an address.
 	// Twenty an hour is more conversations than any owner answers.
 	ShareAddressPerUser = Rule{Name: "share_address_per_user", Burst: 20, Window: time.Hour}
+
+	// PreferencesPerUser bounds a client looping on PATCH /me/preferences. A
+	// person flips the switch a few times at most.
+	PreferencesPerUser = Rule{Name: "preferences_per_user", Burst: 20, Window: time.Hour}
+
+	// The two notification caps (messaging, Phase 18) are not route limits.
+	// The handler consults them with Allow after a write commits, keyed on the
+	// *recipient*, and going over skips the email without failing the
+	// request. The inbox still shows everything.
+	//
+	// The arithmetic matters because Resend's free tier allows 100 emails a
+	// day and 3,000 a month, shared with verification and reset links. A
+	// bucket of Burst B refilling over 24 hours can let through at most 2B in
+	// any 24 hours (a full bucket, then a full refill), and a restart starts
+	// a full bucket again.
+
+	// NotifyPerRecipient: no one receives more than twenty notification emails
+	// at once however many students write to them, then about one every 72
+	// minutes; at most forty in any 24 hours.
+	NotifyPerRecipient = Rule{Name: "notify_per_recipient", Burst: 20, Window: 24 * time.Hour}
+
+	// NotifyGlobal keeps notifications below Resend's daily cap so they cannot
+	// use up the allowance verification and reset emails need: at most sixty
+	// in any 24 hours (thirty at once, thirty more as it refills), which
+	// leaves at least forty of the free tier's hundred for account mail, and
+	// at most about 960 in a month of the 3,000.
+	NotifyGlobal = Rule{Name: "notify_global", Burst: 30, Window: 24 * time.Hour}
 )
 
 // GlobalKey is the key every service-wide backstop shares, one per rule name.

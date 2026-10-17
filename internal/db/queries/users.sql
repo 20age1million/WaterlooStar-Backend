@@ -26,3 +26,10 @@ SELECT
     count(*) FILTER (WHERE lower(email) = lower($1))    AS email_count,
     count(*) FILTER (WHERE lower(username) = lower($2)) AS username_count
 FROM users;
+
+-- The notification-email switch (messaging, Phase 18). Account mail -
+-- verification and reset links - ignores it.
+-- name: SetEmailNotifications :one
+UPDATE users SET email_notifications = sqlc.arg('email_notifications')
+WHERE id = sqlc.arg('id')
+RETURNING *;

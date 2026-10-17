@@ -68,15 +68,15 @@ func limitedHarness(t *testing.T) (*harness, *testClock) {
 	clk := newTestClock()
 	db := newFakeQuerier()
 	mail := &capturingMailer{}
-	srv := httptest.NewServer(httpapi.NewRouter(cfg, log,
-		httpapi.NewServerWithLimiter(cfg, log, db, mail, "", ratelimit.New(0, clk.Now))))
+	api := httpapi.NewServerWithLimiter(cfg, log, db, mail, "", ratelimit.New(0, clk.Now))
+	srv := httptest.NewServer(httpapi.NewRouter(cfg, log, api))
 	t.Cleanup(srv.Close)
 
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		t.Fatalf("cookiejar: %v", err)
 	}
-	return &harness{server: srv, db: db, mail: mail, client: &http.Client{Jar: jar}}, clk
+	return &harness{server: srv, db: db, mail: mail, client: &http.Client{Jar: jar}, api: api}, clk
 }
 
 // doWithHeader is harness.do with one extra header, for the forwarded client
@@ -112,6 +112,7 @@ func (h *harness) doWithHeader(t *testing.T, method, path string, body any, head
 		t.Fatalf("%s %s: %v", method, path, err)
 	}
 	t.Cleanup(func() { res.Body.Close() })
+	h.settle()
 	return res
 }
 

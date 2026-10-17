@@ -4,12 +4,13 @@
 
 **Backend:** Phases 0–14 are shipped: accounts, housing discovery and posting,
 requests and offers, rate limits, admin moderation, listing terms and email
-delivery. Messaging with contact privacy is in progress: Phase 15,
-conversations and messages, is built on `feature/messaging` (pull request
-#17), Phase 16, address privacy and sharing, on `feature/messaging-privacy`
-(#18), stacked on it, and Phase 17, offers opening conversations, on
-`feature/messaging-offers`, stacked on that. None is merged. Phase 18 (email
-notifications) follows. [Backend specs index](specs/INDEX.md).
+delivery. **Messaging with contact privacy is built** (Phases 15–18) and
+awaits merge as four stacked pull requests: Phase 15, conversations and
+messages, on `feature/messaging` (#17); Phase 16, address privacy and sharing,
+on `feature/messaging-privacy` (#18); Phase 17, offers opening conversations,
+on `feature/messaging-offers` (#19); Phase 18, email notifications, on
+`feature/messaging-notifications` (pull request to be opened). None is merged.
+[Backend specs index](specs/INDEX.md).
 
 **Frontend:** housing discovery and posting, requests and offers, session refresh,
 the housing rework and Phase 12's new verification link are shipped.
@@ -31,6 +32,8 @@ once four pieces are done: the frontend Admin Portal, frontend Phase 16 clean-up
 the backend's messaging with contact privacy, and a minimal frontend messaging
 phase. On **2026-10-16** the developer put messaging before launch: there is no
 interim contact path, and no phone number or email is published in the meantime.
+The backend's part is built (Phases 15–18, 2026-10-17, awaiting merge), so
+promotion now waits only on the frontend's three pieces and on those merges.
 The listing page's pinned mobile bar holds no phone number; the frontend
 messaging phase wires up its Message button.
 
@@ -70,6 +73,11 @@ this roadmap.
    offers needs backend Phase 17 (built on `feature/messaging-offers`, not yet
    merged: offers carry `conversation`, and the poster replies there). Before backend Phase 16 merges, the frontend
    stops reading the exact address from public listings, as a small UI fix.
+   Backend Phase 18 sends the notification emails, which link to
+   `/messages/{conversation id}`, so the thread must live at that path; the
+   phase also adds an "Email me about messages" switch
+   (`PATCH /me/preferences`, `email_notifications` on `GET /me`), because every
+   email tells the student to turn notifications off in their settings.
    Anything beyond the minimum gets its own spec later.
 4. **Photos.**
 5. **Question thread.**
@@ -79,16 +87,18 @@ this roadmap.
 
 ## Backend sequence — decided 2026-10-14, revised 2026-10-16
 
-Next is **messaging with contact privacy**, including the address rule below.
-It starts now in parallel with the frontend Admin Portal and UI/UX Overhaul.
-Since **2026-10-16** promotion waits on it. Answering an offer is part of it,
-and is built (backend Phase 17, not yet merged): an offer opens a conversation
-with the student who posted the request, who answers it there by replying
-(decided by Claude under the developer's delegation, 2026-10-16). Its spec is
-[docs/specs/active/messaging/](specs/active/messaging/index.md).
+**Messaging with contact privacy**, including the address rule below, is
+built: backend Phases 15–18, finished 2026-10-17 and awaiting merge as four
+stacked pull requests. It ran in parallel with the frontend Admin Portal and
+UI/UX Overhaul. Since **2026-10-16** promotion waits on it. Answering an offer
+is part of it (backend Phase 17): an offer opens a conversation with the
+student who posted the request, who answers it there by replying (decided by
+Claude under the developer's delegation, 2026-10-16). Email notifications are
+Phase 18. Its spec is
+[docs/specs/implemented/messaging/](specs/implemented/messaging/index.md).
 
-Then come **saves, views and the question thread**. Each feature starts with its
-own backend specification.
+Next come **saves, views and the question thread**, not yet specified. Each
+feature starts with its own backend specification.
 
 This explicitly replaces the order agreed on **2026-09-27**, which put saves,
 views and questions before messaging with contact privacy.

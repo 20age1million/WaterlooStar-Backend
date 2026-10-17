@@ -55,9 +55,10 @@ func run() error {
 	}
 	defer pool.Close()
 
+	api := httpapi.NewServer(cfg, log, pool, newMailer(cfg, log), buildVersion)
 	srv := &http.Server{
 		Addr:              cfg.Addr(),
-		Handler:           httpapi.NewRouter(cfg, log, httpapi.NewServer(cfg, log, pool, newMailer(cfg, log), buildVersion)),
+		Handler:           httpapi.NewRouter(cfg, log, api),
 		ReadHeaderTimeout: readHeaderTimeout,
 	}
 
@@ -89,6 +90,20 @@ func run() error {
 		return err
 	}
 
+	// Notification emails are sent in the background after their request
+	// has been answered. Let the ones in flight finish, within the same
+	// deadline, rather than cut them off mid-send.
+	waited := make(chan struct{})
+	go func() {
+		api.WaitForNotifications()
+		close(waited)
+	}()
+	select {
+	case <-waited:
+	case <-shutdownCtx.Done():
+		log.Warn("stopped before every notification email was sent")
+	}
+
 	log.Info("stopped")
 	return nil
 }
@@ -99,9 +114,9 @@ func run() error {
 func newMailer(cfg config.Config, log *slog.Logger) email.Sender {
 	if cfg.ResendAPIKey == "" {
 		if cfg.IsDevelopment() {
-			log.Info("email: no RESEND_API_KEY, so verification and reset links are written to this log")
+			log.Info("email: no RESEND_API_KEY, so verification and reset links and notification emails are written to this log")
 		} else {
-			log.Warn("email: no RESEND_API_KEY — verification and reset links are written to this log and reach nobody")
+			log.Warn("email: no RESEND_API_KEY — verification and reset links and notification emails are written to this log and reach nobody")
 		}
 		return email.NewLogSender(log)
 	}

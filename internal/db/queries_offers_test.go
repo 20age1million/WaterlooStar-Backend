@@ -354,11 +354,13 @@ func TestTheOfferBackfillOpensConversationsForLiveOffers(t *testing.T) {
 	q := sqlcgen.New(staged.Pool)
 	ctx := context.Background()
 
-	owner := dbtest.User(t, q, "owner@uwaterloo.ca", true)
-	banned := dbtest.User(t, q, "banned@uwaterloo.ca", true)
-	poster := dbtest.User(t, q, "poster@uwaterloo.ca", true)
-	other := dbtest.User(t, q, "other@uwaterloo.ca", true)
-	gone := dbtest.User(t, q, "gone@uwaterloo.ca", true)
+	// Users through raw SQL: the generated user queries read the latest
+	// users table, which migration 14 changed (staged.User says more).
+	owner := staged.User(t, "owner@uwaterloo.ca")
+	banned := staged.User(t, "banned@uwaterloo.ca")
+	poster := staged.User(t, "poster@uwaterloo.ca")
+	other := staged.User(t, "other@uwaterloo.ca")
+	gone := staged.User(t, "gone@uwaterloo.ca")
 
 	room := dbtest.Listing(t, q, owner.ID, dbtest.ListingOptions{Title: "Room"})
 	paused := dbtest.Listing(t, q, owner.ID, dbtest.ListingOptions{Title: "Paused room"})
@@ -383,9 +385,7 @@ func TestTheOfferBackfillOpensConversationsForLiveOffers(t *testing.T) {
 		t.Fatalf("remove request: %v", err)
 	}
 	for _, u := range []sqlcgen.User{banned, gone} {
-		if _, err := q.SuspendUser(ctx, sqlcgen.SuspendUserParams{ID: u.ID, Reason: strp("Scam")}); err != nil {
-			t.Fatalf("suspend: %v", err)
-		}
+		staged.Suspend(t, u.ID, "Scam")
 	}
 
 	// The other student already asked about "Refused" and closed the thread.
@@ -417,7 +417,7 @@ func TestTheOfferBackfillOpensConversationsForLiveOffers(t *testing.T) {
 		return id
 	}
 	live := offer(1, winter, room, "  Two doors from the library.  ", false)
-	joined := offer(2, spring, room, "   ", false)           // same listing, same poster: one conversation
+	joined := offer(2, spring, room, "   ", false)                // same listing, same poster: one conversation
 	onPaused := offer(3, winter, paused, "Paused for now", false) // the owner's own state: included
 	withdrawn := offer(4, others, room, "Withdrawn", true)
 	onTakenDown := offer(5, others, takenDown, "Taken down", false)
