@@ -15,16 +15,29 @@ RETURNING *;
 --
 -- An offer is live only while its listing is: taking a listing down withdraws
 -- its offers, with nothing else to remember. Same for an explicit withdrawal.
+--
+-- Each offer also carries the conversation it opened or joined (Phase 17):
+-- whether it is closed, and whether the request's poster has written in it,
+-- which is how an offer is answered. conversation_closed_at is null both for
+-- an open conversation and for none; o.conversation_id tells them apart.
 -- name: ListOffersForRequest :many
 SELECT
     sqlc.embed(o),
     sqlc.embed(l),
     u.username   AS owner_username,
     u.avatar_url AS owner_avatar_url,
-    u.verified   AS owner_verified
+    u.verified   AS owner_verified,
+    c.closed_at  AS conversation_closed_at,
+    EXISTS (
+        SELECT 1 FROM messages m
+        WHERE m.conversation_id = o.conversation_id
+          AND m.sender_id = r.poster_id
+    ) AS poster_replied
 FROM request_offers o
+JOIN housing_requests r ON r.id = o.request_id
 JOIN listings l ON l.id = o.listing_id
 JOIN users u    ON u.id = o.owner_id
+LEFT JOIN conversations c ON c.id = o.conversation_id
 WHERE o.request_id = sqlc.arg('request_id')
   AND o.withdrawn_at IS NULL
   AND l.status = 'published'
@@ -75,3 +88,11 @@ ORDER BY o.created_at DESC;
 -- name: GetOfferForListing :one
 SELECT * FROM request_offers
 WHERE request_id = sqlc.arg('request_id') AND listing_id = sqlc.arg('listing_id');
+
+-- Points an offer at the conversation it opened or joined. Written in the same
+-- transaction as the offer, by CreateOffer's handler; nothing else sets it.
+-- name: SetOfferConversation :one
+UPDATE request_offers
+SET conversation_id = sqlc.arg('conversation_id')::uuid
+WHERE id = sqlc.arg('id')::uuid
+RETURNING *;

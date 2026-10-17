@@ -203,24 +203,29 @@ func TestNoPublicReadCarriesTheExactAddress(t *testing.T) {
 		}
 	}
 
+	// A conversation before the owner shares, started by the enquirer.
+	started := raw(t, enquirer.do(t, http.MethodPost, "/listings/"+listingID+"/conversations",
+		map[string]string{"body": "Is it still free?"}), http.StatusCreated)
+	assertPublicShape(t, "POST /listings/{id}/conversations", started)
+	id := started.(map[string]any)["id"].(string)
+
 	// An offer: the create response and both sides' offer lists. The request's
-	// poster is the enquirer.
+	// poster is the enquirer, so the offer joins the conversation above
+	// (Phase 17) and its note becomes a message there.
 	_, request := postRequest(t, enquirer, validRequest())
 	requestID := request["id"].(string)
 	offer := raw(t, owner.do(t, http.MethodPost, "/requests/"+requestID+"/offers",
 		map[string]any{"listing_id": listingID, "note": "Near the park."}), http.StatusCreated)
 	assertPublicShape(t, "POST /requests/{id}/offers", offer)
+	if ref, _ := offer.(map[string]any)["conversation"].(map[string]any); ref == nil || ref["id"] != id {
+		t.Errorf("the offer did not join the conversation %s: %v", id, offer.(map[string]any)["conversation"])
+	}
 	for _, h := range []*harness{owner, enquirer} {
 		assertPublicShape(t, "GET /requests/{id}/offers",
 			raw(t, h.do(t, http.MethodGet, "/requests/"+requestID+"/offers", nil), http.StatusOK))
 	}
 
-	// A conversation before the owner shares: the start, the thread, both
-	// inboxes, the messages and the unread counts.
-	started := raw(t, enquirer.do(t, http.MethodPost, "/listings/"+listingID+"/conversations",
-		map[string]string{"body": "Is it still free?"}), http.StatusCreated)
-	assertPublicShape(t, "POST /listings/{id}/conversations", started)
-	id := started.(map[string]any)["id"].(string)
+	// The thread, both inboxes, the messages and the unread counts.
 	for _, h := range []*harness{owner, enquirer} {
 		assertPublicShape(t, "GET /conversations/{id}", raw(t, h.do(t, http.MethodGet, "/conversations/"+id, nil), http.StatusOK))
 		assertPublicShape(t, "GET /me/conversations", raw(t, h.do(t, http.MethodGet, "/me/conversations", nil), http.StatusOK))
@@ -533,6 +538,44 @@ func TestOnlyTheShareQuerySetsAddressSharedAt(t *testing.T) {
 	writes := sqlcWritesTo(t, "address_shared_at")
 	if len(writes) != 1 || writes[0] != "ShareConversationAddress" {
 		t.Errorf("queries that set address_shared_at: %v, want only ShareConversationAddress", writes)
+	}
+}
+
+// The same rule for the migrations. Phase 17's backfill opens conversations
+// for offers made before it, in SQL that is not a query and so escapes the
+// guard above; an offer reveals nothing, and nor may a migration. Comments
+// that name the column do not count.
+func TestNoMigrationSetsAddressSharedAt(t *testing.T) {
+	dir := filepath.Join("..", "..", "migrations")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("read %s: %v", dir, err)
+	}
+	assign := regexp.MustCompile(`(?i)\baddress_shared_at\s*=[^=]`)
+	insert := regexp.MustCompile(`(?is)\binsert\s+into\s+\w+\s*\([^)]*\baddress_shared_at\b`)
+	checked := 0
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".up.sql") {
+			continue
+		}
+		src, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		if err != nil {
+			t.Fatalf("read %s: %v", e.Name(), err)
+		}
+		var body []string
+		for _, line := range strings.Split(string(src), "\n") {
+			if !strings.HasPrefix(strings.TrimSpace(line), "--") {
+				body = append(body, line)
+			}
+		}
+		sql := strings.Join(body, "\n")
+		if assign.MatchString(sql) || insert.MatchString(sql) {
+			t.Errorf("%s writes address_shared_at; only the owner's share may", e.Name())
+		}
+		checked++
+	}
+	if checked < 13 {
+		t.Fatalf("checked %d migrations - is the path right?", checked)
 	}
 }
 

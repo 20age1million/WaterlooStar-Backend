@@ -66,23 +66,61 @@ func (f *fakeQuerier) ListOffersForRequest(_ context.Context, requestID uuid.UUI
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
+	var poster uuid.UUID
+	for _, r := range f.requests {
+		if r.ID == requestID {
+			poster = r.PosterID
+		}
+	}
+
 	rows := []sqlcgen.ListOffersForRequestRow{}
 	for _, o := range f.visibleOffers(requestID) {
 		owner := f.users[o.OwnerID]
 		for _, l := range f.listings {
 			if l.ID == o.ListingID {
-				rows = append(rows, sqlcgen.ListOffersForRequestRow{
+				row := sqlcgen.ListOffersForRequestRow{
 					RequestOffer:   o,
 					Listing:        l,
 					OwnerUsername:  owner.Username,
 					OwnerAvatarUrl: owner.AvatarUrl,
 					OwnerVerified:  owner.Verified,
-				})
+				}
+				// The left join to the conversation, and the EXISTS over its
+				// messages from the request's poster.
+				if o.ConversationID != nil {
+					for _, c := range f.conversations {
+						if c.ID == *o.ConversationID {
+							row.ConversationClosedAt = c.ClosedAt
+						}
+					}
+					for _, m := range f.messages {
+						if m.ConversationID == *o.ConversationID && m.SenderID == poster {
+							row.PosterReplied = true
+						}
+					}
+				}
+				rows = append(rows, row)
 				break
 			}
 		}
 	}
 	return rows, nil
+}
+
+func (f *fakeQuerier) SetOfferConversation(_ context.Context, arg sqlcgen.SetOfferConversationParams) (sqlcgen.RequestOffer, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	for i, o := range f.offers {
+		if o.ID == arg.ID {
+			conversation := arg.ConversationID
+			o.ConversationID = &conversation
+			o.UpdatedAt = time.Now()
+			f.offers[i] = o
+			return o, nil
+		}
+	}
+	return sqlcgen.RequestOffer{}, pgx.ErrNoRows
 }
 
 func (f *fakeQuerier) CountOffersForRequest(_ context.Context, requestID uuid.UUID) (int64, error) {

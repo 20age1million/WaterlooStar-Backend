@@ -16,7 +16,7 @@ across both; everything from Phase 4 onward is not.
 
 | Feature | Phases | Status | Location |
 |---|---|---|---|
-| [Messaging with Contact Privacy](./active/messaging/index.md) | 4 (15–18) | In progress: 15 and 16 complete | `docs/specs/active/messaging/` |
+| [Messaging with Contact Privacy](./active/messaging/index.md) | 4 (15–18) | In progress: 15, 16 and 17 complete | `docs/specs/active/messaging/` |
 
 ### Messaging with Contact Privacy
 
@@ -24,15 +24,15 @@ A verified student messages a listing's owner inside WaterlooStar, and an owner
 answers a housing request with a conversation. Nobody's email or phone is ever
 shown; the exact address reaches a student only when the owner shares it in
 their conversation. Phase 15 is built on `feature/messaging` (pull request
-#17) and Phase 16 on `feature/messaging-privacy`, stacked on it; neither is
-merged yet. Their phase docs are under `implemented/messaging/`, while
+#17), Phase 16 on `feature/messaging-privacy` (#18), stacked on it, and
+Phase 17 on `feature/messaging-offers`, stacked on that; none is merged yet. Their phase docs are under `implemented/messaging/`, while
 `index.md` and the later phases stay in `active/` until the feature is done.
 
 | Phase | Title | Status |
 |---|---|---|
 | 15 | [Conversations and messages](./implemented/messaging/phase-15-conversations.md) | Complete: start, inbox, unread counts, close; migration 11; eight endpoints |
 | 16 | [Contact privacy and address sharing](./implemented/messaging/phase-16-contact-privacy.md) | Complete: the exact address off every public read and out of search; `cross_streets`; the owner's `POST /conversations/{id}/share-address`; migration 12; one endpoint |
-| 17 | [Offers open conversations](./active/messaging/phase-17-offer-conversations.md) | Ready |
+| 17 | [Offers open conversations](./implemented/messaging/phase-17-offer-conversations.md) | Complete: an offer opens or joins a conversation with the poster, the note a message; `RequestOffer.conversation`; migration 13 with a backfill; no new endpoint |
 | 18 | [Message notifications](./active/messaging/phase-18-message-notifications.md) | Ready |
 
 ## Implemented
@@ -153,7 +153,8 @@ coordinates, and search no longer indexes the address. See
 Email Delivery is implemented (Phases 13–14). On **2026-10-14** the developer
 reordered backend work: messaging with contact privacy first, in parallel with
 the frontend Admin Portal and overhaul; then saves, views and the question
-thread. This replaces the **2026-09-27** order. Answering an offer ships with
-messaging, and since **2026-10-16** promotion waits on it. Its spec is in
+thread. This replaces the **2026-09-27** order. Answering an offer is part of
+messaging and is built (Phase 17, not yet merged); since **2026-10-16**
+promotion waits on messaging. Its spec is in
 Active. Read [the project roadmap](../ROADMAP.md) for the full sequence and
 launch goal.

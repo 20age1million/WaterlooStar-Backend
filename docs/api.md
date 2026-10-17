@@ -33,9 +33,9 @@ student surface. The admin surface is in [Admin](admin.md#endpoints).
 | POST | `/requests/{id}/status` | owner | Publish, pause or archive |
 | DELETE | `/requests/{id}` | owner | Take it down (archives) |
 | GET | `/me/requests` | session | Your own, any status |
-| POST | `/requests/{id}/offers` | verified | Answer with one of your listings |
+| POST | `/requests/{id}/offers` | verified | Answer with one of your listings; opens or joins a conversation with the poster |
 | GET | `/requests/{id}/offers` | poster or offerer | The offers on a request |
-| DELETE | `/offers/{id}` | offerer | Withdraw yours |
+| DELETE | `/offers/{id}` | offerer | Withdraw yours; its conversation stays |
 | POST | `/listings/{id}/conversations` | verified | Message a listing's owner; opens a conversation |
 | GET | `/me/conversations` | session | Your conversations, both sides, newest activity first |
 | GET | `/me/conversations/unread` | session | Unread conversation and message counts |
@@ -65,6 +65,21 @@ offer on it; an owner sees only their own. And an offer is only as alive as the
 listing behind it — taking a place down removes its offers from view, with no
 second step.
 
+**An offer opens a conversation, and the poster answers it there.** Offering a
+listing against a request opens a conversation between you and the request's
+poster about that listing, or joins the one you already have, in the same
+transaction; a non-empty note becomes your message in it. Each offer carries
+`conversation` (`id`, `status`, `poster_replied`), so a client can link to the
+thread and show which offers are still waiting on the student. Offers have no
+accept or decline: the poster replies, or refuses by closing the conversation.
+If the poster closed the conversation about that listing, offering it again
+answers 409 with `details.conversation_id`; one you closed yourself is
+reopened. Several offers of one listing to one student share a conversation.
+Withdrawing an offer leaves its conversation as it is. **An offer reveals
+nothing**: the listing in it is the public shape, and the exact address
+reaches the poster only if you share it in the conversation. You cannot offer
+against your own request (400).
+
 ## Messages
 
 A conversation is between two students about one listing: its **owner** and the
@@ -76,8 +91,12 @@ else gets 404, never 403.
   cannot open another about the same listing: there is one conversation per
   listing and enquirer, and a second start answers 409 naming the first in
   `details.conversation_id`.
+- **Either side can open it.** The enquirer from the listing page; the owner
+  by offering the listing against the enquirer's request (see offers, above).
+  A conversation the owner opened, with no note, has no messages yet:
+  `last_message` is null and `created_at` is its last activity.
 - **Opening a conversation reveals nothing.** No email, no phone number and no
-  exact address. Neither do sending, replying, reading or closing.
+  exact address. Neither do sending, replying, reading, closing or an offer.
 - **The owner shares the exact address by hand.**
   `POST /conversations/{id}/share-address` sets `address_shared_at` once and
   fills the conversation's `place` (`address_line`, `lat`, `lng`) for both
@@ -114,7 +133,7 @@ The authentication endpoints and the six write endpoints answer **429** with a
 | `POST /auth/password-reset` | the email address | 3 per hour, 30 per hour overall |
 | `POST /auth/verify/resend` | the email address | 3 per hour, 30 per hour overall |
 | `POST /auth/verify`, `POST /auth/password-reset/confirm` | the token | 10 per hour, 60 per 10 minutes overall |
-| `POST /listings`, `POST /requests`, `POST /requests/{id}/offers` | the user | 30 per hour |
+| `POST /listings`, `POST /requests`, `POST /requests/{id}/offers` | the user | 30 per hour (an offer's note is a message, and is bounded by this, not by the message limit) |
 | `POST /listings/{id}/conversations` | the user | 10 per 2 hours, including attempts that find one already exists |
 | `POST /conversations/{id}/messages` | the user | 60 per 10 minutes |
 | `POST /conversations/{id}/share-address` | the user | 20 per hour, including shares that change nothing |

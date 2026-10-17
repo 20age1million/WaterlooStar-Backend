@@ -155,14 +155,15 @@ type RefreshToken struct {
 }
 
 type RequestOffer struct {
-	ID          uuid.UUID
-	RequestID   uuid.UUID
-	ListingID   uuid.UUID
-	OwnerID     uuid.UUID
-	Note        string
-	WithdrawnAt *time.Time
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID             uuid.UUID
+	RequestID      uuid.UUID
+	ListingID      uuid.UUID
+	OwnerID        uuid.UUID
+	Note           string
+	WithdrawnAt    *time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	ConversationID *uuid.UUID
 }
 
 type User struct {
