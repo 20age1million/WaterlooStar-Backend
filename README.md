@@ -16,13 +16,13 @@ cp .env.example .env
 docker compose up -d --build         # API on localhost:8080; PostgreSQL and migrations included
 docker compose run --rm api seed     # optional: 6 listings, 5 requests; deletes every listing first
 curl localhost:8080/healthz          # {"database":"ok","status":"ok"}
-docker compose logs api             # verification and reset links without RESEND_API_KEY
+docker compose logs api             # verification and reset links, and notification emails, without RESEND_API_KEY
 ```
 
 ## Further reading
 
 - [Setup](docs/setup.md) — Docker, running from source and email configuration.
-- [API surface](docs/api.md) — student endpoints, messages, rate limits and listing terms.
+- [API surface](docs/api.md) — student endpoints, messages, notification emails, rate limits and listing terms.
 - [Admin](docs/admin.md) — admin endpoints, role creation, moderation and `cmd/admin` usage.
 - [Development](docs/development.md) — code layout, workflow, generators, checks and technical decisions.
 - [Project roadmap](docs/ROADMAP.md) — the goal, feature order and decisions for both repositories.

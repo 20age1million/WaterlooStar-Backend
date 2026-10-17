@@ -30,9 +30,12 @@ func toUser(row sqlcgen.User, includeEmail bool) gen.User {
 		CreatedAt:  row.CreatedAt,
 	}
 
+	// The user's own record: their address, and their notification switch.
 	if includeEmail {
 		email := openapi_types.Email(row.Email)
 		u.Email = &email
+		notifications := row.EmailNotifications
+		u.EmailNotifications = &notifications
 	}
 
 	if row.AvatarUrl != nil {

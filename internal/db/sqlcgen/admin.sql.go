@@ -401,7 +401,7 @@ const reinstateUser = `-- name: ReinstateUser :one
 UPDATE users
 SET suspended_at = NULL, suspended_by = NULL, suspend_reason = NULL
 WHERE id = $1 AND suspended_at IS NOT NULL
-RETURNING id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason
+RETURNING id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason, email_notifications
 `
 
 // Reinstating clears all three, so a reinstated account looks like one never
@@ -424,12 +424,13 @@ func (q *Queries) ReinstateUser(ctx context.Context, id uuid.UUID) (User, error)
 		&i.SuspendedAt,
 		&i.SuspendedBy,
 		&i.SuspendReason,
+		&i.EmailNotifications,
 	)
 	return i, err
 }
 
 const setUserRole = `-- name: SetUserRole :one
-UPDATE users SET role = $1 WHERE id = $2 RETURNING id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason
+UPDATE users SET role = $1 WHERE id = $2 RETURNING id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason, email_notifications
 `
 
 type SetUserRoleParams struct {
@@ -457,6 +458,7 @@ func (q *Queries) SetUserRole(ctx context.Context, arg SetUserRoleParams) (User,
 		&i.SuspendedAt,
 		&i.SuspendedBy,
 		&i.SuspendReason,
+		&i.EmailNotifications,
 	)
 	return i, err
 }
@@ -467,7 +469,7 @@ SET suspended_at = now(),
     suspended_by = $1,
     suspend_reason = $2
 WHERE id = $3 AND suspended_at IS NULL
-RETURNING id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason
+RETURNING id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason, email_notifications
 `
 
 type SuspendUserParams struct {
@@ -497,6 +499,7 @@ func (q *Queries) SuspendUser(ctx context.Context, arg SuspendUserParams) (User,
 		&i.SuspendedAt,
 		&i.SuspendedBy,
 		&i.SuspendReason,
+		&i.EmailNotifications,
 	)
 	return i, err
 }
@@ -504,7 +507,7 @@ func (q *Queries) SuspendUser(ctx context.Context, arg SuspendUserParams) (User,
 const verifyUserAsAdmin = `-- name: VerifyUserAsAdmin :one
 UPDATE users SET verified = true
 WHERE id = $1 AND NOT verified
-RETURNING id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason
+RETURNING id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason, email_notifications
 `
 
 // Verification by hand, for while email links only reach the log. Only an
@@ -527,6 +530,7 @@ func (q *Queries) VerifyUserAsAdmin(ctx context.Context, id uuid.UUID) (User, er
 		&i.SuspendedAt,
 		&i.SuspendedBy,
 		&i.SuspendReason,
+		&i.EmailNotifications,
 	)
 	return i, err
 }

@@ -109,6 +109,21 @@ type Querier interface {
 	GetLiveEmailVerificationToken(ctx context.Context, tokenHash []byte) (EmailVerificationToken, error)
 	GetLivePasswordResetToken(ctx context.Context, tokenHash []byte) (PasswordResetToken, error)
 	GetLiveRefreshToken(ctx context.Context, tokenHash []byte) (RefreshToken, error)
+	// Who to tell, by email, about something sender_id just did in this
+	// conversation: the other participant, with what the handler needs to decide
+	// whether to send (their switch, verification and suspension) and to write the
+	// email (their address, the sender's username, the listing's title). Read once,
+	// after the write commits. No row unless sender_id is a participant.
+	//
+	// unread_through_message is how many messages the recipient has not read, up
+	// to and including message_id: 1 means that message is the first one waiting
+	// for them, which is when a reply email is due. Counting only up to that
+	// message, rather than everything unread now, keeps two messages sent at once
+	// from each seeing the other and both staying silent. Null message_id counts
+	// nothing (0).
+	//
+	// No message body and no address is read here: the email may contain neither.
+	GetNotificationRecipient(ctx context.Context, arg GetNotificationRecipientParams) (GetNotificationRecipientRow, error)
 	// Any offer by id, for the ownership check before a withdrawal. "Not yours" and
 	// "does not exist" answer alike in the handler.
 	GetOffer(ctx context.Context, id uuid.UUID) (RequestOffer, error)
@@ -260,6 +275,9 @@ type Querier interface {
 	// actually evicts whoever prompted it.
 	RevokeAllRefreshTokensForUser(ctx context.Context, userID uuid.UUID) error
 	RevokeRefreshToken(ctx context.Context, tokenHash []byte) error
+	// The notification-email switch (messaging, Phase 18). Account mail -
+	// verification and reset links - ignores it.
+	SetEmailNotifications(ctx context.Context, arg SetEmailNotificationsParams) (User, error)
 	// published_at is set the first time a listing goes live and never moved, so
 	// re-publishing after a pause does not make an old post look new.
 	// Cast on both uses: referring to the same parameter as varchar in one place

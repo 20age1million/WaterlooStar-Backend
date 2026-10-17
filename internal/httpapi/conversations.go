@@ -122,6 +122,12 @@ func (s *Server) StartConversation(ctx context.Context, request gen.StartConvers
 		slog.String("conversation_id", conversation.ID.String()),
 		slog.String("listing_id", listing.Listing.ID.String()))
 
+	// The owner hears that someone wrote, not what they wrote. The opening
+	// message is covered by this email, not by a reply email.
+	s.notify(ctx, notification{
+		kind: notifyConversationOpened, conversationID: conversation.ID, senderID: principal.UserID,
+	})
+
 	view, err := s.conversationFor(ctx, conversation.ID, principal)
 	if err != nil {
 		s.log.Error("read started conversation", slog.String("error", err.Error()))
@@ -399,6 +405,9 @@ func (s *Server) ShareAddress(ctx context.Context, request gen.ShareAddressReque
 	}
 	if affected > 0 {
 		s.log.Info("address shared", slog.String("conversation_id", id.String()))
+		// Only the first share emails: the enquirer hears that the address
+		// is in the conversation, never the address itself.
+		s.notify(ctx, notification{kind: notifyAddressShared, conversationID: id, senderID: principal.UserID})
 	}
 	return gen.ShareAddress200JSONResponse(toConversation(shared, principal)), nil
 }
