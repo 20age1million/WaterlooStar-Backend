@@ -169,8 +169,9 @@ Phase 17, offers open conversations, is complete on
 migration 13 (`request_offers.conversation_id` and a backfill), an offer
 opening or joining a conversation with the request's poster in one
 transaction, and `RequestOffer.conversation` (`ConversationRef`: `id`,
-`status`, `poster_replied`). It is committed but **not pushed and has no pull
-request yet**; open it **with `feature/messaging-privacy` as its base**.
+`status`, `poster_replied`). It is open as
+[pull request #19](https://github.com/20age1million/WaterlooStar-Backend/pull/19)
+**with `feature/messaging-privacy` as its base**.
 **Merge order:** Phase 17 merges after Phase 16 (it is stacked on it). Its
 contract change is additive — a new field and a new schema, nothing removed or
 renamed, no status changed — so it needs **no frontend change first**; the
