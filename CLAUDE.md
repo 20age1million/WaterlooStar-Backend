@@ -202,8 +202,9 @@ participant: "wants to talk" / "offered you" when a conversation is opened,
 the recipient has not read (one per unread spell). Never the message text or
 the address. Caps: `NotifyPerRecipient` 20 and `NotifyGlobal` 30, each per 24
 hours, sized against Resend's free tier (100 a day, 3,000 a month; see
-[API surface](docs/api.md#notification-emails)). **Its pull request is to be
-opened with `feature/messaging-offers` as its base**; it merges after #19.
+[API surface](docs/api.md#notification-emails)). It is open as
+[pull request #20](https://github.com/20age1million/WaterlooStar-Backend/pull/20)
+**with `feature/messaging-offers` as its base**; it merges after #19.
 Its contract change is additive, so it needs no frontend change first. After
 it merges, the frontend messaging phase must: put the thread at
 `/messages/{conversation id}` (every email links there); add an "Email me
