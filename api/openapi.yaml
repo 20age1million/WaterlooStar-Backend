@@ -61,12 +61,16 @@ tags:
       about the same listing.
 
       A conversation never carries anyone's email or phone number. Opening one
-      reveals nothing: the exact address of a place is the owner's to share,
-      by hand, inside the conversation (a later phase adds that action). The
-      listing summary here carries no address.
+      reveals nothing, and neither does sending, replying, reading or closing.
+      The exact address of a place is shared by its **owner**, by hand, with
+      `POST /conversations/{id}/share-address`, and by nothing else. A share
+      covers that one conversation, cannot be undone, and fills the
+      conversation's `place`. The listing summary here carries no address.
 
       While the listing is taken down by a moderator, or either participant's
-      account is suspended, the conversation stays visible but read-only.
+      account is suspended, the conversation stays visible but read-only. A
+      shared `place` is withheld while the listing is taken down or its owner
+      is suspended, without being un-shared, and returns when that ends.
 
   - name: admin
     description: |
@@ -364,7 +368,9 @@ paths:
         - name: q
           in: query
           description: |
-            Full-text search over title, neighbourhood, address and description.
+            Full-text search over title, neighbourhood, cross streets and
+            description. The exact address is **not** searched: a hidden field
+            that could still be matched could be confirmed by probing.
             Supports quoted phrases and `-exclusion`.
           schema: { type: string }
         - name: start_after
@@ -1368,6 +1374,64 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /conversations/{id}/share-address:
+    post:
+      tags: [messages]
+      operationId: shareAddress
+      summary: Share the exact address with the enquirer
+      description: |
+        The listing's **owner** shares its exact address with the other
+        participant of this conversation. It is the only way the exact address
+        reaches another student: nothing else - not a reply, not opening a
+        conversation, not an offer - reveals it.
+
+        It **cannot be undone**: there is no un-share, so a client confirms
+        before calling it. It covers **this conversation only**: the same
+        student's conversation about another listing, and every other
+        student's, are unaffected.
+
+        Sharing again answers 200 with the conversation unchanged, its
+        `address_shared_at` still the first share's. The response's `place`
+        carries the address. Only the address is shared: never an email or a
+        phone number. While the listing is taken down or its owner suspended,
+        `place` is withheld (null) without the share being undone.
+
+        Participants only; anyone else gets 404.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Shared, or already shared. `place` is filled.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: |
+            You are the enquirer ("Only the owner can share the address of
+            their place."), or your address has not been confirmed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            The address cannot be shared now: the conversation is closed, the
+            enquirer's account is no longer available, the listing is not
+            available (paused, archived, a draft or taken down), or the
+            listing has no address to share. `message` says which.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /admin/overview:
     get:
       tags: [admin]
@@ -1608,7 +1672,10 @@ paths:
         - $ref: "#/components/parameters/PerPage"
         - name: q
           in: query
-          description: The same full-text search the public reads use.
+          description: |
+            The same full-text search the public reads use: title,
+            neighbourhood, cross streets and description. Not the exact
+            address, which is out of the search index.
           schema: { type: string }
         - name: status
           in: query
@@ -1996,8 +2063,8 @@ components:
         - parking
         - pets
         - laundry
-        - address_line
         - neighbourhood
+        - cross_streets
         - commute_mode
         - status
         - views
@@ -2072,16 +2139,36 @@ components:
         address_line:
           type: string
           description: |
-            Street address. Public for now; whether the exact address should
-            instead be revealed only after contact is an open product decision.
+            The exact address, house number included. Present only on your own
+            listings and on the admin surface. Everyone else sees
+            `neighbourhood` and `cross_streets`. The exact address reaches
+            another student only when you share it in your conversation with
+            them (`POST /conversations/{id}/share-address`).
         neighbourhood:
           type: string
+          description: The area the place is in. Public.
+        cross_streets:
+          type: string
+          maxLength: 80
+          example: King St N & University Ave
+          description: |
+            The nearest intersection, e.g. "King St N & University Ave". Public:
+            with `neighbourhood`, this is the approximate location everyone
+            sees. Empty when the owner has not given one.
         lat:
           type: number
           nullable: true
+          description: |
+            Part of the exact address: it locates the same door. Null on every
+            public read; present only on your own listings, on the admin
+            surface, and in a conversation's shared `place`.
         lng:
           type: number
           nullable: true
+          description: |
+            Part of the exact address: it locates the same door. Null on every
+            public read; present only on your own listings, on the admin
+            surface, and in a conversation's shared `place`.
         distance_m:
           type: integer
           nullable: true
@@ -2201,8 +2288,21 @@ components:
         parking: { type: boolean }
         pets: { type: boolean }
         laundry: { type: boolean }
-        address_line: { type: string, maxLength: 200 }
+        address_line:
+          type: string
+          maxLength: 200
+          description: |
+            Private: the exact address, house number included. Shown only to
+            you, to admins, and to a student you choose to share it with in
+            your conversation. It is not searchable.
         neighbourhood: { type: string, maxLength: 80 }
+        cross_streets:
+          type: string
+          maxLength: 80
+          example: King St N & University Ave
+          description: |
+            Public: the nearest intersection, shown with `neighbourhood` as the
+            approximate location. Trimmed; an empty string clears it.
         distance_m: { type: integer, minimum: 0, nullable: true }
         shorter_stays:
           type: boolean
@@ -2260,8 +2360,21 @@ components:
         parking: { type: boolean }
         pets: { type: boolean }
         laundry: { type: boolean }
-        address_line: { type: string, maxLength: 200 }
+        address_line:
+          type: string
+          maxLength: 200
+          description: |
+            Private: the exact address, house number included. Shown only to
+            you, to admins, and to a student you choose to share it with in
+            your conversation. It is not searchable.
         neighbourhood: { type: string, maxLength: 80 }
+        cross_streets:
+          type: string
+          maxLength: 80
+          example: King St N & University Ave
+          description: |
+            Public: the nearest intersection, shown with `neighbourhood` as the
+            approximate location. Trimmed; an empty string clears it.
         distance_m: { type: integer, minimum: 0, nullable: true }
         shorter_stays:
           type: boolean
@@ -2287,8 +2400,9 @@ components:
     ListingOwner:
       type: object
       description: |
-        Just enough about the poster to render a listing. Never their email -
-        contact details stay private until both sides agree to talk.
+        Just enough about the poster to render a listing. Never their email. A
+        listing's exact address reaches another student only when its owner
+        shares it in a conversation.
       required: [id, username, verified]
       properties:
         id:
@@ -2494,6 +2608,9 @@ components:
         - closed_at
         - closed_by_viewer
         - counterpart_available
+        - address_shared_at
+        - can_share_address
+        - place
       properties:
         id: { type: string, format: uuid }
         status:
@@ -2540,6 +2657,51 @@ components:
           description: |
             False while the other participant's account is suspended. The
             conversation stays readable, and nothing can be sent.
+        address_shared_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            When the owner shared the exact address in this conversation, or
+            null if they have not. Set once, by the owner's share and nothing
+            else, and never cleared. A client places the "address shared" event
+            in the thread by this time. It stays set while the address itself
+            is withheld (see `place`).
+        can_share_address:
+          type: boolean
+          description: |
+            You may share the exact address now: you are the listing's owner
+            and verified, the conversation is open, the enquirer's account is
+            available, the listing is available (published, not taken down),
+            and the address has not been shared here yet.
+        place:
+          description: |
+            The exact address, for both participants of this conversation only.
+            Non-null exactly when the owner has shared it here
+            (`address_shared_at` is set), the listing is not taken down and its
+            owner is not suspended. Null otherwise: before sharing, and while
+            moderation withholds it.
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/ConversationPlace"
+
+    ConversationPlace:
+      type: object
+      description: |
+        A listing's exact address, as its owner shared it in one conversation.
+        Read live from the listing, so a correction the owner makes later shows
+        here. Only the address: never an email or a phone number.
+      required: [address_line, lat, lng]
+      properties:
+        address_line:
+          type: string
+          description: The exact address, house number included.
+        lat:
+          type: number
+          nullable: true
+        lng:
+          type: number
+          nullable: true
 
     ConversationListing:
       type: object

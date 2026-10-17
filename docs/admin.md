@@ -60,3 +60,9 @@ if one is added.
 | GET | `/admin/requests` | admin | Every request, in any state |
 | POST | `/admin/requests/{id}/remove` | admin | Take a request down |
 | POST | `/admin/requests/{id}/restore` | admin | Restore it |
+
+The admin listing reads carry each listing's exact address (`address_line`,
+`lat`, `lng`), which public reads do not. Their `q` search uses the same index
+as the public one, so it matches title, neighbourhood, cross streets and
+description, not the exact address. Admins have no surface for conversations,
+so they never see which students an owner shared an address with.

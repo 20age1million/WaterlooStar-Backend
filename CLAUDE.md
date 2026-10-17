@@ -122,9 +122,11 @@ only thing that calls it.
 | 13 | Resend sender: verification and reset emails delivered through Resend; the log without a key |
 | 14 | A new verification link: `POST /auth/verify/resend`, rate-limited, the same answer for any address |
 | 15 | Conversations and messages: message a listing's owner, the inbox, unread counts, closing (on `feature/messaging`, not yet merged) |
+| 16 | Contact privacy: the exact address off public reads and search, `cross_streets`, the owner's address share (on `feature/messaging-privacy`, not yet merged) |
 
-Fifty endpoints exist, fourteen of them admin-only; eight of them are Phase
-15's messaging endpoints, not yet on `main`. Read
+Fifty-one endpoints exist, fourteen of them admin-only; nine are messaging
+endpoints not yet on `main`: eight from Phase 15 and Phase 16's
+`POST /conversations/{id}/share-address`. Read
 [API surface](docs/api.md) for student endpoints, messages and rate limits, and
 [Admin](docs/admin.md) for admin endpoints and `cmd/admin` usage.
 
@@ -141,12 +143,26 @@ messages, is complete on the branch: migration 11, eight `messages`-tag
 endpoints, two new rate limits. It is open as
 [pull request #17](https://github.com/20age1million/WaterlooStar-Backend/pull/17).
 Each later phase is a stacked pull request (decided by Claude under the
-developer's delegation, 2026-10-16): Phase 16 on `feature/messaging-privacy`
-with `feature/messaging` as its base, then 17 and 18 the same way. Next is
-Phase 16, contact privacy and address sharing, which needs the frontend to stop reading
-`address_line` from public reads before it merges (see that phase's
-Dependencies); then 17 (offers open conversations) and 18 (email
-notifications).
+developer's delegation, 2026-10-16), with the phase before as its base.
+
+Phase 16, contact privacy and address sharing, is complete on
+`feature/messaging-privacy` (branched from `feature/messaging`): migration 12,
+`cross_streets`, the exact address off every public read and out of search,
+and `POST /conversations/{id}/share-address` with its own rate limit. Its pull
+request is still to be opened, **with `feature/messaging` as its base**.
+**Merge order: the frontend's `fix/public-address` (frontend pull request #19)
+must merge to frontend `main` and deploy before Phase 16 reaches `main`.**
+Phase 16 makes `address_line` absent from public reads; a frontend that still
+reads it shows "undefined" on cards. Drone deploys each repository from `main`
+on its own, so nothing else enforces this order. After it merges, the frontend
+regenerates its types (`Listing.address_line` optional; `cross_streets`;
+`Conversation.place`, `address_shared_at`, `can_share_address`), adds a
+cross-streets field to the listing form and shows it where it shows the
+neighbourhood, and its messaging phase adds the owner's "Share exact address"
+action with a confirmation; the full list is the spec's "Frontend impact".
+
+Next is Phase 17 (offers open conversations), stacked on
+`feature/messaging-privacy`, then 18 (email notifications).
 
 **Email goes through Resend**, called with `net/http` (no SDK). Clerk's
 transactional endpoint was chosen first (2026-09-25) and answered 404 with both a
@@ -174,8 +190,10 @@ then an admin can verify accounts by hand.
   cut scope rather than move the date. The community forum is outside this
   roadmap. (The launch gate was revised on 2026-10-16; see below.)
 - Address privacy is settled: approximate location publicly, exact address
-  later, designed with messaging (how it is revealed: 2026-10-16, below). The
-  current public address is an implementation gap, not an open product decision.
+  later, designed with messaging (how it is revealed: 2026-10-16, below).
+  Implemented in messaging Phase 16: public reads show `neighbourhood` and
+  `cross_streets`; the exact address is the owner's to share in one
+  conversation.
 - Create the first admin on the host with `cmd/admin promote`; existing admins
   grant every later admin through the portal's `POST /admin/users/{id}/role`.
   Both backend paths already exist.
@@ -227,10 +245,28 @@ then an admin can verify accounts by hand.
   a listing its owner paused or archived does not stop a conversation; only a
   moderator's takedown or a suspended counterpart makes it read-only (the
   phase doc's Implementation Notes say why).
+  During Phase 16, also decided by Claude under the developer's delegation,
+  2026-10-16, taking the most conservative reading each time: sharing is
+  refused (409) while the enquirer is suspended and while the listing is
+  paused, archived or a draft, not only when it is taken down; a shared
+  address stays in a closed conversation (closing un-shares nothing); and
+  both participants see `place`, the owner included. Sharing also got a rate
+  limit (20 an hour) that the phase doc had not planned, at the implementation
+  brief's request.
 
 ---
 
 ## Rules that bind
+
+- **The exact address is never on a public read, and only the owner reveals
+  it.** `address_line` and coordinates come only from owner reads, admin reads
+  and a conversation whose owner pressed share (`address_shared_at`);
+  `toListing`'s `exact` flag is set explicitly at every call site. The search
+  index does not contain the address. No email or phone is ever revealed.
+  `contact_privacy_test.go` decodes every public read as raw JSON and fails
+  on an `address_line` key, a non-null coordinate, or any email or phone
+  field; `TestOnlyTheShareQuerySetsAddressSharedAt` fails if any query but
+  `ShareConversationAddress` writes `address_shared_at`.
 
 - **The API never invents a bill figure.** `bills_estimate_cents` is the owner's
   number or null; `all_in_cents` is null when it is. Filters and sorts on all-in
@@ -346,6 +382,22 @@ These were all found the hard way and will silently regress if undone.
   table itself (`LEFT JOIN messages lm ON lm.id = (SELECT ... LIMIT 1)`) and
   sqlc makes the columns pointers. Check the generated row type whenever a
   query left-joins anything other than a table.
+- **sqlc types a `CASE ... END` column as `interface{}`.** Phase 16's reveal
+  condition was first written as a `CASE` per column and would have reached
+  the handlers untyped. It is a second `LEFT JOIN listings pl ON ... AND
+  c.address_shared_at IS NOT NULL AND l.removed_at IS NULL AND
+  o.suspended_at IS NULL` instead, whose columns sqlc makes pointers. Check
+  the generated row type after writing any computed column.
+- **`gen.Listing.AddressLine` is a pointer with `omitempty`.** Leaving it nil
+  is what makes the key absent, not null, on public reads. A new field on
+  `Listing` that belongs to the exact address must be set only inside
+  `toListing`'s `if exact` block, and the guard in `contact_privacy_test.go`
+  extended to it.
+- **The search column decides what `q` can find, on the admin surface too.**
+  Migration 12 rebuilt `listings.search` without `address_line`; the admin
+  listing search reads the same column, so an admin cannot search by street
+  either. A field added to the index can be confirmed by probing even if it
+  is hidden from every response.
 - **The fake's conversations run on a strictly increasing clock** (`tick` in
   `internal/httpapi/fake_querier_conversations_test.go`). Unread counts compare
   a message's time with a read marker, and with the wall clock two calls in a

@@ -141,6 +141,13 @@ var limitedRoutes = []limitedRoute{
 		perKey:  ratelimit.MessagePerUser,
 		message: "You are sending messages very quickly. Try again in %s.",
 	},
+	{
+		// The one write that reveals an exact address. Sharing again is a
+		// no-op that still costs, so a looping client meets this.
+		method: http.MethodPost, path: "/conversations/:id/share-address", kind: keyByUser,
+		perKey:  ratelimit.ShareAddressPerUser,
+		message: "You have shared your address a lot in a short time. Try again in %s.",
+	},
 }
 
 // loginRouteKey is the context key under which the middleware leaves the login

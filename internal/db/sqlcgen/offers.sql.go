@@ -127,7 +127,7 @@ func (q *Queries) GetOfferForListing(ctx context.Context, arg GetOfferForListing
 const listOffersByOwner = `-- name: ListOffersByOwner :many
 SELECT
     o.id, o.request_id, o.listing_id, o.owner_id, o.note, o.withdrawn_at, o.created_at, o.updated_at,
-    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.search, l.published_at, l.removed_at, l.removed_by, l.removed_reason, l.shorter_stays, l.min_stay_months, l.bills_estimate_cents
+    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.published_at, l.removed_at, l.removed_by, l.removed_reason, l.shorter_stays, l.min_stay_months, l.bills_estimate_cents, l.cross_streets, l.search
 FROM request_offers o
 JOIN listings l ON l.id = o.listing_id
 WHERE o.owner_id = $1
@@ -194,7 +194,6 @@ func (q *Queries) ListOffersByOwner(ctx context.Context, ownerID uuid.UUID) ([]L
 			&i.Listing.Saves,
 			&i.Listing.CreatedAt,
 			&i.Listing.UpdatedAt,
-			&i.Listing.Search,
 			&i.Listing.PublishedAt,
 			&i.Listing.RemovedAt,
 			&i.Listing.RemovedBy,
@@ -202,6 +201,8 @@ func (q *Queries) ListOffersByOwner(ctx context.Context, ownerID uuid.UUID) ([]L
 			&i.Listing.ShorterStays,
 			&i.Listing.MinStayMonths,
 			&i.Listing.BillsEstimateCents,
+			&i.Listing.CrossStreets,
+			&i.Listing.Search,
 		); err != nil {
 			return nil, err
 		}
@@ -216,7 +217,7 @@ func (q *Queries) ListOffersByOwner(ctx context.Context, ownerID uuid.UUID) ([]L
 const listOffersForRequest = `-- name: ListOffersForRequest :many
 SELECT
     o.id, o.request_id, o.listing_id, o.owner_id, o.note, o.withdrawn_at, o.created_at, o.updated_at,
-    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.search, l.published_at, l.removed_at, l.removed_by, l.removed_reason, l.shorter_stays, l.min_stay_months, l.bills_estimate_cents,
+    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.published_at, l.removed_at, l.removed_by, l.removed_reason, l.shorter_stays, l.min_stay_months, l.bills_estimate_cents, l.cross_streets, l.search,
     u.username   AS owner_username,
     u.avatar_url AS owner_avatar_url,
     u.verified   AS owner_verified
@@ -299,7 +300,6 @@ func (q *Queries) ListOffersForRequest(ctx context.Context, requestID uuid.UUID)
 			&i.Listing.Saves,
 			&i.Listing.CreatedAt,
 			&i.Listing.UpdatedAt,
-			&i.Listing.Search,
 			&i.Listing.PublishedAt,
 			&i.Listing.RemovedAt,
 			&i.Listing.RemovedBy,
@@ -307,6 +307,8 @@ func (q *Queries) ListOffersForRequest(ctx context.Context, requestID uuid.UUID)
 			&i.Listing.ShorterStays,
 			&i.Listing.MinStayMonths,
 			&i.Listing.BillsEstimateCents,
+			&i.Listing.CrossStreets,
+			&i.Listing.Search,
 			&i.OwnerUsername,
 			&i.OwnerAvatarUrl,
 			&i.OwnerVerified,
