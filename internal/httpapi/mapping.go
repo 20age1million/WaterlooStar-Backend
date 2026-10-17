@@ -65,10 +65,18 @@ const (
 
 // toListing maps a listing row, its owner and its photos to the contract shape.
 //
+// exact says whether the response may carry the exact address: address_line,
+// lat and lng. It is explicit rather than inferred, as includeEmail is for
+// toUser, so that exposing an address takes a deliberate `true` at the call
+// site. Only the owner's own reads and the admin surface pass true; every
+// public read passes false, and then address_line is absent and the
+// coordinates are null. A conversation reveals the address through its own
+// place, never through this.
+//
 // Nothing is formatted here: no date range string, no "1 of 4 bed", no price
 // label. Those are the frontend's business, and inventing them server-side is
 // what the prototype's type layer did wrong.
-func toListing(row sqlcgen.Listing, owner gen.ListingOwner, photos []sqlcgen.ListingPhoto) gen.Listing {
+func toListing(row sqlcgen.Listing, owner gen.ListingOwner, photos []sqlcgen.ListingPhoto, exact bool) gen.Listing {
 	out := gen.Listing{
 		Id:            openapi_types.UUID(row.ID),
 		Title:         row.Title,
@@ -90,11 +98,11 @@ func toListing(row sqlcgen.Listing, owner gen.ListingOwner, photos []sqlcgen.Lis
 		Parking:       row.Parking,
 		Pets:          row.Pets,
 		Laundry:       row.Laundry,
-		AddressLine:   row.AddressLine,
 		Neighbourhood: row.Neighbourhood,
+		CrossStreets:  row.CrossStreets,
 
-		Lat:              nullableFloat(row.Lat),
-		Lng:              nullableFloat(row.Lng),
+		Lat:              nullable.NewNullNullable[float32](),
+		Lng:              nullable.NewNullNullable[float32](),
 		DistanceM:        nullableInt(row.DistanceM),
 		CommuteMinutes:   nullableInt(row.CommuteMinutes),
 		CommuteMode:      gen.ListingCommuteMode(row.CommuteMode),
@@ -125,6 +133,13 @@ func toListing(row sqlcgen.Listing, owner gen.ListingOwner, photos []sqlcgen.Lis
 	out.BillsEstimateCents = nullableInt(row.BillsEstimateCents)
 	out.AllInCents = nullableInt(allInCents(row))
 	out.Removal = removalFrom(row.RemovedAt, row.RemovedReason)
+
+	if exact {
+		address := row.AddressLine
+		out.AddressLine = &address
+		out.Lat = nullableFloat(row.Lat)
+		out.Lng = nullableFloat(row.Lng)
+	}
 
 	return out
 }
@@ -245,6 +260,11 @@ type conversationRow struct {
 	CounterpartAvatarUrl *string
 	CounterpartVerified  bool
 	CounterpartSuspended bool
+	// The exact address, non-nil only when the query's reveal condition held:
+	// shared here, the listing not taken down, its owner not suspended.
+	PlaceAddressLine     *string
+	PlaceLat             *float64
+	PlaceLng             *float64
 	LastMessageSenderID  *uuid.UUID
 	LastMessageBody      *string
 	LastMessageCreatedAt *time.Time
@@ -298,6 +318,23 @@ func toConversation(r conversationRow, viewer auth.Principal) gen.Conversation {
 		LastMessage:          nullable.NewNullNullable[gen.MessagePreview](),
 		ClosedAt:             nullable.NewNullNullable[time.Time](),
 		ClosedByViewer:       nullable.NewNullNullable[bool](),
+		AddressSharedAt:      nullable.NewNullNullable[time.Time](),
+		CanShareAddress: viewer.Verified && c.OwnerID == viewer.UserID &&
+			c.AddressSharedAt == nil && shareRefusal(r) == "",
+		Place: nullable.NewNullNullable[gen.ConversationPlace](),
+	}
+
+	if c.AddressSharedAt != nil {
+		out.AddressSharedAt = nullable.NewNullableWithValue(*c.AddressSharedAt)
+	}
+	// The place comes only from the query's reveal columns. The listing summary
+	// above carries no address, so this is the one way it reaches a response.
+	if r.PlaceAddressLine != nil {
+		out.Place = nullable.NewNullableWithValue(gen.ConversationPlace{
+			AddressLine: *r.PlaceAddressLine,
+			Lat:         nullableFloat(r.PlaceLat),
+			Lng:         nullableFloat(r.PlaceLng),
+		})
 	}
 
 	if c.ClosedAt != nil {

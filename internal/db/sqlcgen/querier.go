@@ -56,6 +56,9 @@ type Querier interface {
 	//     a conversation whose listing was taken down or whose other participant
 	//     is suspended. They report it instead (listing_removed, listing_available,
 	//     counterpart_suspended) and the handler makes the conversation read-only.
+	//   * The exact address appears only in the place_* columns, only once the
+	//     owner has shared it (address_shared_at), and is withheld while the
+	//     listing is taken down or its owner suspended.
 	//
 	// Unread counts and last activity are computed here from messages and the read
 	// markers, never stored.
@@ -89,6 +92,12 @@ type Querier interface {
 	GetConversationByListingAndEnquirer(ctx context.Context, arg GetConversationByListingAndEnquirerParams) (Conversation, error)
 	// One conversation, as one of its participants sees it. No row unless user_id
 	// is the owner or the enquirer.
+	// The reveal condition. The listing again, matched only once the owner has
+	// shared its address in this conversation, and not while the listing is taken
+	// down or its owner suspended: withheld, never un-shared, so reinstating
+	// restores it. It is in the SQL, as the public read filters are, so no handler
+	// can forget it. A join rather than a CASE because sqlc types a CASE column as
+	// interface{}, and a left-joined table's columns as pointers.
 	// The newest message. Joined as the messages table itself, rather than as a
 	// lateral subquery, so sqlc knows its columns are null for a conversation with
 	// no messages yet.
@@ -128,6 +137,12 @@ type Querier interface {
 	// The inbox: both sides, newest activity first. status is 'open' or 'closed';
 	// side is 'owner' (about your own listings) or 'enquirer' (ones you asked
 	// about). Either may be null for no filter.
+	// The reveal condition. The listing again, matched only once the owner has
+	// shared its address in this conversation, and not while the listing is taken
+	// down or its owner suspended: withheld, never un-shared, so reinstating
+	// restores it. It is in the SQL, as the public read filters are, so no handler
+	// can forget it. A join rather than a CASE because sqlc types a CASE column as
+	// interface{}, and a left-joined table's columns as pointers.
 	// The newest message. Joined as the messages table itself, rather than as a
 	// lateral subquery, so sqlc knows its columns are null for a conversation with
 	// no messages yet.
@@ -245,6 +260,14 @@ type Querier interface {
 	// A role change. Only cmd/admin calls it in this phase; the portal gains it in
 	// Phase 10. Always paired with InsertAdminAction in one transaction.
 	SetUserRole(ctx context.Context, arg SetUserRoleParams) (User, error)
+	// The owner shares the listing's exact address in this conversation: the
+	// one write that sets address_shared_at, and the only way the address reaches
+	// another student. Set once - a share already made matches nothing, so its
+	// time stands - and only by the owner, while the conversation is open, the
+	// enquirer's account is available, the listing is available to the public and
+	// it has an address to share. No row affected means already shared, refused,
+	// or not this owner's; the handler re-reads and says which.
+	ShareConversationAddress(ctx context.Context, arg ShareConversationAddressParams) (int64, error)
 	// Suspension sets the time, the actor and the reason together. Only an active
 	// account matches, so suspending one already suspended keeps the original
 	// time and reason rather than overwriting them; no row back means that.

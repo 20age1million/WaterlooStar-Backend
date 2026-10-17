@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -27,6 +28,8 @@ import (
 //     student who may be the one reporting it, and nothing is rewritten, so
 //     reinstating restores it.
 //   - Opening a conversation reveals nothing: no email, no phone, no address.
+//     The exact address reaches the enquirer only through ShareAddress, the
+//     owner's explicit act, and only in that one conversation.
 
 // ------------------------------------------------------------------- start
 
@@ -306,6 +309,117 @@ func (s *Server) CloseConversation(ctx context.Context, request gen.CloseConvers
 		return nil, err
 	}
 	return gen.CloseConversation200JSONResponse(view), nil
+}
+
+// ------------------------------------------------------------ share address
+
+// ShareAddress is the owner sharing the listing's exact address with the
+// enquirer of this one conversation. It is the only thing that sets
+// address_shared_at, and so the only way the address reaches another student.
+// It cannot be undone, and sharing again answers 200 with nothing changed.
+func (s *Server) ShareAddress(ctx context.Context, request gen.ShareAddressRequestObject) (gen.ShareAddressResponseObject, error) {
+	principal, ok := auth.PrincipalFrom(ctx)
+	if !ok {
+		return gen.ShareAddress401JSONResponse{
+			UnauthorizedJSONResponse: gen.UnauthorizedJSONResponse(
+				errorBody(apierror.CodeUnauthorized, "Log in to share an address.")),
+		}, nil
+	}
+	id := uuid.UUID(request.Id)
+
+	// Participants first, so a stranger gets 404 and learns nothing else.
+	row, err := s.queries.GetConversationForParticipant(ctx, sqlcgen.GetConversationForParticipantParams{
+		UserID: principal.UserID, ID: id,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return gen.ShareAddress404JSONResponse{NotFoundJSONResponse: conversationNotFound()}, nil
+		}
+		s.log.Error("load conversation to share", slog.String("error", err.Error()))
+		return nil, err
+	}
+	conversation := conversationRowFromGet(row)
+
+	if conversation.Conversation.OwnerID != principal.UserID {
+		return gen.ShareAddress403JSONResponse(errorBody(apierror.CodeForbidden,
+			"Only the owner can share the address of their place.")), nil
+	}
+	if !principal.Verified {
+		return gen.ShareAddress403JSONResponse(errorBody(apierror.CodeForbidden,
+			"Confirm your uwaterloo.ca address before sharing your address.")), nil
+	}
+
+	// Already shared: the caller wanted it shared, and it is. Nothing changes,
+	// and the first share's time stands.
+	if conversation.Conversation.AddressSharedAt != nil {
+		return gen.ShareAddress200JSONResponse(toConversation(conversation, principal)), nil
+	}
+
+	if reason := shareRefusal(conversation); reason != "" {
+		return gen.ShareAddress409JSONResponse(errorBody(apierror.CodeConflict, reason)), nil
+	}
+
+	// The listing's address is read here only to refuse an empty one; it is
+	// never put in a response from this read.
+	listing, err := s.queries.GetListingForOwner(ctx, conversation.Conversation.ListingID)
+	if err != nil {
+		s.log.Error("load listing to share", slog.String("error", err.Error()))
+		return nil, err
+	}
+	if strings.TrimSpace(listing.AddressLine) == "" {
+		return gen.ShareAddress409JSONResponse(errorBody(apierror.CodeConflict, noAddressToShare)), nil
+	}
+
+	// The query repeats every condition, so a change between the read above
+	// and this write cannot share what should not be shared.
+	affected, err := s.queries.ShareConversationAddress(ctx, sqlcgen.ShareConversationAddressParams{
+		ID: id, OwnerID: principal.UserID,
+	})
+	if err != nil {
+		s.log.Error("share address", slog.String("error", err.Error()))
+		return nil, err
+	}
+
+	after, err := s.queries.GetConversationForParticipant(ctx, sqlcgen.GetConversationForParticipantParams{
+		UserID: principal.UserID, ID: id,
+	})
+	if err != nil {
+		s.log.Error("read shared conversation", slog.String("error", err.Error()))
+		return nil, err
+	}
+	shared := conversationRowFromGet(after)
+	if shared.Conversation.AddressSharedAt == nil {
+		// Something changed between the read and the write: say what, if the
+		// re-read shows it.
+		reason := shareRefusal(shared)
+		if reason == "" {
+			reason = "The address cannot be shared in this conversation now."
+		}
+		return gen.ShareAddress409JSONResponse(errorBody(apierror.CodeConflict, reason)), nil
+	}
+	if affected > 0 {
+		s.log.Info("address shared", slog.String("conversation_id", id.String()))
+	}
+	return gen.ShareAddress200JSONResponse(toConversation(shared, principal)), nil
+}
+
+// noAddressToShare is the refusal when the listing has no exact address.
+const noAddressToShare = "Add the exact address to your listing before sharing it."
+
+// shareRefusal says why the owner cannot share the address in this
+// conversation now, or "" when they can. It is the rule can_share_address
+// reports, so the two cannot disagree. Whether it was already shared is not a
+// refusal: sharing again succeeds with nothing changed.
+func shareRefusal(c conversationRow) string {
+	switch {
+	case c.Conversation.ClosedAt != nil:
+		return "This conversation was closed."
+	case c.CounterpartSuspended:
+		return "This account is no longer available."
+	case c.ListingRemoved || !c.ListingAvailable:
+		return "This listing is not available, so its address cannot be shared."
+	}
+	return ""
 }
 
 // --------------------------------------------------------------- shared bits
