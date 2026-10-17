@@ -148,8 +148,9 @@ developer's delegation, 2026-10-16), with the phase before as its base.
 Phase 16, contact privacy and address sharing, is complete on
 `feature/messaging-privacy` (branched from `feature/messaging`): migration 12,
 `cross_streets`, the exact address off every public read and out of search,
-and `POST /conversations/{id}/share-address` with its own rate limit. Its pull
-request is still to be opened, **with `feature/messaging` as its base**.
+and `POST /conversations/{id}/share-address` with its own rate limit. It is open
+as [pull request #18](https://github.com/20age1million/WaterlooStar-Backend/pull/18),
+**with `feature/messaging` as its base**.
 **Merge order: the frontend's `fix/public-address` (frontend pull request #19)
 must merge to frontend `main` and deploy before Phase 16 reaches `main`.**
 Phase 16 makes `address_line` absent from public reads; a frontend that still
