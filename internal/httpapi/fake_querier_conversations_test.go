@@ -260,6 +260,22 @@ func (f *fakeQuerier) CloseConversation(_ context.Context, arg sqlcgen.CloseConv
 	return sqlcgen.Conversation{}, pgx.ErrNoRows
 }
 
+// ReopenConversation matches only a conversation closed by its owner, as the
+// SQL does. It touches nothing else.
+func (f *fakeQuerier) ReopenConversation(_ context.Context, arg sqlcgen.ReopenConversationParams) (sqlcgen.Conversation, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	for i, c := range f.conversations {
+		if c.ID == arg.ID && c.OwnerID == arg.OwnerID && c.ClosedBy != nil && *c.ClosedBy == arg.OwnerID {
+			c.ClosedAt, c.ClosedBy, c.UpdatedAt = nil, nil, f.tick()
+			f.conversations[i] = c
+			return c, nil
+		}
+	}
+	return sqlcgen.Conversation{}, pgx.ErrNoRows
+}
+
 // ShareConversationAddress keeps the SQL's conditions: the owner only, once,
 // while open, with the enquirer active and the listing available and
 // addressed.

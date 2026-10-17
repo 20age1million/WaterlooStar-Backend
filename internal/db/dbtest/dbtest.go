@@ -53,6 +53,49 @@ The tests never touch that database itself — each one creates and drops its ow
 // untested.
 func New(t *testing.T) *pgxpool.Pool {
 	t.Helper()
+	dsn := freshDatabase(t)
+	if err := migrateTo(dsn, 0); err != nil {
+		t.Fatalf("migrate test database: %v", err)
+	}
+	return openPool(t, dsn)
+}
+
+// Staged is a test database held at an earlier schema version, so a test can
+// put rows in place before a migration and check what the migration did to
+// them - a backfill, above all. Its pool works at any version, but the
+// generated queries only match the latest schema: seed a table the later
+// migration changes with raw SQL through Pool.
+type Staged struct {
+	Pool *pgxpool.Pool
+	dsn  string
+}
+
+// NewAt is New stopped at version: migrations after it are not applied until
+// MigrateTo.
+func NewAt(t *testing.T, version uint) *Staged {
+	t.Helper()
+	dsn := freshDatabase(t)
+	if err := migrateTo(dsn, version); err != nil {
+		t.Fatalf("migrate test database to %d: %v", version, err)
+	}
+	return &Staged{Pool: openPool(t, dsn), dsn: dsn}
+}
+
+// MigrateTo moves the staged database to version, up or down; 0 is the
+// latest. Rows already in it go through the migrations as real data would.
+func (s *Staged) MigrateTo(t *testing.T, version uint) {
+	t.Helper()
+	if err := migrateTo(s.dsn, version); err != nil {
+		t.Fatalf("migrate staged database to %d: %v", version, err)
+	}
+	// The pool's connections cached the old schema's statements and types.
+	s.Pool.Reset()
+}
+
+// freshDatabase creates an empty database belonging to this test, dropped
+// when it ends, and returns its DSN. Skips when no server is configured.
+func freshDatabase(t *testing.T) string {
+	t.Helper()
 
 	adminDSN := strings.TrimSpace(os.Getenv(DSNEnv))
 	if adminDSN == "" {
@@ -78,23 +121,9 @@ func New(t *testing.T) *pgxpool.Pool {
 	}
 	_ = admin.Close(ctx)
 
-	dsn, err := withDatabase(adminDSN, name)
-	if err != nil {
-		t.Fatalf("build test DSN: %v", err)
-	}
-
-	if err := migrateUp(dsn); err != nil {
-		t.Fatalf("migrate test database: %v", err)
-	}
-
-	pool, err := pgxpool.New(ctx, dsn)
-	if err != nil {
-		t.Fatalf("open pool on test database: %v", err)
-	}
-
+	// Registered before the pool's cleanup, so it runs after it: cleanups run
+	// last-in, first-out.
 	t.Cleanup(func() {
-		pool.Close()
-
 		// A separate context: the test's may already be cancelled, and the
 		// database has to go regardless or the server collects rubbish.
 		dropCtx, dropCancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -113,6 +142,23 @@ func New(t *testing.T) *pgxpool.Pool {
 		}
 	})
 
+	dsn, err := withDatabase(adminDSN, name)
+	if err != nil {
+		t.Fatalf("build test DSN: %v", err)
+	}
+	return dsn
+}
+
+// openPool opens a pool on dsn, closed when the test ends.
+func openPool(t *testing.T, dsn string) *pgxpool.Pool {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open pool on test database: %v", err)
+	}
+	t.Cleanup(pool.Close)
 	return pool
 }
 
@@ -139,7 +185,9 @@ func withDatabase(dsn, name string) (string, error) {
 		cfg.User, cfg.Password, host, cfg.Port, name), nil
 }
 
-func migrateUp(dsn string) error {
+// migrateTo applies or rolls back migrations until the database is at
+// version; 0 means every migration there is.
+func migrateTo(dsn string, version uint) error {
 	// An io/fs source rather than a "file://" URL: golang-migrate parses that
 	// URL, and a Windows path — with its drive letter and backslashes — does
 	// not survive the round trip. A directory handle has no such opinion.
@@ -154,7 +202,12 @@ func migrateUp(dsn string) error {
 	}
 	defer func() { _, _ = m.Close() }()
 
-	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+	if version == 0 {
+		err = m.Up()
+	} else {
+		err = m.Migrate(version)
+	}
+	if err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("apply migrations: %w", err)
 	}
 	return nil

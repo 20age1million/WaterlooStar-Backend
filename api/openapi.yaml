@@ -60,8 +60,17 @@ tags:
       listing and enquirer, so closing also stops that enquirer opening another
       about the same listing.
 
+      A conversation is opened from either side. The enquirer opens one from
+      the listing page (`POST /listings/{id}/conversations`). The owner opens
+      one by **offering** the listing against the enquirer's housing request
+      (`POST /requests/{id}/offers`): the request's poster becomes the
+      enquirer, the offer's note becomes the owner's first message, and the
+      poster answers the offer by replying. An offer joins the conversation the
+      two already have about that listing rather than opening a second one.
+
       A conversation never carries anyone's email or phone number. Opening one
-      reveals nothing, and neither does sending, replying, reading or closing.
+      reveals nothing, and neither does sending, replying, reading, closing or
+      making an offer.
       The exact address of a place is shared by its **owner**, by hand, with
       `POST /conversations/{id}/share-address`, and by nothing else. A share
       covers that one conversation, cannot be undone, and fills the
@@ -990,6 +999,14 @@ paths:
 
         An offer disappears here when its listing stops being published, so
         taking a place down withdraws its offers with nothing else to remember.
+
+        Each offer carries `conversation`: the conversation between the
+        request's poster and the offering owner about the offered listing,
+        which the offer opened or joined. The poster answers an offer by
+        replying there; `poster_replied` turns true once they have. Offers have
+        no accept or decline of their own. An offer reveals no address: the
+        listing here is the public shape, and the owner shares the exact
+        address in the conversation, by hand, or not at all.
       parameters:
         - name: id
           in: path
@@ -1020,7 +1037,27 @@ paths:
         If you have nothing suitable posted, post the listing first and then
         offer it - two calls, which a client can present as one flow.
 
-        The same listing cannot be offered twice against one request.
+        The same listing cannot be offered twice against one request, and you
+        cannot answer your own request.
+
+        Offering also opens a conversation with the request's poster about the
+        offered listing, in the same transaction, and the response's
+        `conversation` names it:
+
+        - **No conversation yet:** a new one, opened by you. A non-empty note
+          is its first message; with no note it starts empty.
+        - **An open one** (whoever started it): the offer joins it, and a
+          non-empty note is posted there as a message from you.
+        - **One you closed:** it is reopened and joined.
+        - **One the poster closed:** refused with 409. Closing is how a
+          student refuses contact about a listing, and an offer does not get
+          round it.
+
+        Several offers can share one conversation: offering the same listing
+        against two requests by one student joins the same thread. An offer
+        reveals nothing: not your email, and not the exact address, which you
+        share in the conversation by hand
+        (`POST /conversations/{id}/share-address`) or not at all.
       parameters:
         - name: id
           in: path
@@ -1059,7 +1096,11 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404": { $ref: "#/components/responses/NotFound" }
         "409":
-          description: That listing has already been offered against this request.
+          description: |
+            That listing has already been offered against this request
+            (withdrawn or not), or the request's poster has closed the
+            conversation about this listing. The second carries
+            `details.conversation_id`.
           content:
             application/json:
               schema:
@@ -1074,6 +1115,10 @@ paths:
       summary: Withdraw your offer
       description: |
         Only the owner who made it. Someone else's offer answers 404, never 403.
+
+        Withdrawing leaves the offer's conversation as it is: it stays open,
+        its messages stay, and a shared address stays shared. The offer
+        revealed nothing, so there is nothing to take back.
       parameters:
         - name: id
           in: path
@@ -2576,16 +2621,55 @@ components:
         An owner's answer to a request: one of their own listings, with an
         optional note. The listing travels with the offer, so the student sees
         a real place rather than a pitch.
-      required: [id, request_id, note, created_at, listing, owner]
+
+        An offer has no status of its own - no accept, no decline. The poster
+        answers it by replying in its `conversation`, or refuses it by closing
+        that conversation.
+      required: [id, request_id, note, created_at, listing, owner, conversation]
       properties:
         id: { type: string, format: uuid }
         request_id: { type: string, format: uuid }
-        note: { type: string }
+        note:
+          type: string
+          description: |
+            The owner's note, as offered. A non-empty note is also posted as a
+            message in the offer's conversation.
         created_at: { type: string, format: date-time }
         listing:
           $ref: "#/components/schemas/Listing"
         owner:
           $ref: "#/components/schemas/ListingOwner"
+        conversation:
+          description: |
+            The conversation this offer opened or joined, between the request's
+            poster and the offering owner about this listing. Both of them may
+            open it with `GET /conversations/{id}`. Every offer made since
+            offers opened conversations has one, and so does every earlier
+            offer that was live then. Null only for an older offer the backfill
+            could not give one - one hidden by moderation at the time, or one
+            made against its owner's own request - or if the conversation is
+            ever deleted.
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/ConversationRef"
+
+    ConversationRef:
+      type: object
+      description: |
+        Enough of a conversation to link to it and to say whether an offer is
+        still waiting on the student, without loading the conversation. It
+        carries no messages and no address.
+      required: [id, status, poster_replied]
+      properties:
+        id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [open, closed]
+        poster_replied:
+          type: boolean
+          description: |
+            The request's poster has sent at least one message in this
+            conversation. False means the offer is still waiting on them.
 
     Conversation:
       type: object
@@ -2627,7 +2711,13 @@ components:
           description: You own the listing; the counterpart is the enquirer.
         opened_by_viewer:
           type: boolean
-          description: You started this conversation.
+          description: |
+            You started this conversation. A conversation the owner started
+            came from an offer on the enquirer's housing request: an enquirer
+            seeing `viewer_is_owner: false` and `opened_by_viewer: false` is
+            looking at one. It may have no messages, when the offer had no
+            note; `last_message` is then null and `created_at` is its last
+            activity.
         can_send:
           type: boolean
           description: |

@@ -184,6 +184,11 @@ type Querier interface {
 	//
 	// An offer is live only while its listing is: taking a listing down withdraws
 	// its offers, with nothing else to remember. Same for an explicit withdrawal.
+	//
+	// Each offer also carries the conversation it opened or joined (Phase 17):
+	// whether it is closed, and whether the request's poster has written in it,
+	// which is how an offer is answered. conversation_closed_at is null both for
+	// an open conversation and for none; o.conversation_id tells them apart.
 	ListOffersForRequest(ctx context.Context, requestID uuid.UUID) ([]ListOffersForRequestRow, error)
 	ListPhotosForListing(ctx context.Context, listingID uuid.UUID) ([]ListingPhoto, error)
 	// Photos for a page of listings in one round-trip, rather than one query per
@@ -241,6 +246,14 @@ type Querier interface {
 	// cannot overwrite the first one's time and reason; no row back means that.
 	RemoveListing(ctx context.Context, arg RemoveListingParams) (Listing, error)
 	RemoveRequest(ctx context.Context, arg RemoveRequestParams) (HousingRequest, error)
+	// Reopening, for one case only: the owner offers the listing against a
+	// request by the student they had closed this conversation with, so the offer
+	// joins it. Only a conversation closed by that owner matches. One the
+	// enquirer closed never does: closing is how a student refuses contact about
+	// a listing, and an offer must not get round it. Reopening touches nothing
+	// else - not the read markers, and never address_shared_at. No row means it
+	// was not closed by this owner.
+	ReopenConversation(ctx context.Context, arg ReopenConversationParams) (Conversation, error)
 	RestoreListing(ctx context.Context, id uuid.UUID) (Listing, error)
 	RestoreRequest(ctx context.Context, id uuid.UUID) (HousingRequest, error)
 	// Used on password change: every existing session is ended, so a password reset
@@ -253,6 +266,9 @@ type Querier interface {
 	// and ::text in another makes PostgreSQL refuse to deduce a type for it
 	// (SQLSTATE 42P08).
 	SetListingStatus(ctx context.Context, arg SetListingStatusParams) (Listing, error)
+	// Points an offer at the conversation it opened or joined. Written in the same
+	// transaction as the offer, by CreateOffer's handler; nothing else sets it.
+	SetOfferConversation(ctx context.Context, arg SetOfferConversationParams) (RequestOffer, error)
 	// Cast on both uses of the parameter: referring to it as varchar in one place
 	// and ::text in another makes PostgreSQL refuse to deduce a type (SQLSTATE
 	// 42P08). That shipped once already on listings.
