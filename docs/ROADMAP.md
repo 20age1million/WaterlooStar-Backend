@@ -6,9 +6,10 @@
 requests and offers, rate limits, admin moderation, listing terms and email
 delivery. Messaging with contact privacy is in progress: Phase 15,
 conversations and messages, is built on `feature/messaging` (pull request
-#17), and Phase 16, address privacy and sharing, on `feature/messaging-privacy`,
-stacked on it. Neither is merged. Phases 17–18 (offers opening conversations,
-email notifications) follow. [Backend specs index](specs/INDEX.md).
+#17), Phase 16, address privacy and sharing, on `feature/messaging-privacy`
+(#18), stacked on it, and Phase 17, offers opening conversations, on
+`feature/messaging-offers`, stacked on that. None is merged. Phase 18 (email
+notifications) follows. [Backend specs index](specs/INDEX.md).
 
 **Frontend:** housing discovery and posting, requests and offers, session refresh,
 the housing rework and Phase 12's new verification link are shipped.
@@ -66,7 +67,8 @@ this roadmap.
    conversation; and replying to an offer. It restores the header's Messages
    link that Phase 16 removes and fills the Desk home's messages skeleton. It
    can start once backend messaging Phases 15–16 are on `main`; replying to
-   offers needs backend Phase 17. Before backend Phase 16 merges, the frontend
+   offers needs backend Phase 17 (built on `feature/messaging-offers`, not yet
+   merged: offers carry `conversation`, and the poster replies there). Before backend Phase 16 merges, the frontend
    stops reading the exact address from public listings, as a small UI fix.
    Anything beyond the minimum gets its own spec later.
 4. **Photos.**
@@ -79,10 +81,10 @@ this roadmap.
 
 Next is **messaging with contact privacy**, including the address rule below.
 It starts now in parallel with the frontend Admin Portal and UI/UX Overhaul.
-Since **2026-10-16** promotion waits on it. Answering an offer ships with it:
-an offer opens a conversation with the student who posted the request, who
-answers it there (decided by Claude under the developer's delegation,
-2026-10-16). Its spec is
+Since **2026-10-16** promotion waits on it. Answering an offer is part of it,
+and is built (backend Phase 17, not yet merged): an offer opens a conversation
+with the student who posted the request, who answers it there by replying
+(decided by Claude under the developer's delegation, 2026-10-16). Its spec is
 [docs/specs/active/messaging/](specs/active/messaging/index.md).
 
 Then come **saves, views and the question thread**. Each feature starts with its

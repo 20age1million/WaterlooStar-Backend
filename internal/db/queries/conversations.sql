@@ -190,6 +190,21 @@ WHERE id = sqlc.arg('id')::uuid
   AND sqlc.arg('user_id')::uuid IN (owner_id, enquirer_id)
 RETURNING *;
 
+-- Reopening, for one case only: the owner offers the listing against a
+-- request by the student they had closed this conversation with, so the offer
+-- joins it. Only a conversation closed by that owner matches. One the
+-- enquirer closed never does: closing is how a student refuses contact about
+-- a listing, and an offer must not get round it. Reopening touches nothing
+-- else - not the read markers, and never address_shared_at. No row means it
+-- was not closed by this owner.
+-- name: ReopenConversation :one
+UPDATE conversations
+SET closed_at = NULL, closed_by = NULL
+WHERE id = sqlc.arg('id')::uuid
+  AND closed_by = sqlc.arg('owner_id')::uuid
+  AND owner_id = sqlc.arg('owner_id')::uuid
+RETURNING *;
+
 -- The owner shares the listing's exact address in this conversation: the
 -- one write that sets address_shared_at, and the only way the address reaches
 -- another student. Set once - a share already made matches nothing, so its

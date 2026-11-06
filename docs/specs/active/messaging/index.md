@@ -1,7 +1,7 @@
 # Messaging with Contact Privacy — API Phases 15–18
 
-**Status:** In progress: Phases 15 and 16 complete
-**Branch:** `feature/messaging` (Phase 15); each later phase stacks on the one before (`feature/messaging-privacy` for 16)
+**Status:** In progress: Phases 15, 16 and 17 complete
+**Branch:** `feature/messaging` (Phase 15); each later phase stacks on the one before (`feature/messaging-privacy` for 16, `feature/messaging-offers` for 17)
 **Ticket / Work Item:** N/A
 **Owner(s):** WaterlooStar backend
 **Date:** 2026-10-15 (first draft); accepted 2026-10-16
@@ -42,7 +42,7 @@ Everyone else sees an approximate location.
   with messaging *(per `docs/ROADMAP.md`, "Address privacy")*. The public
   address was an implementation gap, not an open decision; Phase 16 closes it.
 - **Answering an offer waits on this** *(per `docs/ROADMAP.md`, backend
-  sequence)*. Phase 7 left out accept and decline because "accepting promises a
+  sequence; built in Phase 17)*. Phase 7 left out accept and decline because "accepting promises a
   conversation the product cannot host yet" *(per
   `docs/specs/implemented/housing-requests/index.md`)*.
 - **Why now:** it is the next backend feature *(per `docs/ROADMAP.md`,
@@ -296,7 +296,7 @@ is "a frontend messaging phase" here.
 |---|---|---|---|
 | [15 — Conversations and messages](../../implemented/messaging/phase-15-conversations.md) | Start a conversation about a listing, the inbox, messages, closing, unread counts | Complete | `docs/specs/implemented/messaging/` |
 | [16 — Contact privacy and address sharing](../../implemented/messaging/phase-16-contact-privacy.md) | Exact address and coordinates off every public read and out of search; the owner shares the address in a conversation | Complete | `docs/specs/implemented/messaging/` |
-| [17 — Offers open conversations](./phase-17-offer-conversations.md) | An offer opens or joins a conversation with the request's poster, who answers it there | Ready | `docs/specs/active/messaging/` |
+| [17 — Offers open conversations](../../implemented/messaging/phase-17-offer-conversations.md) | An offer opens or joins a conversation with the request's poster, who answers it there | Complete | `docs/specs/implemented/messaging/` |
 | [18 — Message notifications](./phase-18-message-notifications.md) | Email when a conversation is opened, the address is shared, or a first reply waits unread | Ready | `docs/specs/active/messaging/` |
 
 Phase 15 is additive and changes nothing the frontend uses today. Phase 16 is

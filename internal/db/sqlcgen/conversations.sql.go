@@ -545,6 +545,47 @@ func (q *Queries) MarkConversationRead(ctx context.Context, arg MarkConversation
 	return result.RowsAffected(), nil
 }
 
+const reopenConversation = `-- name: ReopenConversation :one
+UPDATE conversations
+SET closed_at = NULL, closed_by = NULL
+WHERE id = $1::uuid
+  AND closed_by = $2::uuid
+  AND owner_id = $2::uuid
+RETURNING id, listing_id, owner_id, enquirer_id, opened_by, closed_at, closed_by, owner_read_at, enquirer_read_at, created_at, updated_at, address_shared_at
+`
+
+type ReopenConversationParams struct {
+	ID      uuid.UUID
+	OwnerID uuid.UUID
+}
+
+// Reopening, for one case only: the owner offers the listing against a
+// request by the student they had closed this conversation with, so the offer
+// joins it. Only a conversation closed by that owner matches. One the
+// enquirer closed never does: closing is how a student refuses contact about
+// a listing, and an offer must not get round it. Reopening touches nothing
+// else - not the read markers, and never address_shared_at. No row means it
+// was not closed by this owner.
+func (q *Queries) ReopenConversation(ctx context.Context, arg ReopenConversationParams) (Conversation, error) {
+	row := q.db.QueryRow(ctx, reopenConversation, arg.ID, arg.OwnerID)
+	var i Conversation
+	err := row.Scan(
+		&i.ID,
+		&i.ListingID,
+		&i.OwnerID,
+		&i.EnquirerID,
+		&i.OpenedBy,
+		&i.ClosedAt,
+		&i.ClosedBy,
+		&i.OwnerReadAt,
+		&i.EnquirerReadAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AddressSharedAt,
+	)
+	return i, err
+}
+
 const shareConversationAddress = `-- name: ShareConversationAddress :execrows
 UPDATE conversations c
 SET address_shared_at = now()

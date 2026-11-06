@@ -123,10 +123,12 @@ only thing that calls it.
 | 14 | A new verification link: `POST /auth/verify/resend`, rate-limited, the same answer for any address |
 | 15 | Conversations and messages: message a listing's owner, the inbox, unread counts, closing (on `feature/messaging`, not yet merged) |
 | 16 | Contact privacy: the exact address off public reads and search, `cross_streets`, the owner's address share (on `feature/messaging-privacy`, not yet merged) |
+| 17 | Offers open conversations: an offer opens or joins a conversation with the request's poster, `RequestOffer.conversation`, a backfill (on `feature/messaging-offers`, not yet merged) |
 
 Fifty-one endpoints exist, fourteen of them admin-only; nine are messaging
 endpoints not yet on `main`: eight from Phase 15 and Phase 16's
-`POST /conversations/{id}/share-address`. Read
+`POST /conversations/{id}/share-address`. Phase 17 added no endpoint; it
+changed `POST /requests/{id}/offers` and `GET /requests/{id}/offers`. Read
 [API surface](docs/api.md) for student endpoints, messages and rate limits, and
 [Admin](docs/admin.md) for admin endpoints and `cmd/admin` usage.
 
@@ -162,8 +164,28 @@ cross-streets field to the listing form and shows it where it shows the
 neighbourhood, and its messaging phase adds the owner's "Share exact address"
 action with a confirmation; the full list is the spec's "Frontend impact".
 
-Next is Phase 17 (offers open conversations), stacked on
-`feature/messaging-privacy`, then 18 (email notifications).
+Phase 17, offers open conversations, is complete on
+`feature/messaging-offers` (branched from `feature/messaging-privacy`):
+migration 13 (`request_offers.conversation_id` and a backfill), an offer
+opening or joining a conversation with the request's poster in one
+transaction, and `RequestOffer.conversation` (`ConversationRef`: `id`,
+`status`, `poster_replied`). It is open as
+[pull request #19](https://github.com/20age1million/WaterlooStar-Backend/pull/19)
+**with `feature/messaging-privacy` as its base**.
+**Merge order:** Phase 17 merges after Phase 16 (it is stacked on it). Its
+contract change is additive — a new field and a new schema, nothing removed or
+renamed, no status changed — so it needs **no frontend change first**; the
+frontend's offer code reads only `id`, `request_id`, `note`, `created_at`,
+`listing` and `owner`. One behaviour change a client can meet: offering
+against your own request now answers 400 (the frontend never shows the offer
+panel to the poster), and an offer can now answer 409 when the poster closed
+the conversation (the frontend shows the envelope's message already). After
+it merges, the frontend regenerates its types and its messaging phase links
+each offer to `conversation.id` ("Reply") and uses `poster_replied` for the
+Desk home's waiting offers.
+
+Next is Phase 18 (email notifications), stacked on
+`feature/messaging-offers`.
 
 **Email goes through Resend**, called with `net/http` (no SDK). Clerk's
 transactional endpoint was chosen first (2026-09-25) and answered 404 with both a
@@ -177,7 +199,8 @@ Read [the project roadmap](docs/ROADMAP.md) before choosing or specifying the
 next feature. On 2026-10-14 the developer moved messaging with contact privacy
 first, ahead of saves, views and the question thread, replacing the order agreed
 on 2026-09-27. It starts in parallel with the frontend Admin Portal and overhaul;
-answering an offer ships with it, and since 2026-10-16 promotion waits on it.
+answering an offer is part of it and is built (Phase 17: the poster replies in
+the offer's conversation), and since 2026-10-16 promotion waits on it.
 The messaging spec is in `docs/specs/active/messaging/`. The frontend's new
 verification-link form has
 already shipped. Real email needs `RESEND_API_KEY` in the host env file; until
@@ -254,6 +277,13 @@ then an admin can verify accounts by hand.
   both participants see `place`, the owner included. Sharing also got a rate
   limit (20 an hour) that the phase doc had not planned, at the implementation
   brief's request.
+  During Phase 17, also decided by Claude under the developer's delegation,
+  2026-10-16, taking the most conservative reading: the backfill gives no
+  conversation to an offer hidden by moderation (listing or request taken
+  down, owner or poster suspended), so nothing moderation hid lands in an
+  inbox as new; it posts no note into a closed conversation; and an owner can
+  no longer offer against their own request (400), because a conversation
+  cannot be with yourself. Such offers keep `conversation: null`.
 
 ---
 
@@ -389,6 +419,22 @@ These were all found the hard way and will silently regress if undone.
   c.address_shared_at IS NOT NULL AND l.removed_at IS NULL AND
   o.suspended_at IS NULL` instead, whose columns sqlc makes pointers. Check
   the generated row type after writing any computed column.
+- **An offer is a conversation write.** `CreateOffer` runs `makeOffer` in
+  one `s.tx`: open, join or reopen the (listing, poster) conversation, write
+  the offer, `SetOfferConversation`, and post the note as a message. A
+  conversation the poster closed refuses the offer (409); one the owner closed
+  is reopened (`ReopenConversation` matches only `closed_by = owner`).
+  Withdrawing touches no conversation. No offer path, and no migration, may
+  write `address_shared_at`; `TestNoMigrationSetsAddressSharedAt` extends the
+  share-only guard to `migrations/`.
+- **sqlc reads the migrations, temporary tables included.** Migration 13's
+  backfill first left a `CREATE TEMPORARY TABLE offer_backfill` undropped, and
+  sqlc generated an `OfferBackfill` model for it. Drop any helper table at the
+  end of the migration that makes it.
+- **A backfill is tested by staging the database.** `dbtest.NewAt(t, 12)`
+  holds a test database at version 12; seed it, then `staged.MigrateTo(t, 13)`
+  and assert. The generated queries match only the latest schema, so seed a
+  table the migration changes with raw SQL through `staged.Pool`.
 - **`gen.Listing.AddressLine` is a pointer with `omitempty`.** Leaving it nil
   is what makes the key absent, not null, on public reads. A new field on
   `Listing` that belongs to the exact address must be set only inside

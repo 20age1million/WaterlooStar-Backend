@@ -7,6 +7,7 @@ package sqlcgen
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -36,7 +37,7 @@ const createOffer = `-- name: CreateOffer :one
 
 INSERT INTO request_offers (request_id, listing_id, owner_id, note)
 VALUES ($1, $2, $3, $4)
-RETURNING id, request_id, listing_id, owner_id, note, withdrawn_at, created_at, updated_at
+RETURNING id, request_id, listing_id, owner_id, note, withdrawn_at, created_at, updated_at, conversation_id
 `
 
 type CreateOfferParams struct {
@@ -69,12 +70,13 @@ func (q *Queries) CreateOffer(ctx context.Context, arg CreateOfferParams) (Reque
 		&i.WithdrawnAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ConversationID,
 	)
 	return i, err
 }
 
 const getOffer = `-- name: GetOffer :one
-SELECT id, request_id, listing_id, owner_id, note, withdrawn_at, created_at, updated_at FROM request_offers WHERE id = $1
+SELECT id, request_id, listing_id, owner_id, note, withdrawn_at, created_at, updated_at, conversation_id FROM request_offers WHERE id = $1
 `
 
 // Any offer by id, for the ownership check before a withdrawal. "Not yours" and
@@ -91,12 +93,13 @@ func (q *Queries) GetOffer(ctx context.Context, id uuid.UUID) (RequestOffer, err
 		&i.WithdrawnAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ConversationID,
 	)
 	return i, err
 }
 
 const getOfferForListing = `-- name: GetOfferForListing :one
-SELECT id, request_id, listing_id, owner_id, note, withdrawn_at, created_at, updated_at FROM request_offers
+SELECT id, request_id, listing_id, owner_id, note, withdrawn_at, created_at, updated_at, conversation_id FROM request_offers
 WHERE request_id = $1 AND listing_id = $2
 `
 
@@ -120,13 +123,14 @@ func (q *Queries) GetOfferForListing(ctx context.Context, arg GetOfferForListing
 		&i.WithdrawnAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ConversationID,
 	)
 	return i, err
 }
 
 const listOffersByOwner = `-- name: ListOffersByOwner :many
 SELECT
-    o.id, o.request_id, o.listing_id, o.owner_id, o.note, o.withdrawn_at, o.created_at, o.updated_at,
+    o.id, o.request_id, o.listing_id, o.owner_id, o.note, o.withdrawn_at, o.created_at, o.updated_at, o.conversation_id,
     l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.published_at, l.removed_at, l.removed_by, l.removed_reason, l.shorter_stays, l.min_stay_months, l.bills_estimate_cents, l.cross_streets, l.search
 FROM request_offers o
 JOIN listings l ON l.id = o.listing_id
@@ -158,6 +162,7 @@ func (q *Queries) ListOffersByOwner(ctx context.Context, ownerID uuid.UUID) ([]L
 			&i.RequestOffer.WithdrawnAt,
 			&i.RequestOffer.CreatedAt,
 			&i.RequestOffer.UpdatedAt,
+			&i.RequestOffer.ConversationID,
 			&i.Listing.ID,
 			&i.Listing.OwnerID,
 			&i.Listing.Title,
@@ -216,14 +221,22 @@ func (q *Queries) ListOffersByOwner(ctx context.Context, ownerID uuid.UUID) ([]L
 
 const listOffersForRequest = `-- name: ListOffersForRequest :many
 SELECT
-    o.id, o.request_id, o.listing_id, o.owner_id, o.note, o.withdrawn_at, o.created_at, o.updated_at,
+    o.id, o.request_id, o.listing_id, o.owner_id, o.note, o.withdrawn_at, o.created_at, o.updated_at, o.conversation_id,
     l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.published_at, l.removed_at, l.removed_by, l.removed_reason, l.shorter_stays, l.min_stay_months, l.bills_estimate_cents, l.cross_streets, l.search,
     u.username   AS owner_username,
     u.avatar_url AS owner_avatar_url,
-    u.verified   AS owner_verified
+    u.verified   AS owner_verified,
+    c.closed_at  AS conversation_closed_at,
+    EXISTS (
+        SELECT 1 FROM messages m
+        WHERE m.conversation_id = o.conversation_id
+          AND m.sender_id = r.poster_id
+    ) AS poster_replied
 FROM request_offers o
+JOIN housing_requests r ON r.id = o.request_id
 JOIN listings l ON l.id = o.listing_id
 JOIN users u    ON u.id = o.owner_id
+LEFT JOIN conversations c ON c.id = o.conversation_id
 WHERE o.request_id = $1
   AND o.withdrawn_at IS NULL
   AND l.status = 'published'
@@ -234,11 +247,13 @@ ORDER BY o.created_at DESC
 `
 
 type ListOffersForRequestRow struct {
-	RequestOffer   RequestOffer
-	Listing        Listing
-	OwnerUsername  string
-	OwnerAvatarUrl *string
-	OwnerVerified  bool
+	RequestOffer         RequestOffer
+	Listing              Listing
+	OwnerUsername        string
+	OwnerAvatarUrl       *string
+	OwnerVerified        bool
+	ConversationClosedAt *time.Time
+	PosterReplied        bool
 }
 
 // The offers on a request, as the student sees them: the listing comes with it,
@@ -246,6 +261,11 @@ type ListOffersForRequestRow struct {
 //
 // An offer is live only while its listing is: taking a listing down withdraws
 // its offers, with nothing else to remember. Same for an explicit withdrawal.
+//
+// Each offer also carries the conversation it opened or joined (Phase 17):
+// whether it is closed, and whether the request's poster has written in it,
+// which is how an offer is answered. conversation_closed_at is null both for
+// an open conversation and for none; o.conversation_id tells them apart.
 func (q *Queries) ListOffersForRequest(ctx context.Context, requestID uuid.UUID) ([]ListOffersForRequestRow, error) {
 	rows, err := q.db.Query(ctx, listOffersForRequest, requestID)
 	if err != nil {
@@ -264,6 +284,7 @@ func (q *Queries) ListOffersForRequest(ctx context.Context, requestID uuid.UUID)
 			&i.RequestOffer.WithdrawnAt,
 			&i.RequestOffer.CreatedAt,
 			&i.RequestOffer.UpdatedAt,
+			&i.RequestOffer.ConversationID,
 			&i.Listing.ID,
 			&i.Listing.OwnerID,
 			&i.Listing.Title,
@@ -312,6 +333,8 @@ func (q *Queries) ListOffersForRequest(ctx context.Context, requestID uuid.UUID)
 			&i.OwnerUsername,
 			&i.OwnerAvatarUrl,
 			&i.OwnerVerified,
+			&i.ConversationClosedAt,
+			&i.PosterReplied,
 		); err != nil {
 			return nil, err
 		}
@@ -323,11 +346,42 @@ func (q *Queries) ListOffersForRequest(ctx context.Context, requestID uuid.UUID)
 	return items, nil
 }
 
+const setOfferConversation = `-- name: SetOfferConversation :one
+UPDATE request_offers
+SET conversation_id = $1::uuid
+WHERE id = $2::uuid
+RETURNING id, request_id, listing_id, owner_id, note, withdrawn_at, created_at, updated_at, conversation_id
+`
+
+type SetOfferConversationParams struct {
+	ConversationID uuid.UUID
+	ID             uuid.UUID
+}
+
+// Points an offer at the conversation it opened or joined. Written in the same
+// transaction as the offer, by CreateOffer's handler; nothing else sets it.
+func (q *Queries) SetOfferConversation(ctx context.Context, arg SetOfferConversationParams) (RequestOffer, error) {
+	row := q.db.QueryRow(ctx, setOfferConversation, arg.ConversationID, arg.ID)
+	var i RequestOffer
+	err := row.Scan(
+		&i.ID,
+		&i.RequestID,
+		&i.ListingID,
+		&i.OwnerID,
+		&i.Note,
+		&i.WithdrawnAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ConversationID,
+	)
+	return i, err
+}
+
 const withdrawOffer = `-- name: WithdrawOffer :one
 UPDATE request_offers
 SET withdrawn_at = now()
 WHERE id = $1 AND withdrawn_at IS NULL
-RETURNING id, request_id, listing_id, owner_id, note, withdrawn_at, created_at, updated_at
+RETURNING id, request_id, listing_id, owner_id, note, withdrawn_at, created_at, updated_at, conversation_id
 `
 
 // Withdrawn rather than deleted: the row stays, so the same listing cannot be
@@ -344,6 +398,7 @@ func (q *Queries) WithdrawOffer(ctx context.Context, id uuid.UUID) (RequestOffer
 		&i.WithdrawnAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ConversationID,
 	)
 	return i, err
 }
