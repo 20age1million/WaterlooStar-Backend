@@ -185,7 +185,7 @@ func (s *Server) ListOffers(ctx context.Context, request gen.ListOffersRequestOb
 				Username:  row.OwnerUsername,
 				AvatarUrl: nullableString(row.OwnerAvatarUrl),
 				Verified:  row.OwnerVerified,
-			}, nil),
+			}, nil, false), // the request's poster sees the public shape
 			Owner: gen.ListingOwner{
 				Id:        openapi_types.UUID(row.RequestOffer.OwnerID),
 				Username:  row.OwnerUsername,
@@ -250,7 +250,9 @@ func (s *Server) offerResponse(ctx context.Context, offer sqlcgen.RequestOffer, 
 		RequestId: openapi_types.UUID(offer.RequestID),
 		Note:      offer.Note,
 		CreatedAt: offer.CreatedAt,
-		Listing:   toListing(listing, owner, nil),
-		Owner:     owner,
+		// false: an offer reveals nothing. The owner shares the address in a
+		// conversation, by hand, or not at all.
+		Listing: toListing(listing, owner, nil, false),
+		Owner:   owner,
 	}
 }

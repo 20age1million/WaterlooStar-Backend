@@ -11,6 +11,9 @@
 --     a conversation whose listing was taken down or whose other participant
 --     is suspended. They report it instead (listing_removed, listing_available,
 --     counterpart_suspended) and the handler makes the conversation read-only.
+--   * The exact address appears only in the place_* columns, only once the
+--     owner has shared it (address_shared_at), and is withheld while the
+--     listing is taken down or its owner suspended.
 --
 -- Unread counts and last activity are computed here from messages and the read
 -- markers, never stored.
@@ -52,6 +55,10 @@ SELECT
     cp.avatar_url AS counterpart_avatar_url,
     cp.verified   AS counterpart_verified,
     (cp.suspended_at IS NOT NULL)::bool AS counterpart_suspended,
+    -- The exact address: null unless the reveal join below matched.
+    pl.address_line AS place_address_line,
+    pl.lat          AS place_lat,
+    pl.lng          AS place_lng,
     lm.sender_id  AS last_message_sender_id,
     lm.body       AS last_message_body,
     lm.created_at AS last_message_created_at,
@@ -66,6 +73,16 @@ FROM conversations c
 JOIN listings l ON l.id = c.listing_id
 JOIN users o    ON o.id = c.owner_id
 JOIN users cp   ON cp.id = CASE WHEN c.owner_id = sqlc.arg('user_id')::uuid THEN c.enquirer_id ELSE c.owner_id END
+-- The reveal condition. The listing again, matched only once the owner has
+-- shared its address in this conversation, and not while the listing is taken
+-- down or its owner suspended: withheld, never un-shared, so reinstating
+-- restores it. It is in the SQL, as the public read filters are, so no handler
+-- can forget it. A join rather than a CASE because sqlc types a CASE column as
+-- interface{}, and a left-joined table's columns as pointers.
+LEFT JOIN listings pl ON pl.id = c.listing_id
+    AND c.address_shared_at IS NOT NULL
+    AND l.removed_at IS NULL
+    AND o.suspended_at IS NULL
 -- The newest message. Joined as the messages table itself, rather than as a
 -- lateral subquery, so sqlc knows its columns are null for a conversation with
 -- no messages yet.
@@ -96,6 +113,10 @@ SELECT
     cp.avatar_url AS counterpart_avatar_url,
     cp.verified   AS counterpart_verified,
     (cp.suspended_at IS NOT NULL)::bool AS counterpart_suspended,
+    -- The exact address: null unless the reveal join below matched.
+    pl.address_line AS place_address_line,
+    pl.lat          AS place_lat,
+    pl.lng          AS place_lng,
     lm.sender_id  AS last_message_sender_id,
     lm.body       AS last_message_body,
     lm.created_at AS last_message_created_at,
@@ -110,6 +131,16 @@ FROM conversations c
 JOIN listings l ON l.id = c.listing_id
 JOIN users o    ON o.id = c.owner_id
 JOIN users cp   ON cp.id = CASE WHEN c.owner_id = sqlc.arg('user_id')::uuid THEN c.enquirer_id ELSE c.owner_id END
+-- The reveal condition. The listing again, matched only once the owner has
+-- shared its address in this conversation, and not while the listing is taken
+-- down or its owner suspended: withheld, never un-shared, so reinstating
+-- restores it. It is in the SQL, as the public read filters are, so no handler
+-- can forget it. A join rather than a CASE because sqlc types a CASE column as
+-- interface{}, and a left-joined table's columns as pointers.
+LEFT JOIN listings pl ON pl.id = c.listing_id
+    AND c.address_shared_at IS NOT NULL
+    AND l.removed_at IS NULL
+    AND o.suspended_at IS NULL
 -- The newest message. Joined as the messages table itself, rather than as a
 -- lateral subquery, so sqlc knows its columns are null for a conversation with
 -- no messages yet.
@@ -158,6 +189,30 @@ WHERE id = sqlc.arg('id')::uuid
   AND closed_at IS NULL
   AND sqlc.arg('user_id')::uuid IN (owner_id, enquirer_id)
 RETURNING *;
+
+-- The owner shares the listing's exact address in this conversation: the
+-- one write that sets address_shared_at, and the only way the address reaches
+-- another student. Set once - a share already made matches nothing, so its
+-- time stands - and only by the owner, while the conversation is open, the
+-- enquirer's account is available, the listing is available to the public and
+-- it has an address to share. No row affected means already shared, refused,
+-- or not this owner's; the handler re-reads and says which.
+-- name: ShareConversationAddress :execrows
+UPDATE conversations c
+SET address_shared_at = now()
+FROM listings l, users o, users e
+WHERE c.id = sqlc.arg('id')::uuid
+  AND c.owner_id = sqlc.arg('owner_id')::uuid
+  AND c.address_shared_at IS NULL
+  AND c.closed_at IS NULL
+  AND l.id = c.listing_id
+  AND l.status = 'published'
+  AND l.removed_at IS NULL
+  AND btrim(l.address_line) <> ''
+  AND o.id = c.owner_id
+  AND o.suspended_at IS NULL
+  AND e.id = c.enquirer_id
+  AND e.suspended_at IS NULL;
 
 -- Moves the asking participant's read marker to now. The other side's marker
 -- is untouched. No row affected means the user is not a participant.

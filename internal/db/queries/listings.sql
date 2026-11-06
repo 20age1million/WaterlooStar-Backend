@@ -138,7 +138,8 @@ INSERT INTO listings (
     address_line, neighbourhood, lat, lng, distance_m,
     commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery,
     status, views, replies, created_at,
-    shorter_stays, min_stay_months, bills_estimate_cents
+    shorter_stays, min_stay_months, bills_estimate_cents,
+    cross_streets
 ) VALUES (
     $1, $2, $3, $4,
     $5, $6,
@@ -148,7 +149,8 @@ INSERT INTO listings (
     $21, $22, $23, $24, $25,
     $26, $27, $28, $29,
     $30, $31, $32, $33,
-    $34, $35, $36
+    $34, $35, $36,
+    $37
 )
 RETURNING *;
 
@@ -201,6 +203,8 @@ UPDATE listings SET
     laundry        = coalesce(sqlc.narg('laundry'),        laundry),
     address_line   = coalesce(sqlc.narg('address_line'),   address_line),
     neighbourhood  = coalesce(sqlc.narg('neighbourhood'),  neighbourhood),
+    -- '' is not NULL, so an empty string clears it: COALESCE is enough here.
+    cross_streets  = coalesce(sqlc.narg('cross_streets'),  cross_streets),
     distance_m     = coalesce(sqlc.narg('distance_m'),     distance_m),
     shorter_stays  = coalesce(sqlc.narg('shorter_stays'),  shorter_stays),
     -- These two can be set back to NULL — "whole lease only", "estimate not

@@ -16,21 +16,22 @@ across both; everything from Phase 4 onward is not.
 
 | Feature | Phases | Status | Location |
 |---|---|---|---|
-| [Messaging with Contact Privacy](./active/messaging/index.md) | 4 (15–18) | In progress: 15 complete | `docs/specs/active/messaging/` |
+| [Messaging with Contact Privacy](./active/messaging/index.md) | 4 (15–18) | In progress: 15 and 16 complete | `docs/specs/active/messaging/` |
 
 ### Messaging with Contact Privacy
 
 A verified student messages a listing's owner inside WaterlooStar, and an owner
 answers a housing request with a conversation. Nobody's email or phone is ever
 shown; the exact address reaches a student only when the owner shares it in
-their conversation. Phase 15 is built on `feature/messaging` and not yet
-merged; its phase doc is under `implemented/messaging/`, while `index.md` and
-the later phases stay in `active/` until the feature is done.
+their conversation. Phase 15 is built on `feature/messaging` (pull request
+#17) and Phase 16 on `feature/messaging-privacy`, stacked on it; neither is
+merged yet. Their phase docs are under `implemented/messaging/`, while
+`index.md` and the later phases stay in `active/` until the feature is done.
 
 | Phase | Title | Status |
 |---|---|---|
 | 15 | [Conversations and messages](./implemented/messaging/phase-15-conversations.md) | Complete: start, inbox, unread counts, close; migration 11; eight endpoints |
-| 16 | [Contact privacy and address sharing](./active/messaging/phase-16-contact-privacy.md) | Ready |
+| 16 | [Contact privacy and address sharing](./implemented/messaging/phase-16-contact-privacy.md) | Complete: the exact address off every public read and out of search; `cross_streets`; the owner's `POST /conversations/{id}/share-address`; migration 12; one endpoint |
 | 17 | [Offers open conversations](./active/messaging/phase-17-offer-conversations.md) | Ready |
 | 18 | [Message notifications](./active/messaging/phase-18-message-notifications.md) | Ready |
 
@@ -141,9 +142,11 @@ Recorded in the Platform Foundation `index.md` and still in force:
 
 **Address privacy:** show only an approximate location; the exact address is
 revealed only when the listing's owner shares it in a conversation (refined
-2026-10-16), and nothing but the address is ever revealed. This is designed and
-implemented as part of messaging, so the current public address remains a known
-implementation gap. See [the roadmap](../ROADMAP.md#address-privacy).
+2026-10-16), and nothing but the address is ever revealed. Implemented in
+messaging Phase 16 (on `feature/messaging-privacy`, not yet merged): public
+reads carry `neighbourhood` and `cross_streets`, never `address_line` or
+coordinates, and search no longer indexes the address. See
+[the roadmap](../ROADMAP.md#address-privacy).
 
 ## What comes next
 

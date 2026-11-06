@@ -4,10 +4,11 @@
 
 **Backend:** Phases 0–14 are shipped: accounts, housing discovery and posting,
 requests and offers, rate limits, admin moderation, listing terms and email
-delivery. Messaging with contact privacy is in progress on `feature/messaging`:
-Phase 15, conversations and messages, is built and not yet merged; Phases
-16–18 (address privacy and sharing, offers opening conversations, email
-notifications) follow. [Backend specs index](specs/INDEX.md).
+delivery. Messaging with contact privacy is in progress: Phase 15,
+conversations and messages, is built on `feature/messaging` (pull request
+#17), and Phase 16, address privacy and sharing, on `feature/messaging-privacy`,
+stacked on it. Neither is merged. Phases 17–18 (offers opening conversations,
+email notifications) follow. [Backend specs index](specs/INDEX.md).
 
 **Frontend:** housing discovery and posting, requests and offers, session refresh,
 the housing rework and Phase 12's new verification link are shipped.
@@ -103,10 +104,16 @@ revealed; no email or phone number is shown or collected for contact. Design
 this as part of messaging with contact privacy.
 
 This settles the previously deferred question of whether the street address
-stays public. The current API still exposes it; the privacy change ships with
-messaging, rather than through this documentation change. The schema keeps
-`address_line` separate from `neighbourhood`, so a private field can be added
-without moving data. The earlier context is in the
+stays public. **Shipped in backend messaging Phase 16** (2026-10-16, on
+`feature/messaging-privacy`, not yet merged): `address_line` is the private
+exact address, on the owner's own reads and the admin surface only; public
+reads show `neighbourhood` and a new `cross_streets`, with null coordinates;
+search no longer indexes the address; and `POST
+/conversations/{id}/share-address` is the owner's share, per conversation, with
+no un-share. It merges only after the frontend's `fix/public-address` (frontend
+pull request #19) has merged and deployed, so no public page reads a field that
+has gone. No data moved: `address_line` was always separate from
+`neighbourhood`. The earlier context is in the
 [Platform Foundation spec](specs/implemented/platform-foundation/index.md).
 
 ### Admin creation

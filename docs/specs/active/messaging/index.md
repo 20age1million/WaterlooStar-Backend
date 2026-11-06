@@ -1,7 +1,7 @@
 # Messaging with Contact Privacy — API Phases 15–18
 
-**Status:** Ready
-**Branch:** `feature/messaging`
+**Status:** In progress: Phases 15 and 16 complete
+**Branch:** `feature/messaging` (Phase 15); each later phase stacks on the one before (`feature/messaging-privacy` for 16)
 **Ticket / Work Item:** N/A
 **Owner(s):** WaterlooStar backend
 **Date:** 2026-10-15 (first draft); accepted 2026-10-16
@@ -40,7 +40,7 @@ Everyone else sees an approximate location.
   indexes it (migration 4). On 2026-10-14 the developer settled that a listing
   shows an approximate location publicly and the exact address later, designed
   with messaging *(per `docs/ROADMAP.md`, "Address privacy")*. The public
-  address is an implementation gap, not an open decision.
+  address was an implementation gap, not an open decision; Phase 16 closes it.
 - **Answering an offer waits on this** *(per `docs/ROADMAP.md`, backend
   sequence)*. Phase 7 left out accept and decline because "accepting promises a
   conversation the product cannot host yet" *(per
@@ -281,7 +281,7 @@ is "a frontend messaging phase" here.
 | API handlers | 8 new operations in Phase 15, 1 in Phase 16; changed listing and offer handlers in 16 and 17 |
 | DTOs / contracts | `api/openapi.yaml`: a `messages` tag, `Conversation`, `Message`, pages, `ConversationPlace`; `Listing.address_line` becomes owner-only; `cross_streets`; `RequestOffer.conversation`; `ListingOwner`'s "both sides agree to talk" description reworded |
 | Auth | Verified students only, to start, send or share. Participants only, to read. The owner only, to share. 404 for everyone else |
-| Rate limiting | Allowlist entries for starting a conversation and for sending a message; notification caps in 18 |
+| Rate limiting | Allowlist entries for starting a conversation and for sending a message (15) and for sharing the address (16, added during implementation); notification caps in 18 |
 | Email | Notification builders in Phase 18 |
 | Tests | Query tests for every new query (`TestEveryQueryIsExercised`); handler tests; regression tests that no public read carries `address_line` |
 | Configuration | None. `APP_URL` already builds email links |
@@ -295,7 +295,7 @@ is "a frontend messaging phase" here.
 | Phase | Title | Status | Location |
 |---|---|---|---|
 | [15 — Conversations and messages](../../implemented/messaging/phase-15-conversations.md) | Start a conversation about a listing, the inbox, messages, closing, unread counts | Complete | `docs/specs/implemented/messaging/` |
-| [16 — Contact privacy and address sharing](./phase-16-contact-privacy.md) | Exact address and coordinates off every public read and out of search; the owner shares the address in a conversation | Ready | `docs/specs/active/messaging/` |
+| [16 — Contact privacy and address sharing](../../implemented/messaging/phase-16-contact-privacy.md) | Exact address and coordinates off every public read and out of search; the owner shares the address in a conversation | Complete | `docs/specs/implemented/messaging/` |
 | [17 — Offers open conversations](./phase-17-offer-conversations.md) | An offer opens or joins a conversation with the request's poster, who answers it there | Ready | `docs/specs/active/messaging/` |
 | [18 — Message notifications](./phase-18-message-notifications.md) | Email when a conversation is opened, the address is shared, or a first reply waits unread | Ready | `docs/specs/active/messaging/` |
 

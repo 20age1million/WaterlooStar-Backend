@@ -18,7 +18,7 @@ SET closed_at = now(), closed_by = $1::uuid
 WHERE id = $2::uuid
   AND closed_at IS NULL
   AND $1::uuid IN (owner_id, enquirer_id)
-RETURNING id, listing_id, owner_id, enquirer_id, opened_by, closed_at, closed_by, owner_read_at, enquirer_read_at, created_at, updated_at
+RETURNING id, listing_id, owner_id, enquirer_id, opened_by, closed_at, closed_by, owner_read_at, enquirer_read_at, created_at, updated_at, address_shared_at
 `
 
 type CloseConversationParams struct {
@@ -44,6 +44,7 @@ func (q *Queries) CloseConversation(ctx context.Context, arg CloseConversationPa
 		&i.EnquirerReadAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AddressSharedAt,
 	)
 	return i, err
 }
@@ -89,7 +90,7 @@ INSERT INTO conversations (listing_id, owner_id, enquirer_id, opened_by)
 VALUES (
     $1, $2, $3, $4
 )
-RETURNING id, listing_id, owner_id, enquirer_id, opened_by, closed_at, closed_by, owner_read_at, enquirer_read_at, created_at, updated_at
+RETURNING id, listing_id, owner_id, enquirer_id, opened_by, closed_at, closed_by, owner_read_at, enquirer_read_at, created_at, updated_at, address_shared_at
 `
 
 type CreateConversationParams struct {
@@ -112,6 +113,9 @@ type CreateConversationParams struct {
 //     a conversation whose listing was taken down or whose other participant
 //     is suspended. They report it instead (listing_removed, listing_available,
 //     counterpart_suspended) and the handler makes the conversation read-only.
+//   - The exact address appears only in the place_* columns, only once the
+//     owner has shared it (address_shared_at), and is withheld while the
+//     listing is taken down or its owner suspended.
 //
 // Unread counts and last activity are computed here from messages and the read
 // markers, never stored.
@@ -135,6 +139,7 @@ func (q *Queries) CreateConversation(ctx context.Context, arg CreateConversation
 		&i.EnquirerReadAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AddressSharedAt,
 	)
 	return i, err
 }
@@ -165,7 +170,7 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) (M
 }
 
 const getConversationByListingAndEnquirer = `-- name: GetConversationByListingAndEnquirer :one
-SELECT id, listing_id, owner_id, enquirer_id, opened_by, closed_at, closed_by, owner_read_at, enquirer_read_at, created_at, updated_at FROM conversations
+SELECT id, listing_id, owner_id, enquirer_id, opened_by, closed_at, closed_by, owner_read_at, enquirer_read_at, created_at, updated_at, address_shared_at FROM conversations
 WHERE listing_id = $1 AND enquirer_id = $2
 `
 
@@ -192,13 +197,14 @@ func (q *Queries) GetConversationByListingAndEnquirer(ctx context.Context, arg G
 		&i.EnquirerReadAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AddressSharedAt,
 	)
 	return i, err
 }
 
 const getConversationForParticipant = `-- name: GetConversationForParticipant :one
 SELECT
-    c.id, c.listing_id, c.owner_id, c.enquirer_id, c.opened_by, c.closed_at, c.closed_by, c.owner_read_at, c.enquirer_read_at, c.created_at, c.updated_at,
+    c.id, c.listing_id, c.owner_id, c.enquirer_id, c.opened_by, c.closed_at, c.closed_by, c.owner_read_at, c.enquirer_read_at, c.created_at, c.updated_at, c.address_shared_at,
     l.title         AS listing_title,
     l.neighbourhood AS listing_neighbourhood,
     l.price_cents   AS listing_price_cents,
@@ -212,6 +218,10 @@ SELECT
     cp.avatar_url AS counterpart_avatar_url,
     cp.verified   AS counterpart_verified,
     (cp.suspended_at IS NOT NULL)::bool AS counterpart_suspended,
+    -- The exact address: null unless the reveal join below matched.
+    pl.address_line AS place_address_line,
+    pl.lat          AS place_lat,
+    pl.lng          AS place_lng,
     lm.sender_id  AS last_message_sender_id,
     lm.body       AS last_message_body,
     lm.created_at AS last_message_created_at,
@@ -226,6 +236,10 @@ FROM conversations c
 JOIN listings l ON l.id = c.listing_id
 JOIN users o    ON o.id = c.owner_id
 JOIN users cp   ON cp.id = CASE WHEN c.owner_id = $1::uuid THEN c.enquirer_id ELSE c.owner_id END
+LEFT JOIN listings pl ON pl.id = c.listing_id
+    AND c.address_shared_at IS NOT NULL
+    AND l.removed_at IS NULL
+    AND o.suspended_at IS NULL
 LEFT JOIN messages lm ON lm.id = (
     SELECT m.id FROM messages m
     WHERE m.conversation_id = c.id
@@ -255,6 +269,9 @@ type GetConversationForParticipantRow struct {
 	CounterpartAvatarUrl *string
 	CounterpartVerified  bool
 	CounterpartSuspended bool
+	PlaceAddressLine     *string
+	PlaceLat             *float64
+	PlaceLng             *float64
 	LastMessageSenderID  *uuid.UUID
 	LastMessageBody      *string
 	LastMessageCreatedAt *time.Time
@@ -263,6 +280,12 @@ type GetConversationForParticipantRow struct {
 
 // One conversation, as one of its participants sees it. No row unless user_id
 // is the owner or the enquirer.
+// The reveal condition. The listing again, matched only once the owner has
+// shared its address in this conversation, and not while the listing is taken
+// down or its owner suspended: withheld, never un-shared, so reinstating
+// restores it. It is in the SQL, as the public read filters are, so no handler
+// can forget it. A join rather than a CASE because sqlc types a CASE column as
+// interface{}, and a left-joined table's columns as pointers.
 // The newest message. Joined as the messages table itself, rather than as a
 // lateral subquery, so sqlc knows its columns are null for a conversation with
 // no messages yet.
@@ -281,6 +304,7 @@ func (q *Queries) GetConversationForParticipant(ctx context.Context, arg GetConv
 		&i.Conversation.EnquirerReadAt,
 		&i.Conversation.CreatedAt,
 		&i.Conversation.UpdatedAt,
+		&i.Conversation.AddressSharedAt,
 		&i.ListingTitle,
 		&i.ListingNeighbourhood,
 		&i.ListingPriceCents,
@@ -293,6 +317,9 @@ func (q *Queries) GetConversationForParticipant(ctx context.Context, arg GetConv
 		&i.CounterpartAvatarUrl,
 		&i.CounterpartVerified,
 		&i.CounterpartSuspended,
+		&i.PlaceAddressLine,
+		&i.PlaceLat,
+		&i.PlaceLng,
 		&i.LastMessageSenderID,
 		&i.LastMessageBody,
 		&i.LastMessageCreatedAt,
@@ -303,7 +330,7 @@ func (q *Queries) GetConversationForParticipant(ctx context.Context, arg GetConv
 
 const listConversationsForUser = `-- name: ListConversationsForUser :many
 SELECT
-    c.id, c.listing_id, c.owner_id, c.enquirer_id, c.opened_by, c.closed_at, c.closed_by, c.owner_read_at, c.enquirer_read_at, c.created_at, c.updated_at,
+    c.id, c.listing_id, c.owner_id, c.enquirer_id, c.opened_by, c.closed_at, c.closed_by, c.owner_read_at, c.enquirer_read_at, c.created_at, c.updated_at, c.address_shared_at,
     l.title         AS listing_title,
     l.neighbourhood AS listing_neighbourhood,
     l.price_cents   AS listing_price_cents,
@@ -316,6 +343,10 @@ SELECT
     cp.avatar_url AS counterpart_avatar_url,
     cp.verified   AS counterpart_verified,
     (cp.suspended_at IS NOT NULL)::bool AS counterpart_suspended,
+    -- The exact address: null unless the reveal join below matched.
+    pl.address_line AS place_address_line,
+    pl.lat          AS place_lat,
+    pl.lng          AS place_lng,
     lm.sender_id  AS last_message_sender_id,
     lm.body       AS last_message_body,
     lm.created_at AS last_message_created_at,
@@ -330,6 +361,10 @@ FROM conversations c
 JOIN listings l ON l.id = c.listing_id
 JOIN users o    ON o.id = c.owner_id
 JOIN users cp   ON cp.id = CASE WHEN c.owner_id = $1::uuid THEN c.enquirer_id ELSE c.owner_id END
+LEFT JOIN listings pl ON pl.id = c.listing_id
+    AND c.address_shared_at IS NOT NULL
+    AND l.removed_at IS NULL
+    AND o.suspended_at IS NULL
 LEFT JOIN messages lm ON lm.id = (
     SELECT m.id FROM messages m
     WHERE m.conversation_id = c.id
@@ -367,6 +402,9 @@ type ListConversationsForUserRow struct {
 	CounterpartAvatarUrl *string
 	CounterpartVerified  bool
 	CounterpartSuspended bool
+	PlaceAddressLine     *string
+	PlaceLat             *float64
+	PlaceLng             *float64
 	LastMessageSenderID  *uuid.UUID
 	LastMessageBody      *string
 	LastMessageCreatedAt *time.Time
@@ -376,6 +414,12 @@ type ListConversationsForUserRow struct {
 // The inbox: both sides, newest activity first. status is 'open' or 'closed';
 // side is 'owner' (about your own listings) or 'enquirer' (ones you asked
 // about). Either may be null for no filter.
+// The reveal condition. The listing again, matched only once the owner has
+// shared its address in this conversation, and not while the listing is taken
+// down or its owner suspended: withheld, never un-shared, so reinstating
+// restores it. It is in the SQL, as the public read filters are, so no handler
+// can forget it. A join rather than a CASE because sqlc types a CASE column as
+// interface{}, and a left-joined table's columns as pointers.
 // The newest message. Joined as the messages table itself, rather than as a
 // lateral subquery, so sqlc knows its columns are null for a conversation with
 // no messages yet.
@@ -406,6 +450,7 @@ func (q *Queries) ListConversationsForUser(ctx context.Context, arg ListConversa
 			&i.Conversation.EnquirerReadAt,
 			&i.Conversation.CreatedAt,
 			&i.Conversation.UpdatedAt,
+			&i.Conversation.AddressSharedAt,
 			&i.ListingTitle,
 			&i.ListingNeighbourhood,
 			&i.ListingPriceCents,
@@ -418,6 +463,9 @@ func (q *Queries) ListConversationsForUser(ctx context.Context, arg ListConversa
 			&i.CounterpartAvatarUrl,
 			&i.CounterpartVerified,
 			&i.CounterpartSuspended,
+			&i.PlaceAddressLine,
+			&i.PlaceLat,
+			&i.PlaceLng,
 			&i.LastMessageSenderID,
 			&i.LastMessageBody,
 			&i.LastMessageCreatedAt,
@@ -491,6 +539,44 @@ type MarkConversationReadParams struct {
 // is untouched. No row affected means the user is not a participant.
 func (q *Queries) MarkConversationRead(ctx context.Context, arg MarkConversationReadParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markConversationRead, arg.UserID, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const shareConversationAddress = `-- name: ShareConversationAddress :execrows
+UPDATE conversations c
+SET address_shared_at = now()
+FROM listings l, users o, users e
+WHERE c.id = $1::uuid
+  AND c.owner_id = $2::uuid
+  AND c.address_shared_at IS NULL
+  AND c.closed_at IS NULL
+  AND l.id = c.listing_id
+  AND l.status = 'published'
+  AND l.removed_at IS NULL
+  AND btrim(l.address_line) <> ''
+  AND o.id = c.owner_id
+  AND o.suspended_at IS NULL
+  AND e.id = c.enquirer_id
+  AND e.suspended_at IS NULL
+`
+
+type ShareConversationAddressParams struct {
+	ID      uuid.UUID
+	OwnerID uuid.UUID
+}
+
+// The owner shares the listing's exact address in this conversation: the
+// one write that sets address_shared_at, and the only way the address reaches
+// another student. Set once - a share already made matches nothing, so its
+// time stands - and only by the owner, while the conversation is open, the
+// enquirer's account is available, the listing is available to the public and
+// it has an address to share. No row affected means already shared, refused,
+// or not this owner's; the handler re-reads and says which.
+func (q *Queries) ShareConversationAddress(ctx context.Context, arg ShareConversationAddressParams) (int64, error) {
+	result, err := q.db.Exec(ctx, shareConversationAddress, arg.ID, arg.OwnerID)
 	if err != nil {
 		return 0, err
 	}

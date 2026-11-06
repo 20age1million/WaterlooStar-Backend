@@ -2,7 +2,7 @@
 
 ## Endpoints
 
-The API has fifty endpoints, fourteen of them admin-only. Everything is
+The API has fifty-one endpoints, fourteen of them admin-only. Everything is
 described in [the OpenAPI contract](../api/openapi.yaml); this is the public and
 student surface. The admin surface is in [Admin](admin.md#endpoints).
 
@@ -44,9 +44,21 @@ student surface. The admin surface is in [Admin](admin.md#endpoints).
 | POST | `/conversations/{id}/messages` | verified participant | Send a message |
 | POST | `/conversations/{id}/read` | participant | Mark it read |
 | POST | `/conversations/{id}/close` | participant | Close it; nobody can send afterwards |
+| POST | `/conversations/{id}/share-address` | the listing's owner, verified | Share the exact address with the enquirer; cannot be undone |
 
 Browsing is public by design: an account is only needed to post, to offer, or
 to message a poster.
+
+**The exact address is never public.** A listing's public location is its
+`neighbourhood` and `cross_streets` (the nearest intersection). `address_line`,
+the exact address with the house number, and the coordinates `lat`/`lng` are
+on the owner's own reads (`GET /me/listings` and the responses to their own
+writes) and on the admin surface, and nowhere else: `GET /listings`,
+`GET /listings/{id}` and the listing inside an offer have no `address_line`
+key and null coordinates. Search (`q`) does not index the address, so it
+cannot be confirmed by probing. The one way the exact address reaches another
+student is the owner sharing it in their conversation (below). No response
+ever carries anyone's email, except your own on `/me`, or a phone number.
 
 **Offers are not public.** The student who posted a request sees every live
 offer on it; an owner sees only their own. And an offer is only as alive as the
@@ -65,9 +77,20 @@ else gets 404, never 403.
   listing and enquirer, and a second start answers 409 naming the first in
   `details.conversation_id`.
 - **Opening a conversation reveals nothing.** No email, no phone number and no
-  exact address. The owner will share the address by hand inside the
-  conversation; that action comes in Phase 16, and until then the public
-  listing still carries the street.
+  exact address. Neither do sending, replying, reading or closing.
+- **The owner shares the exact address by hand.**
+  `POST /conversations/{id}/share-address` sets `address_shared_at` once and
+  fills the conversation's `place` (`address_line`, `lat`, `lng`) for both
+  participants of that one conversation. It is the owner's alone (the enquirer
+  gets 403), it covers that conversation only, and it **cannot be undone**:
+  there is no un-share, so a client confirms first. Sharing again answers 200
+  unchanged. It is refused with 409 while the conversation is closed, the
+  enquirer is suspended, the listing is not available, or the listing has no
+  address. `can_share_address` says whether the button should show.
+- **Moderation withholds a shared address without un-sharing it.** While the
+  listing is taken down or its owner is suspended, `place` is null and
+  `address_shared_at` stays set; reinstating brings `place` back. The address
+  is read live, so an owner's correction shows in the conversation.
 - **Moderation makes it read-only, never hidden.** While the listing is taken
   down or the other side is suspended, the conversation stays readable and
   nothing can be sent. Reinstating restores it. A listing its owner paused or
@@ -80,7 +103,7 @@ else gets 404, never 403.
 
 ## Rate limits
 
-The authentication endpoints and the five write endpoints answer **429** with a
+The authentication endpoints and the six write endpoints answer **429** with a
 `Retry-After` header when an allowance is spent. The limits are in
 `internal/ratelimit/policy.go`, each with a comment saying what it protects.
 
@@ -94,6 +117,7 @@ The authentication endpoints and the five write endpoints answer **429** with a
 | `POST /listings`, `POST /requests`, `POST /requests/{id}/offers` | the user | 30 per hour |
 | `POST /listings/{id}/conversations` | the user | 10 per 2 hours, including attempts that find one already exists |
 | `POST /conversations/{id}/messages` | the user | 60 per 10 minutes |
+| `POST /conversations/{id}/share-address` | the user | 20 per hour, including shares that change nothing |
 
 Four things about it are deliberate:
 

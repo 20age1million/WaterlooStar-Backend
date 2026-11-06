@@ -22,17 +22,18 @@ type AdminAction struct {
 }
 
 type Conversation struct {
-	ID             uuid.UUID
-	ListingID      uuid.UUID
-	OwnerID        uuid.UUID
-	EnquirerID     uuid.UUID
-	OpenedBy       uuid.UUID
-	ClosedAt       *time.Time
-	ClosedBy       *uuid.UUID
-	OwnerReadAt    *time.Time
-	EnquirerReadAt *time.Time
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID              uuid.UUID
+	ListingID       uuid.UUID
+	OwnerID         uuid.UUID
+	EnquirerID      uuid.UUID
+	OpenedBy        uuid.UUID
+	ClosedAt        *time.Time
+	ClosedBy        *uuid.UUID
+	OwnerReadAt     *time.Time
+	EnquirerReadAt  *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	AddressSharedAt *time.Time
 }
 
 type EmailVerificationToken struct {
@@ -72,27 +73,28 @@ type HousingRequest struct {
 }
 
 type Listing struct {
-	ID                 uuid.UUID
-	OwnerID            uuid.UUID
-	Title              string
-	Body               string
-	Conditions         []string
-	PriceCents         int32
-	DepositCents       *int32
-	StartDate          time.Time
-	EndDate            time.Time
-	LeaseMonths        int32
-	TermTag            string
-	UnitType           string
-	BedroomsTotal      int32
-	BedroomOf          *int32
-	Bathrooms          float64
-	BathType           string
-	Furnished          bool
-	Utilities          []string
-	Parking            bool
-	Pets               bool
-	Laundry            bool
+	ID            uuid.UUID
+	OwnerID       uuid.UUID
+	Title         string
+	Body          string
+	Conditions    []string
+	PriceCents    int32
+	DepositCents  *int32
+	StartDate     time.Time
+	EndDate       time.Time
+	LeaseMonths   int32
+	TermTag       string
+	UnitType      string
+	BedroomsTotal int32
+	BedroomOf     *int32
+	Bathrooms     float64
+	BathType      string
+	Furnished     bool
+	Utilities     []string
+	Parking       bool
+	Pets          bool
+	Laundry       bool
+	// Private exact address, house number included. Never on a public read; shown to the owner, admins, and a conversation whose owner shared it (conversations.address_shared_at). Not in the search index.
 	AddressLine        string
 	Neighbourhood      string
 	Lat                *float64
@@ -108,7 +110,6 @@ type Listing struct {
 	Saves              int32
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
-	Search             interface{}
 	PublishedAt        *time.Time
 	RemovedAt          *time.Time
 	RemovedBy          *uuid.UUID
@@ -116,6 +117,8 @@ type Listing struct {
 	ShorterStays       bool
 	MinStayMonths      *int32
 	BillsEstimateCents *int32
+	CrossStreets       string
+	Search             interface{}
 }
 
 type ListingPhoto struct {

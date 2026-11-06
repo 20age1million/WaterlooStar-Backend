@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"context"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -101,6 +102,13 @@ func (f *fakeQuerier) conversationView(c sqlcgen.Conversation, user uuid.UUID) s
 			row.ListingEndDate = l.EndDate
 			row.ListingAvailable = l.Status == "published" && l.RemovedAt == nil && f.users[c.OwnerID].SuspendedAt == nil
 			row.ListingRemoved = l.RemovedAt != nil
+			// The reveal condition: shared here, not taken down, owner not
+			// suspended. Withheld otherwise, never un-shared.
+			if c.AddressSharedAt != nil && l.RemovedAt == nil && f.users[c.OwnerID].SuspendedAt == nil {
+				address := l.AddressLine
+				row.PlaceAddressLine = &address
+				row.PlaceLat, row.PlaceLng = l.Lat, l.Lng
+			}
 			break
 		}
 	}
@@ -250,6 +258,36 @@ func (f *fakeQuerier) CloseConversation(_ context.Context, arg sqlcgen.CloseConv
 		}
 	}
 	return sqlcgen.Conversation{}, pgx.ErrNoRows
+}
+
+// ShareConversationAddress keeps the SQL's conditions: the owner only, once,
+// while open, with the enquirer active and the listing available and
+// addressed.
+func (f *fakeQuerier) ShareConversationAddress(_ context.Context, arg sqlcgen.ShareConversationAddressParams) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	for i, c := range f.conversations {
+		if c.ID != arg.ID || c.OwnerID != arg.OwnerID || c.AddressSharedAt != nil || c.ClosedAt != nil {
+			continue
+		}
+		if f.users[c.OwnerID].SuspendedAt != nil || f.users[c.EnquirerID].SuspendedAt != nil {
+			return 0, nil
+		}
+		for _, l := range f.listings {
+			if l.ID != c.ListingID {
+				continue
+			}
+			if l.Status != "published" || l.RemovedAt != nil || strings.TrimSpace(l.AddressLine) == "" {
+				return 0, nil
+			}
+			now := f.tick()
+			c.AddressSharedAt, c.UpdatedAt = &now, now
+			f.conversations[i] = c
+			return 1, nil
+		}
+	}
+	return 0, nil
 }
 
 func (f *fakeQuerier) MarkConversationRead(_ context.Context, arg sqlcgen.MarkConversationReadParams) (int64, error) {

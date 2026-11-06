@@ -69,6 +69,13 @@ var (
 	// step, so this and closing a conversation are what bound an unwanted
 	// correspondent; sixty in ten minutes is more than a real exchange needs.
 	MessagePerUser = Rule{Name: "message_per_user", Burst: 60, Window: 10 * time.Minute}
+
+	// ShareAddressPerUser bounds an owner sharing their exact address. A share
+	// is once per conversation and only in conversations the owner is already
+	// in, so the conversation limits already bound it; this is the backstop
+	// against a client looping on the one write that reveals an address.
+	// Twenty an hour is more conversations than any owner answers.
+	ShareAddressPerUser = Rule{Name: "share_address_per_user", Burst: 20, Window: time.Hour}
 )
 
 // GlobalKey is the key every service-wide backstop shares, one per rule name.
