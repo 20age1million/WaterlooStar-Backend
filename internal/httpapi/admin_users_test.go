@@ -20,7 +20,7 @@ func anotherBrowser(t *testing.T, h *harness) *harness {
 	if err != nil {
 		t.Fatalf("cookiejar: %v", err)
 	}
-	return &harness{server: h.server, db: h.db, mail: h.mail, client: &http.Client{Jar: jar}}
+	return &harness{server: h.server, db: h.db, mail: h.mail, client: &http.Client{Jar: jar}, api: h.api}
 }
 
 // adminBrowser registers admin@uwaterloo.ca in its own browser and signs it in

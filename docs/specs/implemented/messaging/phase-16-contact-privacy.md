@@ -1,7 +1,7 @@
 # Phase 16 — Contact privacy and address sharing
 
 **Status:** Complete (2026-10-16, on `feature/messaging-privacy`)
-**Feature:** [Messaging with Contact Privacy](../../active/messaging/index.md)
+**Feature:** [Messaging with Contact Privacy](./index.md)
 **Objective:** The exact address and coordinates leave every public read and the search index, and the listing's owner can share them with one student by an explicit action inside their conversation.
 
 ---

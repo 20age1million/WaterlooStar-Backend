@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -40,6 +41,10 @@ type Server struct {
 	mailer       email.Sender
 	limiter      *ratelimit.Limiter
 	buildVersion string
+
+	// notifications counts notification emails still being sent in the
+	// background (notifications.go), so shutdown and tests can wait for them.
+	notifications sync.WaitGroup
 }
 
 // NewServer wires the dependencies a handler set needs.

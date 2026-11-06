@@ -40,7 +40,7 @@ func (q *Queries) CountUsersByEmailOrUsername(ctx context.Context, arg CountUser
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (email, username, password_hash)
 VALUES ($1, $2, $3)
-RETURNING id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason
+RETURNING id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason, email_notifications
 `
 
 type CreateUserParams struct {
@@ -67,12 +67,13 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.SuspendedAt,
 		&i.SuspendedBy,
 		&i.SuspendReason,
+		&i.EmailNotifications,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason FROM users WHERE lower(email) = lower($1)
+SELECT id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason, email_notifications FROM users WHERE lower(email) = lower($1)
 `
 
 // Addresses are compared case-insensitively, matching the unique index.
@@ -94,12 +95,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, lower string) (User, error
 		&i.SuspendedAt,
 		&i.SuspendedBy,
 		&i.SuspendReason,
+		&i.EmailNotifications,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason FROM users WHERE id = $1
+SELECT id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason, email_notifications FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -120,12 +122,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.SuspendedAt,
 		&i.SuspendedBy,
 		&i.SuspendReason,
+		&i.EmailNotifications,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason FROM users WHERE lower(username) = lower($1)
+SELECT id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason, email_notifications FROM users WHERE lower(username) = lower($1)
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, lower string) (User, error) {
@@ -146,12 +149,13 @@ func (q *Queries) GetUserByUsername(ctx context.Context, lower string) (User, er
 		&i.SuspendedAt,
 		&i.SuspendedBy,
 		&i.SuspendReason,
+		&i.EmailNotifications,
 	)
 	return i, err
 }
 
 const markUserVerified = `-- name: MarkUserVerified :one
-UPDATE users SET verified = true WHERE id = $1 RETURNING id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason
+UPDATE users SET verified = true WHERE id = $1 RETURNING id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason, email_notifications
 `
 
 func (q *Queries) MarkUserVerified(ctx context.Context, id uuid.UUID) (User, error) {
@@ -172,6 +176,43 @@ func (q *Queries) MarkUserVerified(ctx context.Context, id uuid.UUID) (User, err
 		&i.SuspendedAt,
 		&i.SuspendedBy,
 		&i.SuspendReason,
+		&i.EmailNotifications,
+	)
+	return i, err
+}
+
+const setEmailNotifications = `-- name: SetEmailNotifications :one
+UPDATE users SET email_notifications = $1
+WHERE id = $2
+RETURNING id, email, username, password_hash, role, verified, avatar_url, level, star_points, created_at, updated_at, suspended_at, suspended_by, suspend_reason, email_notifications
+`
+
+type SetEmailNotificationsParams struct {
+	EmailNotifications bool
+	ID                 uuid.UUID
+}
+
+// The notification-email switch (messaging, Phase 18). Account mail -
+// verification and reset links - ignores it.
+func (q *Queries) SetEmailNotifications(ctx context.Context, arg SetEmailNotificationsParams) (User, error) {
+	row := q.db.QueryRow(ctx, setEmailNotifications, arg.EmailNotifications, arg.ID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Username,
+		&i.PasswordHash,
+		&i.Role,
+		&i.Verified,
+		&i.AvatarUrl,
+		&i.Level,
+		&i.StarPoints,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SuspendedAt,
+		&i.SuspendedBy,
+		&i.SuspendReason,
+		&i.EmailNotifications,
 	)
 	return i, err
 }

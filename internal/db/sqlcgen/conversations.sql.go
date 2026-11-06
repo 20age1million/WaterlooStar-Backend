@@ -328,6 +328,80 @@ func (q *Queries) GetConversationForParticipant(ctx context.Context, arg GetConv
 	return i, err
 }
 
+const getNotificationRecipient = `-- name: GetNotificationRecipient :one
+SELECT
+    r.id                  AS recipient_id,
+    r.email               AS recipient_email,
+    r.verified            AS recipient_verified,
+    (r.suspended_at IS NOT NULL)::bool AS recipient_suspended,
+    r.email_notifications AS recipient_email_notifications,
+    s.username            AS sender_username,
+    l.title               AS listing_title,
+    (SELECT count(*) FROM messages m
+     WHERE m.conversation_id = c.id
+       AND m.sender_id <> r.id
+       AND m.created_at > coalesce(
+             CASE WHEN c.owner_id = r.id THEN c.owner_read_at ELSE c.enquirer_read_at END,
+             '-infinity'::timestamptz)
+       AND m.created_at <= (SELECT t.created_at FROM messages t
+                            WHERE t.id = $1::uuid
+                              AND t.conversation_id = c.id)
+    ) AS unread_through_message
+FROM conversations c
+JOIN listings l ON l.id = c.listing_id
+JOIN users s    ON s.id = $2::uuid
+JOIN users r    ON r.id = CASE WHEN c.owner_id = $2::uuid THEN c.enquirer_id ELSE c.owner_id END
+WHERE c.id = $3::uuid
+  AND $2::uuid IN (c.owner_id, c.enquirer_id)
+`
+
+type GetNotificationRecipientParams struct {
+	MessageID      *uuid.UUID
+	SenderID       uuid.UUID
+	ConversationID uuid.UUID
+}
+
+type GetNotificationRecipientRow struct {
+	RecipientID                 uuid.UUID
+	RecipientEmail              string
+	RecipientVerified           bool
+	RecipientSuspended          bool
+	RecipientEmailNotifications bool
+	SenderUsername              string
+	ListingTitle                string
+	UnreadThroughMessage        int64
+}
+
+// Who to tell, by email, about something sender_id just did in this
+// conversation: the other participant, with what the handler needs to decide
+// whether to send (their switch, verification and suspension) and to write the
+// email (their address, the sender's username, the listing's title). Read once,
+// after the write commits. No row unless sender_id is a participant.
+//
+// unread_through_message is how many messages the recipient has not read, up
+// to and including message_id: 1 means that message is the first one waiting
+// for them, which is when a reply email is due. Counting only up to that
+// message, rather than everything unread now, keeps two messages sent at once
+// from each seeing the other and both staying silent. Null message_id counts
+// nothing (0).
+//
+// No message body and no address is read here: the email may contain neither.
+func (q *Queries) GetNotificationRecipient(ctx context.Context, arg GetNotificationRecipientParams) (GetNotificationRecipientRow, error) {
+	row := q.db.QueryRow(ctx, getNotificationRecipient, arg.MessageID, arg.SenderID, arg.ConversationID)
+	var i GetNotificationRecipientRow
+	err := row.Scan(
+		&i.RecipientID,
+		&i.RecipientEmail,
+		&i.RecipientVerified,
+		&i.RecipientSuspended,
+		&i.RecipientEmailNotifications,
+		&i.SenderUsername,
+		&i.ListingTitle,
+		&i.UnreadThroughMessage,
+	)
+	return i, err
+}
+
 const listConversationsForUser = `-- name: ListConversationsForUser :many
 SELECT
     c.id, c.listing_id, c.owner_id, c.enquirer_id, c.opened_by, c.closed_at, c.closed_by, c.owner_read_at, c.enquirer_read_at, c.created_at, c.updated_at, c.address_shared_at,

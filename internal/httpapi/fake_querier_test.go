@@ -93,6 +93,8 @@ func (f *fakeQuerier) CreateUser(_ context.Context, arg sqlcgen.CreateUserParams
 		StarPoints:   0,
 		CreatedAt:    now,
 		UpdatedAt:    now,
+		// The column's default (migration 14).
+		EmailNotifications: true,
 	}
 	f.users[user.ID] = user
 	return user, nil

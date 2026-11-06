@@ -1,7 +1,7 @@
 # Messaging with Contact Privacy — API Phases 15–18
 
-**Status:** In progress: Phases 15, 16 and 17 complete
-**Branch:** `feature/messaging` (Phase 15); each later phase stacks on the one before (`feature/messaging-privacy` for 16, `feature/messaging-offers` for 17)
+**Status:** Complete (Phases 15–18), awaiting merge of the four stacked pull requests
+**Branch:** `feature/messaging` (Phase 15); each later phase stacks on the one before (`feature/messaging-privacy` for 16, `feature/messaging-offers` for 17, `feature/messaging-notifications` for 18)
 **Ticket / Work Item:** N/A
 **Owner(s):** WaterlooStar backend
 **Date:** 2026-10-15 (first draft); accepted 2026-10-16
@@ -294,10 +294,10 @@ is "a frontend messaging phase" here.
 
 | Phase | Title | Status | Location |
 |---|---|---|---|
-| [15 — Conversations and messages](../../implemented/messaging/phase-15-conversations.md) | Start a conversation about a listing, the inbox, messages, closing, unread counts | Complete | `docs/specs/implemented/messaging/` |
-| [16 — Contact privacy and address sharing](../../implemented/messaging/phase-16-contact-privacy.md) | Exact address and coordinates off every public read and out of search; the owner shares the address in a conversation | Complete | `docs/specs/implemented/messaging/` |
-| [17 — Offers open conversations](../../implemented/messaging/phase-17-offer-conversations.md) | An offer opens or joins a conversation with the request's poster, who answers it there | Complete | `docs/specs/implemented/messaging/` |
-| [18 — Message notifications](./phase-18-message-notifications.md) | Email when a conversation is opened, the address is shared, or a first reply waits unread | Ready | `docs/specs/active/messaging/` |
+| [15 — Conversations and messages](./phase-15-conversations.md) | Start a conversation about a listing, the inbox, messages, closing, unread counts | Complete | `docs/specs/implemented/messaging/` |
+| [16 — Contact privacy and address sharing](./phase-16-contact-privacy.md) | Exact address and coordinates off every public read and out of search; the owner shares the address in a conversation | Complete | `docs/specs/implemented/messaging/` |
+| [17 — Offers open conversations](./phase-17-offer-conversations.md) | An offer opens or joins a conversation with the request's poster, who answers it there | Complete | `docs/specs/implemented/messaging/` |
+| [18 — Message notifications](./phase-18-message-notifications.md) | Email when a conversation is opened, the address is shared, or a first reply waits unread | Complete | `docs/specs/implemented/messaging/` |
 
 Phase 15 is additive and changes nothing the frontend uses today. Phase 16 is
 the one breaking contract change; see Constraints. The frontend messaging phase
@@ -375,7 +375,12 @@ waits on all four *(decided 2026-10-16)*. Phase 18 is the final phase.
 - One API instance. Rate-limit buckets are per process *(per `CLAUDE.md`)*.
 - Phase 18: Resend's free tier also covers notification email at this volume.
   Its daily cap needs checking against expected traffic. The Email Delivery spec
-  sized it for verification and reset mail only.
+  sized it for verification and reset mail only. *Checked in Phase 18
+  (2026-10-17):* the free tier allows 100 emails a day and 3,000 a month,
+  shared by every email the service sends. `NotifyGlobal` (30 a day,
+  refilling) holds notifications to at most 60 in any 24 hours and about 960
+  in a month, leaving at least 40 a day for verification and reset links; the
+  phase doc's Implementation Notes have the arithmetic.
 
 ---
 

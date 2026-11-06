@@ -167,18 +167,19 @@ type RequestOffer struct {
 }
 
 type User struct {
-	ID            uuid.UUID
-	Email         string
-	Username      string
-	PasswordHash  string
-	Role          string
-	Verified      bool
-	AvatarUrl     *string
-	Level         int32
-	StarPoints    int32
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	SuspendedAt   *time.Time
-	SuspendedBy   *uuid.UUID
-	SuspendReason *string
+	ID                 uuid.UUID
+	Email              string
+	Username           string
+	PasswordHash       string
+	Role               string
+	Verified           bool
+	AvatarUrl          *string
+	Level              int32
+	StarPoints         int32
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	SuspendedAt        *time.Time
+	SuspendedBy        *uuid.UUID
+	SuspendReason      *string
+	EmailNotifications bool
 }

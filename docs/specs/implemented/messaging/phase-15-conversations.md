@@ -1,7 +1,7 @@
 # Phase 15 — Conversations and messages
 
 **Status:** Complete
-**Feature:** [Messaging with Contact Privacy](../../active/messaging/index.md)
+**Feature:** [Messaging with Contact Privacy](./index.md)
 **Objective:** A verified student can open a conversation with a listing's owner, both sides exchange messages with unread counts, and either side can close it.
 
 ---

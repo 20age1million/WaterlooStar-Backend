@@ -2,7 +2,7 @@
 
 ## Endpoints
 
-The API has fifty-one endpoints, fourteen of them admin-only. Everything is
+The API has fifty-two endpoints, fourteen of them admin-only. Everything is
 described in [the OpenAPI contract](../api/openapi.yaml); this is the public and
 student surface. The admin surface is in [Admin](admin.md#endpoints).
 
@@ -18,6 +18,7 @@ student surface. The admin surface is in [Admin](admin.md#endpoints).
 | POST | `/auth/password-reset` | — | Request a reset email |
 | POST | `/auth/password-reset/confirm` | — | Set a new password |
 | GET | `/me` | session | The signed-in user |
+| PATCH | `/me/preferences` | session | Turn notification emails on or off |
 | GET | `/listings` | — | Browse Housing Available, paginated |
 | GET | `/listings/{id}` | — | One listing in full |
 | GET | `/listings/availability` | — | Listings open in each month of a year, under the browse filters |
@@ -120,9 +121,48 @@ else gets 404, never 403.
   read marker, never stored. Poll `GET /me/conversations/unread`; reads are not
   rate limited.
 
+## Notification emails
+
+The other participant of a conversation is emailed about three events, through
+the same sender as the verification and reset links (Resend, or the log
+without `RESEND_API_KEY`):
+
+| Event | Sent to | Subject |
+|---|---|---|
+| A conversation opened from a listing (`POST /listings/{id}/conversations`) | the owner | "{username} wants to talk about {listing title}" |
+| A conversation opened by an offer (`POST /requests/{id}/offers`) | the request's poster | "{username} offered you {listing title}" |
+| The address shared, the first time (`POST /conversations/{id}/share-address`) | the enquirer | "{username} shared the address of {listing title}" |
+| A reply the recipient has not read, the first since they last read (`POST /conversations/{id}/messages`, or an offer's note in an existing conversation) | the other participant | "{username} replied about {listing title}" |
+
+- **Never the message text, never the address.** An email names who and which
+  listing and links to `APP_URL/messages/{conversation id}`. Neither the
+  builders in `internal/email` nor the query that feeds them can see a message
+  body or an address; tests in both packages enforce it.
+- **One reply email per unread spell.** Later messages send nothing until the
+  recipient reads the conversation (`POST /conversations/{id}/read`). The
+  opening message is covered by the "wants to talk" or "offered you" email.
+  An offer that joins an existing conversation emails only as a message does;
+  one with no note emails nothing.
+- **An opt-out.** `PATCH /me/preferences` with `{"email_notifications": false}`
+  stops all four; `GET /me` shows the setting. The inbox is unaffected.
+  Verification and reset emails are not notifications and are always sent.
+- **Only someone who can act on it.** Nothing goes to a recipient who opted
+  out, is suspended or has not confirmed their address.
+- **Caps.** At most 20 notification emails to one student at once, refilling
+  over a day (about one every 72 minutes, so at most 40 in any 24 hours), and
+  30 across the service, refilling over a day (at most 60 in any 24 hours).
+  Resend's free tier allows 100 emails a day and 3,000 a month for everything
+  the service sends, so the global cap always leaves at least 40 a day for
+  verification and reset links, and notifications use at most about 960 a
+  month. A restart forgets the counters and starts full again.
+- **Never in the way.** The email is sent after the write commits, in the
+  background: a slow or failing provider neither delays nor changes the
+  response. A failure, or a skip for any reason above, is logged by
+  conversation and user id, never by address.
+
 ## Rate limits
 
-The authentication endpoints and the six write endpoints answer **429** with a
+The authentication endpoints and the seven write endpoints answer **429** with a
 `Retry-After` header when an allowance is spent. The limits are in
 `internal/ratelimit/policy.go`, each with a comment saying what it protects.
 
@@ -137,6 +177,10 @@ The authentication endpoints and the six write endpoints answer **429** with a
 | `POST /listings/{id}/conversations` | the user | 10 per 2 hours, including attempts that find one already exists |
 | `POST /conversations/{id}/messages` | the user | 60 per 10 minutes |
 | `POST /conversations/{id}/share-address` | the user | 20 per hour, including shares that change nothing |
+| `PATCH /me/preferences` | the user | 20 per hour |
+
+The notification caps above are not route limits: they skip an email and
+never answer 429.
 
 Four things about it are deliberate:
 

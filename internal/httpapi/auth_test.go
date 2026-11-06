@@ -93,6 +93,19 @@ type harness struct {
 	db     *fakeQuerier
 	mail   *capturingMailer
 	client *http.Client
+	// api is the server behind it, so a request can wait for the
+	// notification emails it handed to the background (Phase 18).
+	api *httpapi.Server
+}
+
+// settle waits for any notification email the last request sent in the
+// background, so that what the mailer recorded is final when do returns.
+// Without it, a notification could land after a later verification email and
+// a test reading the last email would read the wrong one.
+func (h *harness) settle() {
+	if h.api != nil {
+		h.api.WaitForNotifications()
+	}
 }
 
 // newHarness builds a server over in-memory storage, with a cookie jar so the
@@ -113,8 +126,8 @@ func newHarness(t *testing.T) *harness {
 
 	db := newFakeQuerier()
 	mail := &capturingMailer{}
-	srv := httptest.NewServer(httpapi.NewRouter(cfg, log,
-		httpapi.NewServerWithQuerier(cfg, log, db, mail, "")))
+	api := httpapi.NewServerWithQuerier(cfg, log, db, mail, "")
+	srv := httptest.NewServer(httpapi.NewRouter(cfg, log, api))
 	t.Cleanup(srv.Close)
 
 	jar, err := cookiejar.New(nil)
@@ -122,7 +135,7 @@ func newHarness(t *testing.T) *harness {
 		t.Fatalf("cookiejar: %v", err)
 	}
 
-	return &harness{server: srv, db: db, mail: mail, client: &http.Client{Jar: jar}}
+	return &harness{server: srv, db: db, mail: mail, client: &http.Client{Jar: jar}, api: api}
 }
 
 // do sends a request, attaching the CSRF header from the jar when one is present
@@ -157,6 +170,7 @@ func (h *harness) do(t *testing.T, method, path string, body any) *http.Response
 		t.Fatalf("%s %s: %v", method, path, err)
 	}
 	t.Cleanup(func() { res.Body.Close() })
+	h.settle()
 	return res
 }
 

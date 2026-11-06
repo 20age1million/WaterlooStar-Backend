@@ -1,0 +1,13 @@
+-- Notification emails (messaging, Phase 18).
+--
+-- A student is emailed when a conversation is opened with them, when an owner
+-- shares an address with them, and when the first reply they have not read
+-- arrives. This is their one switch for all three. It is on by default, so a
+-- student who never visits their settings still hears that someone wrote.
+-- It does not cover account mail: verification and password-reset links are
+-- always sent.
+--
+-- What was sent is not recorded. Whether a reply email is due is computed from
+-- the messages and the read markers, as the unread counts are, and the caps
+-- live in the rate limiter.
+ALTER TABLE users ADD COLUMN email_notifications boolean NOT NULL DEFAULT true;

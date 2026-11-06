@@ -1,7 +1,7 @@
 # Phase 17 — Offers open conversations
 
 **Status:** Complete (2026-10-17, on `feature/messaging-offers`)
-**Feature:** [Messaging with Contact Privacy](../../active/messaging/index.md)
+**Feature:** [Messaging with Contact Privacy](./index.md)
 **Objective:** Making an offer opens a conversation with the request's poster, or joins the one they already have about that listing, so the poster can answer the offer there; the owner shares the address in it as in any other conversation.
 
 *(This whole phase follows Q-10, decided 2026-10-16.)*

@@ -92,6 +92,32 @@ func (s *Staged) MigrateTo(t *testing.T, version uint) {
 	s.Pool.Reset()
 }
 
+// User inserts a verified student with raw SQL. Every generated query that
+// returns a user reads users.* as the latest schema has it (migration 14
+// added email_notifications), so a staged database cannot run them; the
+// columns written here exist from migration 2 on.
+func (s *Staged) User(t *testing.T, email string) sqlcgen.User {
+	t.Helper()
+	u := sqlcgen.User{Email: email, Username: strings.TrimSuffix(email, "@uwaterloo.ca")}
+	if err := s.Pool.QueryRow(context.Background(), `
+		INSERT INTO users (email, username, password_hash, verified)
+		VALUES ($1, $2, '$2a$12$fixture.not.a.real.hash.only.a.placeholder.value.aa', true)
+		RETURNING id`, u.Email, u.Username).Scan(&u.ID); err != nil {
+		t.Fatalf("staged user %s: %v", email, err)
+	}
+	u.Verified = true
+	return u
+}
+
+// Suspend suspends a user with raw SQL, for the reason User gives.
+func (s *Staged) Suspend(t *testing.T, id uuid.UUID, reason string) {
+	t.Helper()
+	if _, err := s.Pool.Exec(context.Background(),
+		`UPDATE users SET suspended_at = now(), suspend_reason = $2 WHERE id = $1`, id, reason); err != nil {
+		t.Fatalf("staged suspend %s: %v", id, err)
+	}
+}
+
 // freshDatabase creates an empty database belonging to this test, dropped
 // when it ends, and returns its DSN. Skips when no server is configured.
 func freshDatabase(t *testing.T) string {

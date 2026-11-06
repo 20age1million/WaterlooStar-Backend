@@ -148,6 +148,14 @@ var limitedRoutes = []limitedRoute{
 		perKey:  ratelimit.ShareAddressPerUser,
 		message: "You have shared your address a lot in a short time. Try again in %s.",
 	},
+	{
+		method: http.MethodPatch, path: "/me/preferences", kind: keyByUser,
+		perKey:  ratelimit.PreferencesPerUser,
+		message: "You have changed your settings a lot in a short time. Try again in %s.",
+	},
+	// The notification caps, NotifyPerRecipient and NotifyGlobal, are not
+	// here: they limit emails, not routes, and are consulted in
+	// notifications.go after the write that triggers one.
 }
 
 // loginRouteKey is the context key under which the middleware leaves the login
