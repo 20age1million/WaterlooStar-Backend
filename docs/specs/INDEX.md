@@ -14,7 +14,25 @@ across both; everything from Phase 4 onward is not.
 
 ## Active
 
-*None.*
+| Feature | Phases | Status | Location |
+|---|---|---|---|
+| [Messaging with Contact Privacy](./active/messaging/index.md) | 4 (15–18) | In progress: 15 complete | `docs/specs/active/messaging/` |
+
+### Messaging with Contact Privacy
+
+A verified student messages a listing's owner inside WaterlooStar, and an owner
+answers a housing request with a conversation. Nobody's email or phone is ever
+shown; the exact address reaches a student only when the owner shares it in
+their conversation. Phase 15 is built on `feature/messaging` and not yet
+merged; its phase doc is under `implemented/messaging/`, while `index.md` and
+the later phases stay in `active/` until the feature is done.
+
+| Phase | Title | Status |
+|---|---|---|
+| 15 | [Conversations and messages](./implemented/messaging/phase-15-conversations.md) | Complete: start, inbox, unread counts, close; migration 11; eight endpoints |
+| 16 | [Contact privacy and address sharing](./active/messaging/phase-16-contact-privacy.md) | Ready |
+| 17 | [Offers open conversations](./active/messaging/phase-17-offer-conversations.md) | Ready |
+| 18 | [Message notifications](./active/messaging/phase-18-message-notifications.md) | Ready |
 
 ## Implemented
 
@@ -121,16 +139,18 @@ Recorded in the Platform Foundation `index.md` and still in force:
 
 ## Decisions settled — 2026-10-14
 
-**Address privacy:** show only an approximate location; reveal the exact address
-once contact is confirmed. This is designed and implemented as part of messaging,
-so the current public address remains a known implementation gap. See
-[the roadmap](../ROADMAP.md#address-privacy).
+**Address privacy:** show only an approximate location; the exact address is
+revealed only when the listing's owner shares it in a conversation (refined
+2026-10-16), and nothing but the address is ever revealed. This is designed and
+implemented as part of messaging, so the current public address remains a known
+implementation gap. See [the roadmap](../ROADMAP.md#address-privacy).
 
 ## What comes next
 
 Email Delivery is implemented (Phases 13–14). On **2026-10-14** the developer
 reordered backend work: messaging with contact privacy first, in parallel with
 the frontend Admin Portal and overhaul; then saves, views and the question
-thread. This replaces the **2026-09-27** order. “Accept an offer” waits on
-messaging. Each feature starts with a new spec. Read
-[the project roadmap](../ROADMAP.md) for the full sequence and launch goal.
+thread. This replaces the **2026-09-27** order. Answering an offer ships with
+messaging, and since **2026-10-16** promotion waits on it. Its spec is in
+Active. Read [the project roadmap](../ROADMAP.md) for the full sequence and
+launch goal.

@@ -34,6 +34,11 @@ type fakeQuerier struct {
 	requests          []sqlcgen.HousingRequest
 	offers            []sqlcgen.RequestOffer
 	adminActions      []sqlcgen.AdminAction
+	conversations     []sqlcgen.Conversation
+	messages          []sqlcgen.Message
+
+	// lastTick is the conversation clock's last reading. See tick.
+	lastTick time.Time
 
 	pingErr error
 }

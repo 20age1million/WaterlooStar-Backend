@@ -4,10 +4,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/oapi-codegen/nullable"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"github.com/20age1million/WaterlooStar-Backend/internal/apierror"
+	"github.com/20age1million/WaterlooStar-Backend/internal/auth"
 	"github.com/20age1million/WaterlooStar-Backend/internal/db/sqlcgen"
 	"github.com/20age1million/WaterlooStar-Backend/internal/httpapi/gen"
 )
@@ -224,4 +226,115 @@ func allInCents(row sqlcgen.Listing) *int32 {
 	}
 	sum := row.PriceCents + *row.BillsEstimateCents
 	return &sum
+}
+
+// conversationRow is one conversation as a participant sees it, whichever
+// query read it. The single read and the inbox return different generated
+// types with the same columns; both adapt to this so there is one mapping.
+type conversationRow struct {
+	Conversation         sqlcgen.Conversation
+	ListingTitle         string
+	ListingNeighbourhood string
+	ListingPriceCents    int32
+	ListingStartDate     time.Time
+	ListingEndDate       time.Time
+	ListingAvailable     bool
+	ListingRemoved       bool
+	CounterpartID        uuid.UUID
+	CounterpartUsername  string
+	CounterpartAvatarUrl *string
+	CounterpartVerified  bool
+	CounterpartSuspended bool
+	LastMessageSenderID  *uuid.UUID
+	LastMessageBody      *string
+	LastMessageCreatedAt *time.Time
+	UnreadCount          int64
+}
+
+func conversationRowFromGet(r sqlcgen.GetConversationForParticipantRow) conversationRow {
+	return conversationRow(r)
+}
+
+func conversationRowFromList(r sqlcgen.ListConversationsForUserRow) conversationRow {
+	return conversationRow(r)
+}
+
+// previewLength is how much of the newest message an inbox row shows.
+const previewLength = 140
+
+// toConversation maps a conversation to the contract shape for viewer.
+//
+// Everything that depends on who is looking is computed here - which side the
+// viewer is on, whether they opened or closed it, whether they sent the last
+// message - so the response never has to carry a participant's id other than
+// the counterpart's, and never anyone's email.
+func toConversation(r conversationRow, viewer auth.Principal) gen.Conversation {
+	c := r.Conversation
+
+	out := gen.Conversation{
+		Id:     openapi_types.UUID(c.ID),
+		Status: gen.ConversationStatusOpen,
+		Listing: gen.ConversationListing{
+			Id:            openapi_types.UUID(c.ListingID),
+			Title:         r.ListingTitle,
+			Neighbourhood: r.ListingNeighbourhood,
+			PriceCents:    int(r.ListingPriceCents),
+			StartDate:     openapi_types.Date{Time: r.ListingStartDate},
+			EndDate:       openapi_types.Date{Time: r.ListingEndDate},
+			Available:     r.ListingAvailable,
+		},
+		Counterpart: gen.ListingOwner{
+			Id:        openapi_types.UUID(r.CounterpartID),
+			Username:  r.CounterpartUsername,
+			AvatarUrl: nullableString(r.CounterpartAvatarUrl),
+			Verified:  r.CounterpartVerified,
+		},
+		ViewerIsOwner:        c.OwnerID == viewer.UserID,
+		OpenedByViewer:       c.OpenedBy == viewer.UserID,
+		CanSend:              viewer.Verified && sendRefusal(r) == "",
+		UnreadCount:          int(r.UnreadCount),
+		CreatedAt:            c.CreatedAt,
+		CounterpartAvailable: !r.CounterpartSuspended,
+		LastMessage:          nullable.NewNullNullable[gen.MessagePreview](),
+		ClosedAt:             nullable.NewNullNullable[time.Time](),
+		ClosedByViewer:       nullable.NewNullNullable[bool](),
+	}
+
+	if c.ClosedAt != nil {
+		out.Status = gen.ConversationStatusClosed
+		out.ClosedAt = nullable.NewNullableWithValue(*c.ClosedAt)
+		out.ClosedByViewer = nullable.NewNullableWithValue(c.ClosedBy != nil && *c.ClosedBy == viewer.UserID)
+	}
+
+	if r.LastMessageBody != nil && r.LastMessageCreatedAt != nil && r.LastMessageSenderID != nil {
+		out.LastMessage = nullable.NewNullableWithValue(gen.MessagePreview{
+			FromViewer: *r.LastMessageSenderID == viewer.UserID,
+			Body:       preview(*r.LastMessageBody),
+			CreatedAt:  *r.LastMessageCreatedAt,
+		})
+	}
+
+	return out
+}
+
+// preview cuts a message to previewLength characters - characters, not bytes,
+// so a cut never splits one.
+func preview(body string) string {
+	runes := []rune(body)
+	if len(runes) <= previewLength {
+		return body
+	}
+	return string(runes[:previewLength])
+}
+
+// toMessage maps a message for viewer. The sender is given as from_viewer
+// rather than as an id: there are only two people in a conversation.
+func toMessage(m sqlcgen.Message, viewer uuid.UUID) gen.Message {
+	return gen.Message{
+		Id:             openapi_types.UUID(m.ID),
+		ConversationId: openapi_types.UUID(m.ConversationID),
+		FromViewer:     m.SenderID == viewer,
+		Body:           m.Body,
+		CreatedAt:      m.CreatedAt,
+	}
 }

@@ -21,6 +21,20 @@ type AdminAction struct {
 	CreatedAt   time.Time
 }
 
+type Conversation struct {
+	ID             uuid.UUID
+	ListingID      uuid.UUID
+	OwnerID        uuid.UUID
+	EnquirerID     uuid.UUID
+	OpenedBy       uuid.UUID
+	ClosedAt       *time.Time
+	ClosedBy       *uuid.UUID
+	OwnerReadAt    *time.Time
+	EnquirerReadAt *time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
 type EmailVerificationToken struct {
 	TokenHash  []byte
 	UserID     uuid.UUID
@@ -110,6 +124,14 @@ type ListingPhoto struct {
 	Url       string
 	Position  int32
 	CreatedAt time.Time
+}
+
+type Message struct {
+	ID             uuid.UUID
+	ConversationID uuid.UUID
+	SenderID       uuid.UUID
+	Body           string
+	CreatedAt      time.Time
 }
 
 type PasswordResetToken struct {

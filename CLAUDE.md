@@ -121,20 +121,32 @@ only thing that calls it.
 | 12 | Listing terms: shorter stays, bill estimate and all-in cost, window ranking, monthly availability |
 | 13 | Resend sender: verification and reset emails delivered through Resend; the log without a key |
 | 14 | A new verification link: `POST /auth/verify/resend`, rate-limited, the same answer for any address |
+| 15 | Conversations and messages: message a listing's owner, the inbox, unread counts, closing (on `feature/messaging`, not yet merged) |
 
-Forty-two endpoints exist, fourteen of them admin-only. Read
-[API surface](docs/api.md) for student endpoints and rate limits, and
+Fifty endpoints exist, fourteen of them admin-only; eight of them are Phase
+15's messaging endpoints, not yet on `main`. Read
+[API surface](docs/api.md) for student endpoints, messages and rate limits, and
 [Admin](docs/admin.md) for admin endpoints and `cmd/admin` usage.
 
 Phases 5–14 are merged into `main` (pull requests #6–#13). Email Delivery is
 complete; its [spec](docs/specs/implemented/email-delivery/index.md) is implemented.
-No backend feature is currently in flight; messaging needs a new accepted spec.
 The roadmap and README split merged in #14. The documentation-current rule and
 the `.gitattributes` that keeps `go.mod`/`go.sum` on LF merged in #15
-(2026-10-15).
+(2026-10-15). The pull-request-description rule merged in #16.
 
-**In flight:** `chore/pr-descriptions` adds the pull-request-description rule above
-to the skill library.
+**In flight:** `feature/messaging` — the
+[Messaging with Contact Privacy spec](docs/specs/active/messaging/index.md)
+(Phases 15–18) is accepted (2026-10-16), and Phase 15, conversations and
+messages, is complete on the branch: migration 11, eight `messages`-tag
+endpoints, two new rate limits. It is open as
+[pull request #17](https://github.com/20age1million/WaterlooStar-Backend/pull/17).
+Each later phase is a stacked pull request (decided by Claude under the
+developer's delegation, 2026-10-16): Phase 16 on `feature/messaging-privacy`
+with `feature/messaging` as its base, then 17 and 18 the same way. Next is
+Phase 16, contact privacy and address sharing, which needs the frontend to stop reading
+`address_line` from public reads before it merges (see that phase's
+Dependencies); then 17 (offers open conversations) and 18 (email
+notifications).
 
 **Email goes through Resend**, called with `net/http` (no SDK). Clerk's
 transactional endpoint was chosen first (2026-09-25) and answered 404 with both a
@@ -148,7 +160,9 @@ Read [the project roadmap](docs/ROADMAP.md) before choosing or specifying the
 next feature. On 2026-10-14 the developer moved messaging with contact privacy
 first, ahead of saves, views and the question thread, replacing the order agreed
 on 2026-09-27. It starts in parallel with the frontend Admin Portal and overhaul;
-“accept an offer” waits on it. The frontend's new verification-link form has
+answering an offer ships with it, and since 2026-10-16 promotion waits on it.
+The messaging spec is in `docs/specs/active/messaging/`. The frontend's new
+verification-link form has
 already shipped. Real email needs `RESEND_API_KEY` in the host env file; until
 then an admin can verify accounts by hand.
 
@@ -156,19 +170,19 @@ then an admin can verify accounts by hand.
 
 [The project roadmap](docs/ROADMAP.md) is authoritative for the full plan:
 
-- The MVP is finding and posting housing, promoted after the frontend Admin
-  Portal and Phase 16 clean-up. Target: before Winter 2027 (January); cut scope
-  rather than move the date. Until messaging, use the listing's phone bar.
-  The community forum is outside this roadmap.
-- Address privacy is settled: approximate location publicly, exact address once
-  contact is confirmed, designed with messaging. The current public address is
-  an implementation gap, not an open product decision.
+- The MVP is finding and posting housing. Target: before Winter 2027 (January);
+  cut scope rather than move the date. The community forum is outside this
+  roadmap. (The launch gate was revised on 2026-10-16; see below.)
+- Address privacy is settled: approximate location publicly, exact address
+  later, designed with messaging (how it is revealed: 2026-10-16, below). The
+  current public address is an implementation gap, not an open product decision.
 - Create the first admin on the host with `cmd/admin promote`; existing admins
   grant every later admin through the portal's `POST /admin/users/{id}/role`.
   Both backend paths already exist.
 - Frontend order: Admin Portal (new spec; lost `feature/admin-portal` branch;
-  Phases 13–15), UI/UX Overhaul from Phase 16, messaging after the backend,
-  photos, question thread, poster profiles, saved searches, real maps. The
+  Phases 13–15), UI/UX Overhaul from Phase 16, a minimal messaging phase before
+  promotion (2026-10-16), photos, question thread, poster profiles, saved
+  searches, real maps. The
   portal guard returns 404 to non-admins. Phase 16 removes fake data and header
   links to absent features; mobile layout ends the overhaul. Small UI fixes
   happen any time.
@@ -183,6 +197,36 @@ then an admin can verify accounts by hand.
 - The developer chooses image hosting and map/geocoding providers when their
   features start. Each repo keeps its own specs and phase numbering; only
   `api/openapi.yaml` coordinates them.
+
+### Developer decisions — 2026-10-16
+
+- **Messaging before launch.** Promotion waits on the frontend Admin Portal,
+  frontend Phase 16, this repository's messaging with contact privacy, and a
+  minimal frontend messaging phase. There is no interim contact path: no phone
+  number or email is published. The listing's "phone bar" is the frontend's
+  pinned mobile bar and holds no phone.
+- **The owner shares the exact address by hand.** An explicit “Share exact
+  address” action in the conversation, by the listing's owner, whenever they
+  choose. Nothing else reveals it — not a reply, not opening a conversation,
+  not an offer.
+- **Only the exact address is revealed.** No email, no phone, ever.
+- **The rest of messaging was delegated to Claude.** The developer delegated
+  the spec's open questions (Q-1 to Q-11) to Claude the same day. Each was
+  decided by Claude under the developer's delegation, 2026-10-16, taking the
+  drafted recommendation: no accept step; either side can close, no blocking;
+  suspension and takedown make a conversation read-only and withhold a shared
+  address without un-sharing it; every conversation is about a listing; admins
+  never read message bodies in this feature; messages are append-only and
+  kept; the public location is `neighbourhood` plus a new `cross_streets`; no
+  un-share; sharing is per conversation; an offer opens or joins a
+  conversation and replying is the answer; email on conversation opened,
+  address shared and first unread reply, with an opt-out and caps. The
+  frontend messaging phase goes straight after frontend Phase 16, under the
+  same delegation. The spec's `index.md`, Decisions, has the table.
+  During Phase 15, also decided by Claude under the developer's delegation:
+  a listing its owner paused or archived does not stop a conversation; only a
+  moderator's takedown or a suspended counterpart makes it read-only (the
+  phase doc's Implementation Notes say why).
 
 ---
 
@@ -287,6 +331,26 @@ These were all found the hard way and will silently regress if undone.
   owner's. Sharing a column would let an owner republish over a moderator and
   lose what the status was. `ownedListing`/`ownedRequest` refuse a removed post
   with a 409, so every owner write path inherits the rule.
+- **Conversation reads are the participants' own, so they do not hide.** Like
+  `/me/...`, `GetConversationForParticipant` and `ListConversationsForUser` do
+  not filter out a suspended counterpart or a taken-down listing; they return
+  `counterpart_suspended`, `listing_removed` and `listing_available`, and
+  `sendRefusal` in `internal/httpapi/messages.go` turns those into a read-only
+  conversation (`can_send: false`, 409 on send). Hiding it would erase what the
+  other student might be reporting. Starting one still goes through
+  `GetPublishedListing`, so the public filters apply there. A paused or
+  archived listing does *not* stop a conversation: only a takedown does.
+- **sqlc types a `LEFT JOIN LATERAL (subquery)` column as non-null.** The first
+  draft of the conversation reads did, and a conversation with no messages
+  would have failed to scan its NULL last message into a `string`. Join the
+  table itself (`LEFT JOIN messages lm ON lm.id = (SELECT ... LIMIT 1)`) and
+  sqlc makes the columns pointers. Check the generated row type whenever a
+  query left-joins anything other than a table.
+- **The fake's conversations run on a strictly increasing clock** (`tick` in
+  `internal/httpapi/fake_querier_conversations_test.go`). Unread counts compare
+  a message's time with a read marker, and with the wall clock two calls in a
+  row can read the same instant, making an unread message look read. Use
+  `f.tick()` for any new timestamp the unread rule compares.
 - **The admin post lists are the one exception to the published-only rule.**
   `ListListingsForAdmin` and `ListRequestsForAdmin` read every row on purpose,
   behind the `/admin` guard. Every other read of a post filters on `status`,

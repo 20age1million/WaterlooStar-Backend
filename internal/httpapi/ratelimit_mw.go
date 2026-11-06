@@ -129,6 +129,18 @@ var limitedRoutes = []limitedRoute{
 		perKey:  ratelimit.WritePerUser,
 		message: "You have sent a lot of offers in a short time. Try again in %s.",
 	},
+	{
+		// Closing, marking read and the reads stay unlimited: each acts only on
+		// conversations the caller is already in.
+		method: http.MethodPost, path: "/listings/:id/conversations", kind: keyByUser,
+		perKey:  ratelimit.ConversationStartPerUser,
+		message: "You have messaged a lot of owners in a short time. Try again in %s.",
+	},
+	{
+		method: http.MethodPost, path: "/conversations/:id/messages", kind: keyByUser,
+		perKey:  ratelimit.MessagePerUser,
+		message: "You are sending messages very quickly. Try again in %s.",
+	},
 }
 
 // loginRouteKey is the context key under which the middleware leaves the login
