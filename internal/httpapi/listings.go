@@ -77,6 +77,7 @@ func (s *Server) ListListings(ctx context.Context, request gen.ListListingsReque
 				Verified:  row.OwnerVerified,
 			},
 			photos[row.Listing.ID],
+			false, // public: no exact address, no coordinates
 		))
 	}
 
@@ -206,6 +207,7 @@ func (s *Server) GetListing(ctx context.Context, request gen.GetListingRequestOb
 			Verified:  row.OwnerVerified,
 		},
 		photos,
+		false, // public: no exact address, no coordinates
 	)), nil
 }
 

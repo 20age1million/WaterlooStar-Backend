@@ -4,13 +4,17 @@
 
 **Backend:** Phases 0–14 are shipped: accounts, housing discovery and posting,
 requests and offers, rate limits, admin moderation, listing terms and email
-delivery. Messaging with contact privacy is in progress on `feature/messaging`:
-Phase 15, conversations and messages, is built and not yet merged; Phases
-16–18 (address privacy and sharing, offers opening conversations, email
-notifications) follow. [Backend specs index](specs/INDEX.md).
+delivery. **Messaging with contact privacy is built** (Phases 15–18): Phase
+15, conversations and messages, is on `main` (#17); Phase 16, address privacy
+and sharing, Phase 17, offers opening conversations, and Phase 18, email
+notifications, merged into `feature/messaging` (#18–#20) and reach `main` with
+pull request #21.
+[Backend specs index](specs/INDEX.md).
 
 **Frontend:** housing discovery and posting, requests and offers, session refresh,
-the housing rework and Phase 12's new verification link are shipped.
+the housing rework, Phase 12's new verification link, the Admin Portal (phases
+13–15) and the public-address fix are shipped. Its messaging phase is not yet
+specified.
 [Frontend specs index](https://github.com/20age1million/WaterlooStar-Frontend/blob/main/docs/specs/INDEX.md).
 
 ## How to update this file
@@ -29,6 +33,8 @@ once four pieces are done: the frontend Admin Portal, frontend Phase 16 clean-up
 the backend's messaging with contact privacy, and a minimal frontend messaging
 phase. On **2026-10-16** the developer put messaging before launch: there is no
 interim contact path, and no phone number or email is published in the meantime.
+The backend's part is built (Phases 15–18, 2026-10-17, awaiting merge), so
+promotion now waits only on the frontend's three pieces and on those merges.
 The listing page's pinned mobile bar holds no phone number; the frontend
 messaging phase wires up its Message button.
 
@@ -65,8 +71,14 @@ this roadmap.
    conversation; and replying to an offer. It restores the header's Messages
    link that Phase 16 removes and fills the Desk home's messages skeleton. It
    can start once backend messaging Phases 15–16 are on `main`; replying to
-   offers needs backend Phase 17. Before backend Phase 16 merges, the frontend
+   offers needs backend Phase 17 (built on `feature/messaging-offers`, not yet
+   merged: offers carry `conversation`, and the poster replies there). Before backend Phase 16 merges, the frontend
    stops reading the exact address from public listings, as a small UI fix.
+   Backend Phase 18 sends the notification emails, which link to
+   `/messages/{conversation id}`, so the thread must live at that path; the
+   phase also adds an "Email me about messages" switch
+   (`PATCH /me/preferences`, `email_notifications` on `GET /me`), because every
+   email tells the student to turn notifications off in their settings.
    Anything beyond the minimum gets its own spec later.
 4. **Photos.**
 5. **Question thread.**
@@ -76,16 +88,18 @@ this roadmap.
 
 ## Backend sequence — decided 2026-10-14, revised 2026-10-16
 
-Next is **messaging with contact privacy**, including the address rule below.
-It starts now in parallel with the frontend Admin Portal and UI/UX Overhaul.
-Since **2026-10-16** promotion waits on it. Answering an offer ships with it:
-an offer opens a conversation with the student who posted the request, who
-answers it there (decided by Claude under the developer's delegation,
-2026-10-16). Its spec is
-[docs/specs/active/messaging/](specs/active/messaging/index.md).
+**Messaging with contact privacy**, including the address rule below, is
+built: backend Phases 15–18, finished 2026-10-17 and awaiting merge as four
+stacked pull requests. It ran in parallel with the frontend Admin Portal and
+UI/UX Overhaul. Since **2026-10-16** promotion waits on it. Answering an offer
+is part of it (backend Phase 17): an offer opens a conversation with the
+student who posted the request, who answers it there by replying (decided by
+Claude under the developer's delegation, 2026-10-16). Email notifications are
+Phase 18. Its spec is
+[docs/specs/implemented/messaging/](specs/implemented/messaging/index.md).
 
-Then come **saves, views and the question thread**. Each feature starts with its
-own backend specification.
+Next come **saves, views and the question thread**, not yet specified. Each
+feature starts with its own backend specification.
 
 This explicitly replaces the order agreed on **2026-09-27**, which put saves,
 views and questions before messaging with contact privacy.
@@ -103,10 +117,16 @@ revealed; no email or phone number is shown or collected for contact. Design
 this as part of messaging with contact privacy.
 
 This settles the previously deferred question of whether the street address
-stays public. The current API still exposes it; the privacy change ships with
-messaging, rather than through this documentation change. The schema keeps
-`address_line` separate from `neighbourhood`, so a private field can be added
-without moving data. The earlier context is in the
+stays public. **Shipped in backend messaging Phase 16** (2026-10-16; on
+`feature/messaging` via #18, reaching `main` with #21): `address_line` is the private
+exact address, on the owner's own reads and the admin surface only; public
+reads show `neighbourhood` and a new `cross_streets`, with null coordinates;
+search no longer indexes the address; and `POST
+/conversations/{id}/share-address` is the owner's share, per conversation, with
+no un-share. It could reach `main` only after the frontend's `fix/public-address` (frontend
+pull request #19) had merged, so no public page reads a field that has gone;
+that merged on 2026-11-06. No data moved: `address_line` was always separate from
+`neighbourhood`. The earlier context is in the
 [Platform Foundation spec](specs/implemented/platform-foundation/index.md).
 
 ### Admin creation

@@ -93,6 +93,8 @@ func (f *fakeQuerier) CreateUser(_ context.Context, arg sqlcgen.CreateUserParams
 		StarPoints:   0,
 		CreatedAt:    now,
 		UpdatedAt:    now,
+		// The column's default (migration 14).
+		EmailNotifications: true,
 	}
 	f.users[user.ID] = user
 	return user, nil
@@ -353,7 +355,7 @@ func (f *fakeQuerier) CreateListing(_ context.Context, arg sqlcgen.CreateListing
 		Status: arg.Status, Views: arg.Views, Replies: arg.Replies,
 		CreatedAt: arg.CreatedAt, UpdatedAt: arg.CreatedAt,
 		ShorterStays: arg.ShorterStays, MinStayMonths: arg.MinStayMonths,
-		BillsEstimateCents: arg.BillsEstimateCents,
+		BillsEstimateCents: arg.BillsEstimateCents, CrossStreets: arg.CrossStreets,
 	}
 	if l.Conditions == nil {
 		l.Conditions = []string{}
@@ -387,7 +389,8 @@ func (f *fakeQuerier) matches(l sqlcgen.Listing, p sqlcgen.ListListingsParams) b
 
 	if p.Search != nil {
 		haystack := strings.ToLower(strings.Join(
-			[]string{l.Title, l.Body, l.Neighbourhood, l.AddressLine}, " "))
+			// The search column (migration 12): never the exact address.
+			[]string{l.Title, l.Body, l.Neighbourhood, l.CrossStreets}, " "))
 		for _, word := range strings.Fields(strings.ToLower(*p.Search)) {
 			if !strings.Contains(haystack, strings.Trim(word, `"`)) {
 				return false
@@ -670,6 +673,9 @@ func (f *fakeQuerier) UpdateListing(_ context.Context, arg sqlcgen.UpdateListing
 		}
 		if arg.Neighbourhood != nil {
 			l.Neighbourhood = *arg.Neighbourhood
+		}
+		if arg.CrossStreets != nil {
+			l.CrossStreets = *arg.CrossStreets
 		}
 		if arg.DistanceM != nil {
 			l.DistanceM = arg.DistanceM

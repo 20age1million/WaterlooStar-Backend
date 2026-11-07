@@ -56,6 +56,9 @@ type Querier interface {
 	//     a conversation whose listing was taken down or whose other participant
 	//     is suspended. They report it instead (listing_removed, listing_available,
 	//     counterpart_suspended) and the handler makes the conversation read-only.
+	//   * The exact address appears only in the place_* columns, only once the
+	//     owner has shared it (address_shared_at), and is withheld while the
+	//     listing is taken down or its owner suspended.
 	//
 	// Unread counts and last activity are computed here from messages and the read
 	// markers, never stored.
@@ -89,6 +92,12 @@ type Querier interface {
 	GetConversationByListingAndEnquirer(ctx context.Context, arg GetConversationByListingAndEnquirerParams) (Conversation, error)
 	// One conversation, as one of its participants sees it. No row unless user_id
 	// is the owner or the enquirer.
+	// The reveal condition. The listing again, matched only once the owner has
+	// shared its address in this conversation, and not while the listing is taken
+	// down or its owner suspended: withheld, never un-shared, so reinstating
+	// restores it. It is in the SQL, as the public read filters are, so no handler
+	// can forget it. A join rather than a CASE because sqlc types a CASE column as
+	// interface{}, and a left-joined table's columns as pointers.
 	// The newest message. Joined as the messages table itself, rather than as a
 	// lateral subquery, so sqlc knows its columns are null for a conversation with
 	// no messages yet.
@@ -100,6 +109,21 @@ type Querier interface {
 	GetLiveEmailVerificationToken(ctx context.Context, tokenHash []byte) (EmailVerificationToken, error)
 	GetLivePasswordResetToken(ctx context.Context, tokenHash []byte) (PasswordResetToken, error)
 	GetLiveRefreshToken(ctx context.Context, tokenHash []byte) (RefreshToken, error)
+	// Who to tell, by email, about something sender_id just did in this
+	// conversation: the other participant, with what the handler needs to decide
+	// whether to send (their switch, verification and suspension) and to write the
+	// email (their address, the sender's username, the listing's title). Read once,
+	// after the write commits. No row unless sender_id is a participant.
+	//
+	// unread_through_message is how many messages the recipient has not read, up
+	// to and including message_id: 1 means that message is the first one waiting
+	// for them, which is when a reply email is due. Counting only up to that
+	// message, rather than everything unread now, keeps two messages sent at once
+	// from each seeing the other and both staying silent. Null message_id counts
+	// nothing (0).
+	//
+	// No message body and no address is read here: the email may contain neither.
+	GetNotificationRecipient(ctx context.Context, arg GetNotificationRecipientParams) (GetNotificationRecipientRow, error)
 	// Any offer by id, for the ownership check before a withdrawal. "Not yours" and
 	// "does not exist" answer alike in the handler.
 	GetOffer(ctx context.Context, id uuid.UUID) (RequestOffer, error)
@@ -128,6 +152,12 @@ type Querier interface {
 	// The inbox: both sides, newest activity first. status is 'open' or 'closed';
 	// side is 'owner' (about your own listings) or 'enquirer' (ones you asked
 	// about). Either may be null for no filter.
+	// The reveal condition. The listing again, matched only once the owner has
+	// shared its address in this conversation, and not while the listing is taken
+	// down or its owner suspended: withheld, never un-shared, so reinstating
+	// restores it. It is in the SQL, as the public read filters are, so no handler
+	// can forget it. A join rather than a CASE because sqlc types a CASE column as
+	// interface{}, and a left-joined table's columns as pointers.
 	// The newest message. Joined as the messages table itself, rather than as a
 	// lateral subquery, so sqlc knows its columns are null for a conversation with
 	// no messages yet.
@@ -169,6 +199,11 @@ type Querier interface {
 	//
 	// An offer is live only while its listing is: taking a listing down withdraws
 	// its offers, with nothing else to remember. Same for an explicit withdrawal.
+	//
+	// Each offer also carries the conversation it opened or joined (Phase 17):
+	// whether it is closed, and whether the request's poster has written in it,
+	// which is how an offer is answered. conversation_closed_at is null both for
+	// an open conversation and for none; o.conversation_id tells them apart.
 	ListOffersForRequest(ctx context.Context, requestID uuid.UUID) ([]ListOffersForRequestRow, error)
 	ListPhotosForListing(ctx context.Context, listingID uuid.UUID) ([]ListingPhoto, error)
 	// Photos for a page of listings in one round-trip, rather than one query per
@@ -226,18 +261,32 @@ type Querier interface {
 	// cannot overwrite the first one's time and reason; no row back means that.
 	RemoveListing(ctx context.Context, arg RemoveListingParams) (Listing, error)
 	RemoveRequest(ctx context.Context, arg RemoveRequestParams) (HousingRequest, error)
+	// Reopening, for one case only: the owner offers the listing against a
+	// request by the student they had closed this conversation with, so the offer
+	// joins it. Only a conversation closed by that owner matches. One the
+	// enquirer closed never does: closing is how a student refuses contact about
+	// a listing, and an offer must not get round it. Reopening touches nothing
+	// else - not the read markers, and never address_shared_at. No row means it
+	// was not closed by this owner.
+	ReopenConversation(ctx context.Context, arg ReopenConversationParams) (Conversation, error)
 	RestoreListing(ctx context.Context, id uuid.UUID) (Listing, error)
 	RestoreRequest(ctx context.Context, id uuid.UUID) (HousingRequest, error)
 	// Used on password change: every existing session is ended, so a password reset
 	// actually evicts whoever prompted it.
 	RevokeAllRefreshTokensForUser(ctx context.Context, userID uuid.UUID) error
 	RevokeRefreshToken(ctx context.Context, tokenHash []byte) error
+	// The notification-email switch (messaging, Phase 18). Account mail -
+	// verification and reset links - ignores it.
+	SetEmailNotifications(ctx context.Context, arg SetEmailNotificationsParams) (User, error)
 	// published_at is set the first time a listing goes live and never moved, so
 	// re-publishing after a pause does not make an old post look new.
 	// Cast on both uses: referring to the same parameter as varchar in one place
 	// and ::text in another makes PostgreSQL refuse to deduce a type for it
 	// (SQLSTATE 42P08).
 	SetListingStatus(ctx context.Context, arg SetListingStatusParams) (Listing, error)
+	// Points an offer at the conversation it opened or joined. Written in the same
+	// transaction as the offer, by CreateOffer's handler; nothing else sets it.
+	SetOfferConversation(ctx context.Context, arg SetOfferConversationParams) (RequestOffer, error)
 	// Cast on both uses of the parameter: referring to it as varchar in one place
 	// and ::text in another makes PostgreSQL refuse to deduce a type (SQLSTATE
 	// 42P08). That shipped once already on listings.
@@ -245,6 +294,14 @@ type Querier interface {
 	// A role change. Only cmd/admin calls it in this phase; the portal gains it in
 	// Phase 10. Always paired with InsertAdminAction in one transaction.
 	SetUserRole(ctx context.Context, arg SetUserRoleParams) (User, error)
+	// The owner shares the listing's exact address in this conversation: the
+	// one write that sets address_shared_at, and the only way the address reaches
+	// another student. Set once - a share already made matches nothing, so its
+	// time stands - and only by the owner, while the conversation is open, the
+	// enquirer's account is available, the listing is available to the public and
+	// it has an address to share. No row affected means already shared, refused,
+	// or not this owner's; the handler re-reads and says which.
+	ShareConversationAddress(ctx context.Context, arg ShareConversationAddressParams) (int64, error)
 	// Suspension sets the time, the actor and the reason together. Only an active
 	// account matches, so suspending one already suspended keeps the original
 	// time and reason rather than overwriting them; no row back means that.

@@ -94,7 +94,8 @@ INSERT INTO listings (
     address_line, neighbourhood, lat, lng, distance_m,
     commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery,
     status, views, replies, created_at,
-    shorter_stays, min_stay_months, bills_estimate_cents
+    shorter_stays, min_stay_months, bills_estimate_cents,
+    cross_streets
 ) VALUES (
     $1, $2, $3, $4,
     $5, $6,
@@ -104,9 +105,10 @@ INSERT INTO listings (
     $21, $22, $23, $24, $25,
     $26, $27, $28, $29,
     $30, $31, $32, $33,
-    $34, $35, $36
+    $34, $35, $36,
+    $37
 )
-RETURNING id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at, search, published_at, removed_at, removed_by, removed_reason, shorter_stays, min_stay_months, bills_estimate_cents
+RETURNING id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at, published_at, removed_at, removed_by, removed_reason, shorter_stays, min_stay_months, bills_estimate_cents, cross_streets, search
 `
 
 type CreateListingParams struct {
@@ -146,6 +148,7 @@ type CreateListingParams struct {
 	ShorterStays       bool
 	MinStayMonths      *int32
 	BillsEstimateCents *int32
+	CrossStreets       string
 }
 
 func (q *Queries) CreateListing(ctx context.Context, arg CreateListingParams) (Listing, error) {
@@ -186,6 +189,7 @@ func (q *Queries) CreateListing(ctx context.Context, arg CreateListingParams) (L
 		arg.ShorterStays,
 		arg.MinStayMonths,
 		arg.BillsEstimateCents,
+		arg.CrossStreets,
 	)
 	var i Listing
 	err := row.Scan(
@@ -225,7 +229,6 @@ func (q *Queries) CreateListing(ctx context.Context, arg CreateListingParams) (L
 		&i.Saves,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.Search,
 		&i.PublishedAt,
 		&i.RemovedAt,
 		&i.RemovedBy,
@@ -233,6 +236,8 @@ func (q *Queries) CreateListing(ctx context.Context, arg CreateListingParams) (L
 		&i.ShorterStays,
 		&i.MinStayMonths,
 		&i.BillsEstimateCents,
+		&i.CrossStreets,
+		&i.Search,
 	)
 	return i, err
 }
@@ -247,7 +252,7 @@ func (q *Queries) DeleteAllListings(ctx context.Context) error {
 }
 
 const getListingForOwner = `-- name: GetListingForOwner :one
-SELECT id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at, search, published_at, removed_at, removed_by, removed_reason, shorter_stays, min_stay_months, bills_estimate_cents FROM listings WHERE id = $1
+SELECT id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at, published_at, removed_at, removed_by, removed_reason, shorter_stays, min_stay_months, bills_estimate_cents, cross_streets, search FROM listings WHERE id = $1
 `
 
 // Fetch for an ownership check. Returns the row whatever its status, so a
@@ -293,7 +298,6 @@ func (q *Queries) GetListingForOwner(ctx context.Context, id uuid.UUID) (Listing
 		&i.Saves,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.Search,
 		&i.PublishedAt,
 		&i.RemovedAt,
 		&i.RemovedBy,
@@ -301,13 +305,15 @@ func (q *Queries) GetListingForOwner(ctx context.Context, id uuid.UUID) (Listing
 		&i.ShorterStays,
 		&i.MinStayMonths,
 		&i.BillsEstimateCents,
+		&i.CrossStreets,
+		&i.Search,
 	)
 	return i, err
 }
 
 const getPublishedListing = `-- name: GetPublishedListing :one
 SELECT
-    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.search, l.published_at, l.removed_at, l.removed_by, l.removed_reason, l.shorter_stays, l.min_stay_months, l.bills_estimate_cents,
+    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.published_at, l.removed_at, l.removed_by, l.removed_reason, l.shorter_stays, l.min_stay_months, l.bills_estimate_cents, l.cross_streets, l.search,
     u.username    AS owner_username,
     u.avatar_url  AS owner_avatar_url,
     u.verified    AS owner_verified
@@ -365,7 +371,6 @@ func (q *Queries) GetPublishedListing(ctx context.Context, id uuid.UUID) (GetPub
 		&i.Listing.Saves,
 		&i.Listing.CreatedAt,
 		&i.Listing.UpdatedAt,
-		&i.Listing.Search,
 		&i.Listing.PublishedAt,
 		&i.Listing.RemovedAt,
 		&i.Listing.RemovedBy,
@@ -373,6 +378,8 @@ func (q *Queries) GetPublishedListing(ctx context.Context, id uuid.UUID) (GetPub
 		&i.Listing.ShorterStays,
 		&i.Listing.MinStayMonths,
 		&i.Listing.BillsEstimateCents,
+		&i.Listing.CrossStreets,
+		&i.Listing.Search,
 		&i.OwnerUsername,
 		&i.OwnerAvatarUrl,
 		&i.OwnerVerified,
@@ -384,7 +391,7 @@ const listListings = `-- name: ListListings :many
 
 
 SELECT
-    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.search, l.published_at, l.removed_at, l.removed_by, l.removed_reason, l.shorter_stays, l.min_stay_months, l.bills_estimate_cents,
+    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.published_at, l.removed_at, l.removed_by, l.removed_reason, l.shorter_stays, l.min_stay_months, l.bills_estimate_cents, l.cross_streets, l.search,
     u.username    AS owner_username,
     u.avatar_url  AS owner_avatar_url,
     u.verified    AS owner_verified
@@ -545,7 +552,6 @@ func (q *Queries) ListListings(ctx context.Context, arg ListListingsParams) ([]L
 			&i.Listing.Saves,
 			&i.Listing.CreatedAt,
 			&i.Listing.UpdatedAt,
-			&i.Listing.Search,
 			&i.Listing.PublishedAt,
 			&i.Listing.RemovedAt,
 			&i.Listing.RemovedBy,
@@ -553,6 +559,8 @@ func (q *Queries) ListListings(ctx context.Context, arg ListListingsParams) ([]L
 			&i.Listing.ShorterStays,
 			&i.Listing.MinStayMonths,
 			&i.Listing.BillsEstimateCents,
+			&i.Listing.CrossStreets,
+			&i.Listing.Search,
 			&i.OwnerUsername,
 			&i.OwnerAvatarUrl,
 			&i.OwnerVerified,
@@ -570,7 +578,7 @@ func (q *Queries) ListListings(ctx context.Context, arg ListListingsParams) ([]L
 const listListingsByOwner = `-- name: ListListingsByOwner :many
 
 SELECT
-    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.search, l.published_at, l.removed_at, l.removed_by, l.removed_reason, l.shorter_stays, l.min_stay_months, l.bills_estimate_cents,
+    l.id, l.owner_id, l.title, l.body, l.conditions, l.price_cents, l.deposit_cents, l.start_date, l.end_date, l.lease_months, l.term_tag, l.unit_type, l.bedrooms_total, l.bedroom_of, l.bathrooms, l.bath_type, l.furnished, l.utilities, l.parking, l.pets, l.laundry, l.address_line, l.neighbourhood, l.lat, l.lng, l.distance_m, l.commute_minutes, l.commute_mode, l.minutes_to_transit, l.minutes_to_grocery, l.status, l.views, l.replies, l.saves, l.created_at, l.updated_at, l.published_at, l.removed_at, l.removed_by, l.removed_reason, l.shorter_stays, l.min_stay_months, l.bills_estimate_cents, l.cross_streets, l.search,
     u.username    AS owner_username,
     u.avatar_url  AS owner_avatar_url,
     u.verified    AS owner_verified
@@ -636,7 +644,6 @@ func (q *Queries) ListListingsByOwner(ctx context.Context, ownerID uuid.UUID) ([
 			&i.Listing.Saves,
 			&i.Listing.CreatedAt,
 			&i.Listing.UpdatedAt,
-			&i.Listing.Search,
 			&i.Listing.PublishedAt,
 			&i.Listing.RemovedAt,
 			&i.Listing.RemovedBy,
@@ -644,6 +651,8 @@ func (q *Queries) ListListingsByOwner(ctx context.Context, ownerID uuid.UUID) ([
 			&i.Listing.ShorterStays,
 			&i.Listing.MinStayMonths,
 			&i.Listing.BillsEstimateCents,
+			&i.Listing.CrossStreets,
+			&i.Listing.Search,
 			&i.OwnerUsername,
 			&i.OwnerAvatarUrl,
 			&i.OwnerVerified,
@@ -830,7 +839,7 @@ SET status = $1::text,
         ELSE published_at
     END
 WHERE id = $2
-RETURNING id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at, search, published_at, removed_at, removed_by, removed_reason, shorter_stays, min_stay_months, bills_estimate_cents
+RETURNING id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at, published_at, removed_at, removed_by, removed_reason, shorter_stays, min_stay_months, bills_estimate_cents, cross_streets, search
 `
 
 type SetListingStatusParams struct {
@@ -883,7 +892,6 @@ func (q *Queries) SetListingStatus(ctx context.Context, arg SetListingStatusPara
 		&i.Saves,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.Search,
 		&i.PublishedAt,
 		&i.RemovedAt,
 		&i.RemovedBy,
@@ -891,6 +899,8 @@ func (q *Queries) SetListingStatus(ctx context.Context, arg SetListingStatusPara
 		&i.ShorterStays,
 		&i.MinStayMonths,
 		&i.BillsEstimateCents,
+		&i.CrossStreets,
+		&i.Search,
 	)
 	return i, err
 }
@@ -918,17 +928,19 @@ UPDATE listings SET
     laundry        = coalesce($19,        laundry),
     address_line   = coalesce($20,   address_line),
     neighbourhood  = coalesce($21,  neighbourhood),
-    distance_m     = coalesce($22,     distance_m),
-    shorter_stays  = coalesce($23,  shorter_stays),
+    -- '' is not NULL, so an empty string clears it: COALESCE is enough here.
+    cross_streets  = coalesce($22,  cross_streets),
+    distance_m     = coalesce($23,     distance_m),
+    shorter_stays  = coalesce($24,  shorter_stays),
     -- These two can be set back to NULL — "whole lease only", "estimate not
     -- stated" — which COALESCE cannot express, so each says whether it is
     -- being set at all.
-    min_stay_months = CASE WHEN $24::bool
-                           THEN $25::int ELSE min_stay_months END,
-    bills_estimate_cents = CASE WHEN $26::bool
-                                THEN $27::int ELSE bills_estimate_cents END
-WHERE id = $28
-RETURNING id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at, search, published_at, removed_at, removed_by, removed_reason, shorter_stays, min_stay_months, bills_estimate_cents
+    min_stay_months = CASE WHEN $25::bool
+                           THEN $26::int ELSE min_stay_months END,
+    bills_estimate_cents = CASE WHEN $27::bool
+                                THEN $28::int ELSE bills_estimate_cents END
+WHERE id = $29
+RETURNING id, owner_id, title, body, conditions, price_cents, deposit_cents, start_date, end_date, lease_months, term_tag, unit_type, bedrooms_total, bedroom_of, bathrooms, bath_type, furnished, utilities, parking, pets, laundry, address_line, neighbourhood, lat, lng, distance_m, commute_minutes, commute_mode, minutes_to_transit, minutes_to_grocery, status, views, replies, saves, created_at, updated_at, published_at, removed_at, removed_by, removed_reason, shorter_stays, min_stay_months, bills_estimate_cents, cross_streets, search
 `
 
 type UpdateListingParams struct {
@@ -953,6 +965,7 @@ type UpdateListingParams struct {
 	Laundry            *bool
 	AddressLine        *string
 	Neighbourhood      *string
+	CrossStreets       *string
 	DistanceM          *int32
 	ShorterStays       *bool
 	SetMinStay         bool
@@ -987,6 +1000,7 @@ func (q *Queries) UpdateListing(ctx context.Context, arg UpdateListingParams) (L
 		arg.Laundry,
 		arg.AddressLine,
 		arg.Neighbourhood,
+		arg.CrossStreets,
 		arg.DistanceM,
 		arg.ShorterStays,
 		arg.SetMinStay,
@@ -1033,7 +1047,6 @@ func (q *Queries) UpdateListing(ctx context.Context, arg UpdateListingParams) (L
 		&i.Saves,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.Search,
 		&i.PublishedAt,
 		&i.RemovedAt,
 		&i.RemovedBy,
@@ -1041,6 +1054,8 @@ func (q *Queries) UpdateListing(ctx context.Context, arg UpdateListingParams) (L
 		&i.ShorterStays,
 		&i.MinStayMonths,
 		&i.BillsEstimateCents,
+		&i.CrossStreets,
+		&i.Search,
 	)
 	return i, err
 }

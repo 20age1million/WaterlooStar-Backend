@@ -16,7 +16,7 @@ internal/db/sqlcgen      Generated. Do not edit.
 internal/httpapi         Router and handlers.
 internal/httpapi/gen     Generated from openapi.yaml. Do not edit.
 internal/db/seed         Development fixtures: 6 prototype listings and 5 requests.
-internal/email           Sender interface; Resend delivery, or the log without a key.
+internal/email           Sender interface; Resend delivery, or the log without a key; the account and notification emails.
 internal/middleware      Request id, logging, recovery, CORS, auth, CSRF.
 internal/ratelimit       Token buckets and the limits, in policy.go.
 internal/db/dbtest       Harness that runs queries against a real PostgreSQL.

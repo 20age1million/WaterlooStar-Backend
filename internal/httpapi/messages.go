@@ -116,6 +116,12 @@ func (s *Server) SendMessage(ctx context.Context, request gen.SendMessageRequest
 		s.log.Error("send message", slog.String("error", err.Error()))
 		return nil, err
 	}
+
+	// Emails the other side only if this is the first message they have not
+	// read; notify decides.
+	s.notify(ctx, notification{
+		kind: notifyReplyWaiting, conversationID: id, senderID: principal.UserID, messageID: &message.ID,
+	})
 	return gen.SendMessage201JSONResponse(toMessage(message, principal.UserID)), nil
 }
 

@@ -3,6 +3,7 @@ package httpapi
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
@@ -24,7 +25,8 @@ func validateListing(p sqlcgen.CreateListingParams) map[string]string {
 		StartDate: p.StartDate, EndDate: p.EndDate, LeaseMonths: p.LeaseMonths,
 		UnitType: p.UnitType, BedroomsTotal: p.BedroomsTotal, BedroomOf: p.BedroomOf,
 		Bathrooms: p.Bathrooms, BathType: p.BathType, AddressLine: p.AddressLine,
-		Conditions: p.Conditions, Status: p.Status,
+		CrossStreets: p.CrossStreets,
+		Conditions:   p.Conditions, Status: p.Status,
 		ShorterStays: p.ShorterStays, MinStayMonths: p.MinStayMonths, BillsEstimateCents: p.BillsEstimateCents,
 	})
 }
@@ -65,7 +67,11 @@ func validateListingRow(l sqlcgen.Listing) map[string]string {
 		problems["bathrooms"] = "A bathroom count cannot be negative."
 	}
 	if strings.TrimSpace(l.AddressLine) == "" {
-		problems["address_line"] = "Say which street the place is on."
+		problems["address_line"] = "Give the exact address, house number included. Only students you choose to share it with will see it."
+	}
+	// Characters, not bytes, as varchar(80) counts them.
+	if utf8.RuneCountInString(strings.TrimSpace(l.CrossStreets)) > maxCrossStreets {
+		problems["cross_streets"] = fmt.Sprintf("Keep the cross streets to %d characters or fewer.", maxCrossStreets)
 	}
 	if len(l.Conditions) > maxConditions {
 		problems["conditions"] = fmt.Sprintf("Keep it to %d conditions or fewer.", maxConditions)
@@ -141,6 +147,9 @@ func applyUpdate(l *sqlcgen.Listing, in gen.ListingUpdate) {
 	if in.AddressLine != nil {
 		l.AddressLine = *in.AddressLine
 	}
+	if in.CrossStreets != nil {
+		l.CrossStreets = strings.TrimSpace(*in.CrossStreets)
+	}
 	if in.ShorterStays != nil {
 		l.ShorterStays = *in.ShorterStays
 	}
@@ -154,6 +163,9 @@ func applyUpdate(l *sqlcgen.Listing, in gen.ListingUpdate) {
 
 // maxBillsEstimateCents is the database's ceiling on a bill estimate: $1,000.
 const maxBillsEstimateCents = 100000
+
+// maxCrossStreets is the length of listings.cross_streets, varchar(80).
+const maxCrossStreets = 80
 
 // minStayChange reports what an edit does to the minimum stay. Turning shorter
 // stays off without mentioning the minimum clears it: the minimum means
@@ -218,6 +230,7 @@ func updateParams(id uuid.UUID, in gen.ListingUpdate) sqlcgen.UpdateListingParam
 	p.Laundry = in.Laundry
 	p.AddressLine = trimmedPtr(in.AddressLine)
 	p.Neighbourhood = trimmedPtr(in.Neighbourhood)
+	p.CrossStreets = trimmedPtr(in.CrossStreets)
 	if v, ok := nullableValue(in.DistanceM); ok {
 		p.DistanceM = int32Ptr(v)
 	}

@@ -60,13 +60,37 @@ tags:
       listing and enquirer, so closing also stops that enquirer opening another
       about the same listing.
 
+      A conversation is opened from either side. The enquirer opens one from
+      the listing page (`POST /listings/{id}/conversations`). The owner opens
+      one by **offering** the listing against the enquirer's housing request
+      (`POST /requests/{id}/offers`): the request's poster becomes the
+      enquirer, the offer's note becomes the owner's first message, and the
+      poster answers the offer by replying. An offer joins the conversation the
+      two already have about that listing rather than opening a second one.
+
       A conversation never carries anyone's email or phone number. Opening one
-      reveals nothing: the exact address of a place is the owner's to share,
-      by hand, inside the conversation (a later phase adds that action). The
-      listing summary here carries no address.
+      reveals nothing, and neither does sending, replying, reading, closing or
+      making an offer.
+      The exact address of a place is shared by its **owner**, by hand, with
+      `POST /conversations/{id}/share-address`, and by nothing else. A share
+      covers that one conversation, cannot be undone, and fills the
+      conversation's `place`. The listing summary here carries no address.
 
       While the listing is taken down by a moderator, or either participant's
-      account is suspended, the conversation stays visible but read-only.
+      account is suspended, the conversation stays visible but read-only. A
+      shared `place` is withheld while the listing is taken down or its owner
+      is suspended, without being un-shared, and returns when that ends.
+
+      **Email notifications.** The other participant is told by email when a
+      conversation is opened with them, when the owner shares the address,
+      and when the first reply they have not read arrives (one email per
+      unread spell: nothing more until they read the conversation). The email
+      names the sender and the listing and links to the conversation; it
+      never contains a message's text or the address. Nothing is sent to a
+      student who turned them off (`PATCH /me/preferences`), is suspended or
+      has not confirmed their address, and caps bound how many anyone
+      receives a day. Email is sent after the response is decided and never
+      changes it: a failed or capped email is not an error.
 
   - name: admin
     description: |
@@ -346,6 +370,45 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /me/preferences:
+    patch:
+      tags: [me]
+      operationId: updateMyPreferences
+      summary: Change your notification preferences
+      description: |
+        Turns the notification emails on or off for the signed-in user. A
+        field left out is left as it is. The answer is your own `User`, with
+        the new setting in `email_notifications`.
+
+        With `email_notifications` on (the default), you get an email when
+        someone opens a conversation with you (from a listing, or by offering
+        you a place), when an owner shares the exact address of a place with
+        you, and when a reply is waiting that you have not read - one email
+        per unread spell, not one per message. With it off you get none of
+        these. The inbox is unaffected either way. Account emails - the
+        verification and password-reset links - are not notifications and are
+        always sent.
+
+        No notification email ever contains a message's text or an exact
+        address: it names who, which listing, and links to the conversation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PreferencesUpdate"
+      responses:
+        "200":
+          description: Updated. The signed-in user, as `GET /me` returns them.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /listings:
     get:
       tags: [housing]
@@ -364,7 +427,9 @@ paths:
         - name: q
           in: query
           description: |
-            Full-text search over title, neighbourhood, address and description.
+            Full-text search over title, neighbourhood, cross streets and
+            description. The exact address is **not** searched: a hidden field
+            that could still be matched could be confirmed by probing.
             Supports quoted phrases and `-exclusion`.
           schema: { type: string }
         - name: start_after
@@ -984,6 +1049,14 @@ paths:
 
         An offer disappears here when its listing stops being published, so
         taking a place down withdraws its offers with nothing else to remember.
+
+        Each offer carries `conversation`: the conversation between the
+        request's poster and the offering owner about the offered listing,
+        which the offer opened or joined. The poster answers an offer by
+        replying there; `poster_replied` turns true once they have. Offers have
+        no accept or decline of their own. An offer reveals no address: the
+        listing here is the public shape, and the owner shares the exact
+        address in the conversation, by hand, or not at all.
       parameters:
         - name: id
           in: path
@@ -1014,7 +1087,32 @@ paths:
         If you have nothing suitable posted, post the listing first and then
         offer it - two calls, which a client can present as one flow.
 
-        The same listing cannot be offered twice against one request.
+        The same listing cannot be offered twice against one request, and you
+        cannot answer your own request.
+
+        Offering also opens a conversation with the request's poster about the
+        offered listing, in the same transaction, and the response's
+        `conversation` names it:
+
+        - **No conversation yet:** a new one, opened by you. A non-empty note
+          is its first message; with no note it starts empty.
+        - **An open one** (whoever started it): the offer joins it, and a
+          non-empty note is posted there as a message from you.
+        - **One you closed:** it is reopened and joined.
+        - **One the poster closed:** refused with 409. Closing is how a
+          student refuses contact about a listing, and an offer does not get
+          round it.
+
+        An offer that opens a conversation emails the poster that you offered
+        them the listing (without the note). One that joins a conversation
+        emails only as a message does: when its note is the first message the
+        poster has not read.
+
+        Several offers can share one conversation: offering the same listing
+        against two requests by one student joins the same thread. An offer
+        reveals nothing: not your email, and not the exact address, which you
+        share in the conversation by hand
+        (`POST /conversations/{id}/share-address`) or not at all.
       parameters:
         - name: id
           in: path
@@ -1053,7 +1151,11 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404": { $ref: "#/components/responses/NotFound" }
         "409":
-          description: That listing has already been offered against this request.
+          description: |
+            That listing has already been offered against this request
+            (withdrawn or not), or the request's poster has closed the
+            conversation about this listing. The second carries
+            `details.conversation_id`.
           content:
             application/json:
               schema:
@@ -1068,6 +1170,10 @@ paths:
       summary: Withdraw your offer
       description: |
         Only the owner who made it. Someone else's offer answers 404, never 403.
+
+        Withdrawing leaves the offer's conversation as it is: it stays open,
+        its messages stay, and a shared address stays shared. The offer
+        revealed nothing, so there is nothing to take back.
       parameters:
         - name: id
           in: path
@@ -1119,6 +1225,10 @@ paths:
 
         Opening a conversation reveals nothing about either side: no email, no
         phone number and no exact address.
+
+        The owner is emailed that someone wants to talk about the listing
+        (without the message), unless they turned notifications off; see the
+        `messages` tag.
       parameters:
         - name: id
           in: path
@@ -1282,6 +1392,10 @@ paths:
         is open. Refused with **409** once it is closed, while the other
         participant's account is suspended, and while the listing is taken
         down. Messages cannot be edited or deleted.
+
+        When this is the first message the other participant has not read,
+        they are emailed that a reply is waiting (without its text); further
+        messages send nothing until they read the conversation.
       parameters:
         - name: id
           in: path
@@ -1366,6 +1480,67 @@ paths:
                 $ref: "#/components/schemas/Conversation"
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /conversations/{id}/share-address:
+    post:
+      tags: [messages]
+      operationId: shareAddress
+      summary: Share the exact address with the enquirer
+      description: |
+        The listing's **owner** shares its exact address with the other
+        participant of this conversation. It is the only way the exact address
+        reaches another student: nothing else - not a reply, not opening a
+        conversation, not an offer - reveals it.
+
+        It **cannot be undone**: there is no un-share, so a client confirms
+        before calling it. It covers **this conversation only**: the same
+        student's conversation about another listing, and every other
+        student's, are unaffected.
+
+        The enquirer is emailed that the address was shared, with a link to
+        the conversation; the email does not contain the address.
+
+        Sharing again answers 200 with the conversation unchanged, its
+        `address_shared_at` still the first share's, and sends no email. The response's `place`
+        carries the address. Only the address is shared: never an email or a
+        phone number. While the listing is taken down or its owner suspended,
+        `place` is withheld (null) without the share being undone.
+
+        Participants only; anyone else gets 404.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Shared, or already shared. `place` is filled.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: |
+            You are the enquirer ("Only the owner can share the address of
+            their place."), or your address has not been confirmed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            The address cannot be shared now: the conversation is closed, the
+            enquirer's account is no longer available, the listing is not
+            available (paused, archived, a draft or taken down), or the
+            listing has no address to share. `message` says which.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalError" }
 
   /admin/overview:
@@ -1608,7 +1783,10 @@ paths:
         - $ref: "#/components/parameters/PerPage"
         - name: q
           in: query
-          description: The same full-text search the public reads use.
+          description: |
+            The same full-text search the public reads use: title,
+            neighbourhood, cross streets and description. Not the exact
+            address, which is out of the search index.
           schema: { type: string }
         - name: status
           in: query
@@ -1861,8 +2039,9 @@ components:
     User:
       type: object
       description: |
-        A user as exposed by the API. Never carries a password hash. `email` is
-        present only when the user is looking at their own record.
+        A user as exposed by the API. Never carries a password hash. `email`
+        and `email_notifications` are present only when the user is looking at
+        their own record.
       required: [id, username, role, verified, level, star_points, created_at]
       properties:
         id:
@@ -1890,6 +2069,13 @@ components:
         created_at:
           type: string
           format: date-time
+        email_notifications:
+          type: boolean
+          description: |
+            Only returned to the user themselves, like `email`. Whether they
+            get notification emails about their conversations (a conversation
+            opened with them, an address shared with them, a reply waiting).
+            On by default; changed with `PATCH /me/preferences`.
       example:
         id: 3f7c1b2a-9d4e-4c8a-8f1b-2e3d4c5b6a70
         username: meil
@@ -1899,6 +2085,17 @@ components:
         level: 4
         star_points: 120
         created_at: "2026-09-01T14:03:00Z"
+        email_notifications: true
+
+    PreferencesUpdate:
+      type: object
+      description: The preferences to change. A field left out is left as it is.
+      properties:
+        email_notifications:
+          type: boolean
+          description: Turn notification emails on (true) or off (false).
+      example:
+        email_notifications: false
 
     RegisterRequest:
       type: object
@@ -1996,8 +2193,8 @@ components:
         - parking
         - pets
         - laundry
-        - address_line
         - neighbourhood
+        - cross_streets
         - commute_mode
         - status
         - views
@@ -2072,16 +2269,36 @@ components:
         address_line:
           type: string
           description: |
-            Street address. Public for now; whether the exact address should
-            instead be revealed only after contact is an open product decision.
+            The exact address, house number included. Present only on your own
+            listings and on the admin surface. Everyone else sees
+            `neighbourhood` and `cross_streets`. The exact address reaches
+            another student only when you share it in your conversation with
+            them (`POST /conversations/{id}/share-address`).
         neighbourhood:
           type: string
+          description: The area the place is in. Public.
+        cross_streets:
+          type: string
+          maxLength: 80
+          example: King St N & University Ave
+          description: |
+            The nearest intersection, e.g. "King St N & University Ave". Public:
+            with `neighbourhood`, this is the approximate location everyone
+            sees. Empty when the owner has not given one.
         lat:
           type: number
           nullable: true
+          description: |
+            Part of the exact address: it locates the same door. Null on every
+            public read; present only on your own listings, on the admin
+            surface, and in a conversation's shared `place`.
         lng:
           type: number
           nullable: true
+          description: |
+            Part of the exact address: it locates the same door. Null on every
+            public read; present only on your own listings, on the admin
+            surface, and in a conversation's shared `place`.
         distance_m:
           type: integer
           nullable: true
@@ -2201,8 +2418,21 @@ components:
         parking: { type: boolean }
         pets: { type: boolean }
         laundry: { type: boolean }
-        address_line: { type: string, maxLength: 200 }
+        address_line:
+          type: string
+          maxLength: 200
+          description: |
+            Private: the exact address, house number included. Shown only to
+            you, to admins, and to a student you choose to share it with in
+            your conversation. It is not searchable.
         neighbourhood: { type: string, maxLength: 80 }
+        cross_streets:
+          type: string
+          maxLength: 80
+          example: King St N & University Ave
+          description: |
+            Public: the nearest intersection, shown with `neighbourhood` as the
+            approximate location. Trimmed; an empty string clears it.
         distance_m: { type: integer, minimum: 0, nullable: true }
         shorter_stays:
           type: boolean
@@ -2260,8 +2490,21 @@ components:
         parking: { type: boolean }
         pets: { type: boolean }
         laundry: { type: boolean }
-        address_line: { type: string, maxLength: 200 }
+        address_line:
+          type: string
+          maxLength: 200
+          description: |
+            Private: the exact address, house number included. Shown only to
+            you, to admins, and to a student you choose to share it with in
+            your conversation. It is not searchable.
         neighbourhood: { type: string, maxLength: 80 }
+        cross_streets:
+          type: string
+          maxLength: 80
+          example: King St N & University Ave
+          description: |
+            Public: the nearest intersection, shown with `neighbourhood` as the
+            approximate location. Trimmed; an empty string clears it.
         distance_m: { type: integer, minimum: 0, nullable: true }
         shorter_stays:
           type: boolean
@@ -2287,8 +2530,9 @@ components:
     ListingOwner:
       type: object
       description: |
-        Just enough about the poster to render a listing. Never their email -
-        contact details stay private until both sides agree to talk.
+        Just enough about the poster to render a listing. Never their email. A
+        listing's exact address reaches another student only when its owner
+        shares it in a conversation.
       required: [id, username, verified]
       properties:
         id:
@@ -2462,16 +2706,55 @@ components:
         An owner's answer to a request: one of their own listings, with an
         optional note. The listing travels with the offer, so the student sees
         a real place rather than a pitch.
-      required: [id, request_id, note, created_at, listing, owner]
+
+        An offer has no status of its own - no accept, no decline. The poster
+        answers it by replying in its `conversation`, or refuses it by closing
+        that conversation.
+      required: [id, request_id, note, created_at, listing, owner, conversation]
       properties:
         id: { type: string, format: uuid }
         request_id: { type: string, format: uuid }
-        note: { type: string }
+        note:
+          type: string
+          description: |
+            The owner's note, as offered. A non-empty note is also posted as a
+            message in the offer's conversation.
         created_at: { type: string, format: date-time }
         listing:
           $ref: "#/components/schemas/Listing"
         owner:
           $ref: "#/components/schemas/ListingOwner"
+        conversation:
+          description: |
+            The conversation this offer opened or joined, between the request's
+            poster and the offering owner about this listing. Both of them may
+            open it with `GET /conversations/{id}`. Every offer made since
+            offers opened conversations has one, and so does every earlier
+            offer that was live then. Null only for an older offer the backfill
+            could not give one - one hidden by moderation at the time, or one
+            made against its owner's own request - or if the conversation is
+            ever deleted.
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/ConversationRef"
+
+    ConversationRef:
+      type: object
+      description: |
+        Enough of a conversation to link to it and to say whether an offer is
+        still waiting on the student, without loading the conversation. It
+        carries no messages and no address.
+      required: [id, status, poster_replied]
+      properties:
+        id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [open, closed]
+        poster_replied:
+          type: boolean
+          description: |
+            The request's poster has sent at least one message in this
+            conversation. False means the offer is still waiting on them.
 
     Conversation:
       type: object
@@ -2494,6 +2777,9 @@ components:
         - closed_at
         - closed_by_viewer
         - counterpart_available
+        - address_shared_at
+        - can_share_address
+        - place
       properties:
         id: { type: string, format: uuid }
         status:
@@ -2510,7 +2796,13 @@ components:
           description: You own the listing; the counterpart is the enquirer.
         opened_by_viewer:
           type: boolean
-          description: You started this conversation.
+          description: |
+            You started this conversation. A conversation the owner started
+            came from an offer on the enquirer's housing request: an enquirer
+            seeing `viewer_is_owner: false` and `opened_by_viewer: false` is
+            looking at one. It may have no messages, when the offer had no
+            note; `last_message` is then null and `created_at` is its last
+            activity.
         can_send:
           type: boolean
           description: |
@@ -2540,6 +2832,51 @@ components:
           description: |
             False while the other participant's account is suspended. The
             conversation stays readable, and nothing can be sent.
+        address_shared_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            When the owner shared the exact address in this conversation, or
+            null if they have not. Set once, by the owner's share and nothing
+            else, and never cleared. A client places the "address shared" event
+            in the thread by this time. It stays set while the address itself
+            is withheld (see `place`).
+        can_share_address:
+          type: boolean
+          description: |
+            You may share the exact address now: you are the listing's owner
+            and verified, the conversation is open, the enquirer's account is
+            available, the listing is available (published, not taken down),
+            and the address has not been shared here yet.
+        place:
+          description: |
+            The exact address, for both participants of this conversation only.
+            Non-null exactly when the owner has shared it here
+            (`address_shared_at` is set), the listing is not taken down and its
+            owner is not suspended. Null otherwise: before sharing, and while
+            moderation withholds it.
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/ConversationPlace"
+
+    ConversationPlace:
+      type: object
+      description: |
+        A listing's exact address, as its owner shared it in one conversation.
+        Read live from the listing, so a correction the owner makes later shows
+        here. Only the address: never an email or a phone number.
+      required: [address_line, lat, lng]
+      properties:
+        address_line:
+          type: string
+          description: The exact address, house number included.
+        lat:
+          type: number
+          nullable: true
+        lng:
+          type: number
+          nullable: true
 
     ConversationListing:
       type: object

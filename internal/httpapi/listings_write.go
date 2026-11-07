@@ -73,6 +73,7 @@ func (s *Server) CreateListing(ctx context.Context, request gen.CreateListingReq
 		Laundry:            derefBool(in.Laundry),
 		AddressLine:        strings.TrimSpace(in.AddressLine),
 		Neighbourhood:      strings.TrimSpace(derefString(in.Neighbourhood)),
+		CrossStreets:       strings.TrimSpace(derefString(in.CrossStreets)),
 		DistanceM:          int32Ptr(nullableToPtrInt(in.DistanceM)),
 		ShorterStays:       derefBool(in.ShorterStays),
 		MinStayMonths:      int32Ptr(nullableToPtrInt(in.MinStayMonths)),
@@ -240,7 +241,7 @@ func (s *Server) ListMyListings(ctx context.Context, _ gen.ListMyListingsRequest
 			Username:  row.OwnerUsername,
 			AvatarUrl: nullableString(row.OwnerAvatarUrl),
 			Verified:  row.OwnerVerified,
-		}, nil))
+		}, nil, true)) // the owner's own listings: the exact address
 	}
 
 	return gen.ListMyListings200JSONResponse(out), nil
@@ -296,7 +297,8 @@ func (s *Server) ownedListing(ctx context.Context, id uuid.UUID) (auth.Principal
 	return principal, listing, nil
 }
 
-// listingResponse attaches the owner summary and photos to a row.
+// listingResponse attaches the owner summary and photos to a row. It carries
+// the exact address, so only the owner's own writes may use it.
 func (s *Server) listingResponse(ctx context.Context, row sqlcgen.Listing) gen.Listing {
 	owner := gen.ListingOwner{Id: openapi_types.UUID(row.OwnerID)}
 	if u, err := s.queries.GetUserByID(ctx, row.OwnerID); err == nil {
@@ -309,7 +311,8 @@ func (s *Server) listingResponse(ctx context.Context, row sqlcgen.Listing) gen.L
 	if err != nil {
 		photos = nil
 	}
-	return toListing(row, owner, photos)
+	// true: every caller is the owner's own write, answered to the owner.
+	return toListing(row, owner, photos, true)
 }
 
 func contains(haystack []string, needle string) bool {

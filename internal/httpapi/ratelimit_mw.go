@@ -141,6 +141,21 @@ var limitedRoutes = []limitedRoute{
 		perKey:  ratelimit.MessagePerUser,
 		message: "You are sending messages very quickly. Try again in %s.",
 	},
+	{
+		// The one write that reveals an exact address. Sharing again is a
+		// no-op that still costs, so a looping client meets this.
+		method: http.MethodPost, path: "/conversations/:id/share-address", kind: keyByUser,
+		perKey:  ratelimit.ShareAddressPerUser,
+		message: "You have shared your address a lot in a short time. Try again in %s.",
+	},
+	{
+		method: http.MethodPatch, path: "/me/preferences", kind: keyByUser,
+		perKey:  ratelimit.PreferencesPerUser,
+		message: "You have changed your settings a lot in a short time. Try again in %s.",
+	},
+	// The notification caps, NotifyPerRecipient and NotifyGlobal, are not
+	// here: they limit emails, not routes, and are consulted in
+	// notifications.go after the write that triggers one.
 }
 
 // loginRouteKey is the context key under which the middleware leaves the login

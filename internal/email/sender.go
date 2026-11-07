@@ -12,6 +12,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // Message is one outbound email.
@@ -89,4 +92,113 @@ func PasswordResetMessage(id, to, link string) Message {
 				"and you can ignore this email.",
 			link),
 	}
+}
+
+// ------------------------------------------------------------ notifications
+//
+// The messaging notifications (Phase 18). Each says who, about which listing,
+// and links to the conversation. None of them takes a message's text or the
+// listing's address, so none can carry either: an inbox is not a private
+// place, and a forwarded email would get round the owner's choice of whom to
+// share the address with. TestNotificationsCarryNoMessageTextOrAddress, here
+// and in internal/httpapi, holds them to it.
+//
+// Their IDs come from MessageID over the conversation's id
+// ("conversation-opened", "address-shared") or the message's
+// ("reply-waiting"), so a retried request sends once.
+
+// maxTitleInEmail keeps a long listing title from making a subject line
+// nobody can read. The body carries the same shortened title.
+const maxTitleInEmail = 80
+
+// maxUsernameInEmail is the longest username the API accepts.
+const maxUsernameInEmail = 32
+
+// notificationFooter ends every notification.
+const notificationFooter = "\n\nYou get these emails because you have a WaterlooStar account. " +
+	"To stop them, turn off email notifications in your account settings on WaterlooStar. " +
+	"Your messages stay in your inbox there either way."
+
+// ConversationOpenedMessage tells a listing's owner that a student wrote to
+// them about it. The message itself is not included.
+func ConversationOpenedMessage(id, to, from, listingTitle, link string) Message {
+	from, title := oneLine(from, maxUsernameInEmail), oneLine(listingTitle, maxTitleInEmail)
+	return Message{
+		ID:      id,
+		To:      to,
+		Subject: fmt.Sprintf("%s wants to talk about %s", from, title),
+		Body: fmt.Sprintf(
+			"%s sent you a message on WaterlooStar about your listing \"%s\".\n\n"+
+				"Read it and reply here:\n\n%s\n\n"+
+				"The message is not in this email. Your email address is not shown to %s."+
+				notificationFooter,
+			from, title, link, from),
+	}
+}
+
+// OfferConversationMessage tells a student who posted a housing request that
+// an owner offered them a listing, which opened a conversation. The offer's
+// note is not included.
+func OfferConversationMessage(id, to, from, listingTitle, link string) Message {
+	from, title := oneLine(from, maxUsernameInEmail), oneLine(listingTitle, maxTitleInEmail)
+	return Message{
+		ID:      id,
+		To:      to,
+		Subject: fmt.Sprintf("%s offered you %s", from, title),
+		Body: fmt.Sprintf(
+			"%s answered your housing request on WaterlooStar with a place: \"%s\".\n\n"+
+				"See the offer and reply here:\n\n%s\n\n"+
+				"Replying is how you answer an offer. Your email address is not shown to %s."+
+				notificationFooter,
+			from, title, link, from),
+	}
+}
+
+// AddressSharedMessage tells a student that the owner shared a place's exact
+// address with them. The address is not included: it is in the
+// conversation, for that student only, and stays there.
+func AddressSharedMessage(id, to, from, listingTitle, link string) Message {
+	from, title := oneLine(from, maxUsernameInEmail), oneLine(listingTitle, maxTitleInEmail)
+	return Message{
+		ID:      id,
+		To:      to,
+		Subject: fmt.Sprintf("%s shared the address of %s", from, title),
+		Body: fmt.Sprintf(
+			"%s shared the exact address of \"%s\" with you on WaterlooStar.\n\n"+
+				"It is in your conversation, not in this email:\n\n%s"+
+				notificationFooter,
+			from, title, link),
+	}
+}
+
+// ReplyWaitingMessage tells a student a reply is waiting in a conversation.
+// It is sent for the first message they have not read, so it says that no
+// more will follow until they read it. The reply is not included.
+func ReplyWaitingMessage(id, to, from, listingTitle, link string) Message {
+	from, title := oneLine(from, maxUsernameInEmail), oneLine(listingTitle, maxTitleInEmail)
+	return Message{
+		ID:      id,
+		To:      to,
+		Subject: fmt.Sprintf("%s replied about %s", from, title),
+		Body: fmt.Sprintf(
+			"%s replied in your WaterlooStar conversation about \"%s\".\n\n"+
+				"Read it here:\n\n%s\n\n"+
+				"The reply is not in this email. You will not get another email about this "+
+				"conversation until you have read it."+
+				notificationFooter,
+			from, title, link),
+	}
+}
+
+// oneLine makes user-written text safe for a subject line: control characters
+// and line breaks become spaces, runs of space collapse, and anything past max
+// characters is cut with an ellipsis.
+func oneLine(s string, max int) string {
+	s = strings.Join(strings.FieldsFunc(s, func(r rune) bool {
+		return unicode.IsSpace(r) || unicode.IsControl(r)
+	}), " ")
+	if utf8.RuneCountInString(s) > max {
+		s = strings.TrimSpace(string([]rune(s)[:max-1])) + "…"
+	}
+	return s
 }

@@ -92,7 +92,7 @@ func (s *Server) ListAdminListings(ctx context.Context, request gen.ListAdminLis
 			Listing: toListing(r.Listing, gen.ListingOwner{
 				Id: openapi_types.UUID(r.Listing.OwnerID), Username: r.OwnerUsername,
 				Verified: r.OwnerVerified, AvatarUrl: nullableString(r.OwnerAvatarUrl),
-			}, photos[r.Listing.ID]),
+			}, photos[r.Listing.ID], true), // admin surface: the exact address
 			Owner: adminPostOwner(r.Listing.OwnerID, r.OwnerUsername, r.OwnerEmail, r.OwnerVerified, r.OwnerSuspendedAt),
 		})
 	}
@@ -162,7 +162,7 @@ func (s *Server) adminListing(ctx context.Context, id uuid.UUID) (gen.AdminListi
 		Listing: toListing(row, gen.ListingOwner{
 			Id: openapi_types.UUID(owner.ID), Username: owner.Username,
 			Verified: owner.Verified, AvatarUrl: nullableString(owner.AvatarUrl),
-		}, photos),
+		}, photos, true), // admin surface: the exact address
 		Owner: adminPostOwner(owner.ID, owner.Username, owner.Email, owner.Verified, owner.SuspendedAt),
 	}, nil
 }

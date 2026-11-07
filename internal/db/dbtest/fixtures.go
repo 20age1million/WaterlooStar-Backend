@@ -61,6 +61,13 @@ type ListingOptions struct {
 	ShorterStays       bool
 	MinStayMonths      *int32
 	BillsEstimateCents *int32
+
+	// Location (Phase 16). AddressLine is the private exact address and
+	// defaults to "Hazel St"; CrossStreets is public and defaults to empty.
+	// Lat and Lng are part of the exact address.
+	AddressLine  string
+	CrossStreets string
+	Lat, Lng     *float64
 }
 
 // Listing inserts a listing owned by owner.
@@ -83,7 +90,10 @@ func Listing(t *testing.T, q *sqlcgen.Queries, owner uuid.UUID, opts ListingOpti
 		BathType:      "shared",
 		Furnished:     opts.Furnished,
 		Utilities:     orStrings(opts.Utilities),
-		AddressLine:   "Hazel St",
+		AddressLine:   orString(opts.AddressLine, "Hazel St"),
+		CrossStreets:  opts.CrossStreets,
+		Lat:           opts.Lat,
+		Lng:           opts.Lng,
 		Neighbourhood: orString(opts.Neighbour, "Northdale"),
 		DistanceM:     opts.DistanceM,
 		CommuteMode:   "walk",

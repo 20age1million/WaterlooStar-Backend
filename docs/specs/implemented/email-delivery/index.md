@@ -126,7 +126,10 @@ the account. Clerk's trace IDs: `d70d5c63e09f4634c79d491e0747e500` and
 - **An outbox with retries.** Sending stays inside the request (the
   developer's decision). A failure is recovered by asking for a new link.
 - **Notification emails** (offers, contact requests, messages). These come with
-  the features that need them.
+  the features that need them. *(Shipped
+  with messaging, Phase 18, 2026-10-17: email for a conversation opened, an
+  address shared and a first unread reply, with an opt-out and caps; see
+  [Messaging](../messaging/index.md).)*
 - **The frontend's "Send a new link" button.** That is the frontend's own
   phase, generated from this contract.
 

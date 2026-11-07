@@ -14,25 +14,7 @@ across both; everything from Phase 4 onward is not.
 
 ## Active
 
-| Feature | Phases | Status | Location |
-|---|---|---|---|
-| [Messaging with Contact Privacy](./active/messaging/index.md) | 4 (15–18) | In progress: 15 complete | `docs/specs/active/messaging/` |
-
-### Messaging with Contact Privacy
-
-A verified student messages a listing's owner inside WaterlooStar, and an owner
-answers a housing request with a conversation. Nobody's email or phone is ever
-shown; the exact address reaches a student only when the owner shares it in
-their conversation. Phase 15 is built on `feature/messaging` and not yet
-merged; its phase doc is under `implemented/messaging/`, while `index.md` and
-the later phases stay in `active/` until the feature is done.
-
-| Phase | Title | Status |
-|---|---|---|
-| 15 | [Conversations and messages](./implemented/messaging/phase-15-conversations.md) | Complete: start, inbox, unread counts, close; migration 11; eight endpoints |
-| 16 | [Contact privacy and address sharing](./active/messaging/phase-16-contact-privacy.md) | Ready |
-| 17 | [Offers open conversations](./active/messaging/phase-17-offer-conversations.md) | Ready |
-| 18 | [Message notifications](./active/messaging/phase-18-message-notifications.md) | Ready |
+*None.*
 
 ## Implemented
 
@@ -46,6 +28,7 @@ the later phases stay in `active/` until the feature is done.
 | [Admin and Moderation](./implemented/admin-moderation/index.md) | 3 (9–11) | `docs/specs/implemented/admin-moderation/` |
 | [Listing Terms](./implemented/listing-terms/index.md) | 1 (Phase 12) | `docs/specs/implemented/listing-terms/` |
 | [Email Delivery](./implemented/email-delivery/index.md) | 2 (13–14) | `docs/specs/implemented/email-delivery/` |
+| [Messaging with Contact Privacy](./implemented/messaging/index.md) | 4 (15–18) | `docs/specs/implemented/messaging/` |
 
 ### Platform Foundation
 
@@ -121,6 +104,22 @@ whose link is lost or expired asks for a new one with `POST /auth/verify/resend`
 which answers 202 for every address (14). Clerk was the first provider and its
 endpoint proved closed to the account.
 
+### Messaging with Contact Privacy
+
+A verified student messages a listing's owner inside WaterlooStar, and an owner
+answers a housing request with a conversation. Nobody's email or phone is ever
+shown; the exact address reaches a student only when the owner shares it in
+their conversation. Every phase is complete, each its own stacked pull request,
+all merged on 2026-11-06: Phase 15 into `main` (#17), and 16 (#18), 17 (#19) and
+18 (#20) into `feature/messaging`, which pull request #21 brings into `main`.
+
+| Phase | Title | Delivered |
+|---|---|---|
+| 15 | [Conversations and messages](./implemented/messaging/phase-15-conversations.md) | Start, inbox, unread counts, close; migration 11; eight endpoints |
+| 16 | [Contact privacy and address sharing](./implemented/messaging/phase-16-contact-privacy.md) | The exact address off every public read and out of search; `cross_streets`; the owner's `POST /conversations/{id}/share-address`; migration 12; one endpoint |
+| 17 | [Offers open conversations](./implemented/messaging/phase-17-offer-conversations.md) | An offer opens or joins a conversation with the poster, the note a message; `RequestOffer.conversation`; migration 13 with a backfill; no new endpoint |
+| 18 | [Message notifications](./implemented/messaging/phase-18-message-notifications.md) | Email for a conversation opened, an address shared and a first unread reply, never with the text or the address; `users.email_notifications` and `PATCH /me/preferences`; per-recipient and global caps; migration 14; one endpoint |
+
 ## Decisions carried forward
 
 Recorded in the Platform Foundation `index.md` and still in force:
@@ -141,16 +140,21 @@ Recorded in the Platform Foundation `index.md` and still in force:
 
 **Address privacy:** show only an approximate location; the exact address is
 revealed only when the listing's owner shares it in a conversation (refined
-2026-10-16), and nothing but the address is ever revealed. This is designed and
-implemented as part of messaging, so the current public address remains a known
-implementation gap. See [the roadmap](../ROADMAP.md#address-privacy).
+2026-10-16), and nothing but the address is ever revealed. Implemented in
+messaging Phase 16 (reaching `main` with pull request #21): public
+reads carry `neighbourhood` and `cross_streets`, never `address_line` or
+coordinates, and search no longer indexes the address. See
+[the roadmap](../ROADMAP.md#address-privacy).
 
 ## What comes next
 
 Email Delivery is implemented (Phases 13–14). On **2026-10-14** the developer
 reordered backend work: messaging with contact privacy first, in parallel with
 the frontend Admin Portal and overhaul; then saves, views and the question
-thread. This replaces the **2026-09-27** order. Answering an offer ships with
-messaging, and since **2026-10-16** promotion waits on it. Its spec is in
-Active. Read [the project roadmap](../ROADMAP.md) for the full sequence and
-launch goal.
+thread. This replaces the **2026-09-27** order. Messaging is now fully
+specified and built (Phases 15–18, implemented, awaiting merge of its four
+stacked pull requests); answering an offer is part of it (Phase 17). Since
+**2026-10-16** promotion waits on messaging; with the backend done, it waits
+on the frontend only. The next backend feature is saves, views and the
+question thread, not yet specified. Read [the project roadmap](../ROADMAP.md)
+for the full sequence and launch goal.

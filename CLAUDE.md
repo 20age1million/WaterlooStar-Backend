@@ -121,10 +121,16 @@ only thing that calls it.
 | 12 | Listing terms: shorter stays, bill estimate and all-in cost, window ranking, monthly availability |
 | 13 | Resend sender: verification and reset emails delivered through Resend; the log without a key |
 | 14 | A new verification link: `POST /auth/verify/resend`, rate-limited, the same answer for any address |
-| 15 | Conversations and messages: message a listing's owner, the inbox, unread counts, closing (on `feature/messaging`, not yet merged) |
+| 15 | Conversations and messages: message a listing's owner, the inbox, unread counts, closing (merged in #17) |
+| 16 | Contact privacy: the exact address off public reads and search, `cross_streets`, the owner's address share (on `feature/messaging` via #18; reaches `main` with #21) |
+| 17 | Offers open conversations: an offer opens or joins a conversation with the request's poster, `RequestOffer.conversation`, a backfill (on `feature/messaging` via #19; reaches `main` with #21) |
+| 18 | Message notifications: email for a conversation opened, an address shared and a first unread reply, never with the text or the address; the opt-out `PATCH /me/preferences`; caps (on `feature/messaging` via #20; reaches `main` with #21) |
 
-Fifty endpoints exist, fourteen of them admin-only; eight of them are Phase
-15's messaging endpoints, not yet on `main`. Read
+Fifty-two endpoints exist, fourteen of them admin-only; two are not yet on
+`main` until #21 merges: Phase 16's `POST /conversations/{id}/share-address`
+and Phase 18's `PATCH /me/preferences`. Phase 15's eight messaging endpoints
+are on `main`. Phase 17 added no endpoint; it changed
+`POST /requests/{id}/offers` and `GET /requests/{id}/offers`. Read
 [API surface](docs/api.md) for student endpoints, messages and rate limits, and
 [Admin](docs/admin.md) for admin endpoints and `cmd/admin` usage.
 
@@ -132,21 +138,94 @@ Phases 5–14 are merged into `main` (pull requests #6–#13). Email Delivery is
 complete; its [spec](docs/specs/implemented/email-delivery/index.md) is implemented.
 The roadmap and README split merged in #14. The documentation-current rule and
 the `.gitattributes` that keeps `go.mod`/`go.sum` on LF merged in #15
-(2026-10-15). The pull-request-description rule merged in #16.
+(2026-10-15). The pull-request-description rule merged in #16. Messaging Phase 15 merged in
+#17 (2026-11-06).
 
-**In flight:** `feature/messaging` — the
-[Messaging with Contact Privacy spec](docs/specs/active/messaging/index.md)
-(Phases 15–18) is accepted (2026-10-16), and Phase 15, conversations and
-messages, is complete on the branch: migration 11, eight `messages`-tag
-endpoints, two new rate limits. It is open as
+**In flight: landing Messaging Phases 16–18 on `main`.** The
+[spec](docs/specs/implemented/messaging/index.md) (Phases 15–18, accepted
+2026-10-16) is fully implemented and moved to `docs/specs/implemented/`.
+Its four phases were four stacked pull requests, all merged on 2026-11-06,
+but only #17 into `main`: #18, #19 and #20 still had `feature/messaging` as
+their base when they merged, so Phases 16–18 landed on `feature/messaging`
+and not on `main` (see the stacked-pull-request gotcha below).
+[pull request #21](https://github.com/20age1million/WaterlooStar-Backend/pull/21) brings them from `feature/messaging` into `main`.
+After it merges, record it here and clear this entry.
+
+Phase 15, conversations and
+messages, is complete on `feature/messaging`: migration 11, eight `messages`-tag
+endpoints, two new rate limits. It merged into `main` in
 [pull request #17](https://github.com/20age1million/WaterlooStar-Backend/pull/17).
 Each later phase is a stacked pull request (decided by Claude under the
-developer's delegation, 2026-10-16): Phase 16 on `feature/messaging-privacy`
-with `feature/messaging` as its base, then 17 and 18 the same way. Next is
-Phase 16, contact privacy and address sharing, which needs the frontend to stop reading
-`address_line` from public reads before it merges (see that phase's
-Dependencies); then 17 (offers open conversations) and 18 (email
-notifications).
+developer's delegation, 2026-10-16), with the phase before as its base.
+
+Phase 16, contact privacy and address sharing, is complete on
+`feature/messaging-privacy` (branched from `feature/messaging`): migration 12,
+`cross_streets`, the exact address off every public read and out of search,
+and `POST /conversations/{id}/share-address` with its own rate limit. It merged
+into `feature/messaging` in
+[pull request #18](https://github.com/20age1million/WaterlooStar-Backend/pull/18)
+and reaches `main` with #21.
+**Precondition met:** the frontend's `fix/public-address` merged to frontend
+`main` on 2026-11-06 (frontend pull request #19), so Phase 16 may reach `main`.
+It had to come first because Phase 16 makes `address_line` absent from public reads; a frontend that still
+reads it shows "undefined" on cards. Drone deploys each repository from `main`
+on its own, so nothing else enforces this order. After it merges, the frontend
+regenerates its types (`Listing.address_line` optional; `cross_streets`;
+`Conversation.place`, `address_shared_at`, `can_share_address`), adds a
+cross-streets field to the listing form and shows it where it shows the
+neighbourhood, and its messaging phase adds the owner's "Share exact address"
+action with a confirmation; the full list is the spec's "Frontend impact".
+
+Phase 17, offers open conversations, is complete on
+`feature/messaging-offers` (branched from `feature/messaging-privacy`):
+migration 13 (`request_offers.conversation_id` and a backfill), an offer
+opening or joining a conversation with the request's poster in one
+transaction, and `RequestOffer.conversation` (`ConversationRef`: `id`,
+`status`, `poster_replied`). It merged into `feature/messaging` in
+[pull request #19](https://github.com/20age1million/WaterlooStar-Backend/pull/19)
+and reaches `main` with #21. Its contract change is additive — a new field and a new schema, nothing removed or
+renamed, no status changed — so it needs **no frontend change first**; the
+frontend's offer code reads only `id`, `request_id`, `note`, `created_at`,
+`listing` and `owner`. One behaviour change a client can meet: offering
+against your own request now answers 400 (the frontend never shows the offer
+panel to the poster), and an offer can now answer 409 when the poster closed
+the conversation (the frontend shows the envelope's message already). After
+it merges, the frontend regenerates its types and its messaging phase links
+each offer to `conversation.id` ("Reply") and uses `poster_replied` for the
+Desk home's waiting offers.
+
+Phase 18, message notifications, is complete on
+`feature/messaging-notifications` (branched from `feature/messaging-offers`):
+migration 14 (`users.email_notifications`, default true),
+`PATCH /me/preferences`, `User.email_notifications` on the user's own record,
+and three emails sent through the existing `email.Sender` to the other
+participant: "wants to talk" / "offered you" when a conversation is opened,
+"shared the address" on the first share, and "replied" for the first message
+the recipient has not read (one per unread spell). Never the message text or
+the address. Caps: `NotifyPerRecipient` 20 and `NotifyGlobal` 30, each per 24
+hours, sized against Resend's free tier (100 a day, 3,000 a month; see
+[API surface](docs/api.md#notification-emails)). It merged into
+`feature/messaging` in
+[pull request #20](https://github.com/20age1million/WaterlooStar-Backend/pull/20)
+and reaches `main` with #21.
+Its contract change is additive, so it needs no frontend change first. After
+it merges, the frontend messaging phase must: put the thread at
+`/messages/{conversation id}` (every email links there); add an "Email me
+about messages" switch calling `PATCH /me/preferences` and reading
+`email_notifications` from `GET /me` (every email tells the student to turn
+notifications off in their settings); and regenerate its types
+(`User.email_notifications`, `PreferencesUpdate`).
+
+**Until that frontend phase ships, notification emails point at pages that do
+not exist:** `/messages/{id}` is a 404, and there is no settings switch, though
+every email says notifications can be turned off in settings. They are sent
+only where `RESEND_API_KEY` is set. Raised in review on 2026-10-18; the
+frontend messaging phase closes it.
+
+**Next:** record #21's merge here. The next backend feature is saves, views and
+the question thread (not yet specified; start with `feature-start`). Promotion
+waits on #21 and on the frontend's Phase 16 clean-up and messaging phase; the
+frontend Admin Portal merged on 2026-11-06.
 
 **Email goes through Resend**, called with `net/http` (no SDK). Clerk's
 transactional endpoint was chosen first (2026-09-25) and answered 404 with both a
@@ -160,8 +239,10 @@ Read [the project roadmap](docs/ROADMAP.md) before choosing or specifying the
 next feature. On 2026-10-14 the developer moved messaging with contact privacy
 first, ahead of saves, views and the question thread, replacing the order agreed
 on 2026-09-27. It starts in parallel with the frontend Admin Portal and overhaul;
-answering an offer ships with it, and since 2026-10-16 promotion waits on it.
-The messaging spec is in `docs/specs/active/messaging/`. The frontend's new
+answering an offer is part of it and is built (Phase 17: the poster replies in
+the offer's conversation), and since 2026-10-16 promotion waits on it.
+Messaging is fully built (Phases 15–18); its spec is in
+`docs/specs/implemented/messaging/`. The frontend's new
 verification-link form has
 already shipped. Real email needs `RESEND_API_KEY` in the host env file; until
 then an admin can verify accounts by hand.
@@ -174,8 +255,10 @@ then an admin can verify accounts by hand.
   cut scope rather than move the date. The community forum is outside this
   roadmap. (The launch gate was revised on 2026-10-16; see below.)
 - Address privacy is settled: approximate location publicly, exact address
-  later, designed with messaging (how it is revealed: 2026-10-16, below). The
-  current public address is an implementation gap, not an open product decision.
+  later, designed with messaging (how it is revealed: 2026-10-16, below).
+  Implemented in messaging Phase 16: public reads show `neighbourhood` and
+  `cross_streets`; the exact address is the owner's to share in one
+  conversation.
 - Create the first admin on the host with `cmd/admin promote`; existing admins
   grant every later admin through the portal's `POST /admin/users/{id}/role`.
   Both backend paths already exist.
@@ -227,10 +310,55 @@ then an admin can verify accounts by hand.
   a listing its owner paused or archived does not stop a conversation; only a
   moderator's takedown or a suspended counterpart makes it read-only (the
   phase doc's Implementation Notes say why).
+  During Phase 16, also decided by Claude under the developer's delegation,
+  2026-10-16, taking the most conservative reading each time: sharing is
+  refused (409) while the enquirer is suspended and while the listing is
+  paused, archived or a draft, not only when it is taken down; a shared
+  address stays in a closed conversation (closing un-shares nothing); and
+  both participants see `place`, the owner included. Sharing also got a rate
+  limit (20 an hour) that the phase doc had not planned, at the implementation
+  brief's request.
+  During Phase 17, also decided by Claude under the developer's delegation,
+  2026-10-16, taking the most conservative reading: the backfill gives no
+  conversation to an offer hidden by moderation (listing or request taken
+  down, owner or poster suspended), so nothing moderation hid lands in an
+  inbox as new; it posts no note into a closed conversation; and an owner can
+  no longer offer against their own request (400), because a conversation
+  cannot be with yourself. Such offers keep `conversation: null`.
+  During Phase 18, also decided by Claude under the developer's delegation,
+  2026-10-16, taking the most conservative option (fewest emails, nothing
+  new revealed): an offer that joins an existing conversation sends no
+  "offered you" email (its note follows the reply rule; no note, no email);
+  sharing again sends nothing; any signed-in account, verified or not, can
+  turn notifications off; `PATCH /me/preferences` leaves an absent field
+  as it is; `NotifyGlobal` is 30 a day; and the sender's own suspension is
+  not checked. At the implementation brief's request, sending runs in the
+  background after the response is decided (not inside the request, as
+  verification email does), and `PATCH /me/preferences` is rate limited
+  (20 an hour). The phase doc's Implementation Notes say why.
 
 ---
 
 ## Rules that bind
+
+- **The exact address is never on a public read, and only the owner reveals
+  it.** `address_line` and coordinates come only from owner reads, admin reads
+  and a conversation whose owner pressed share (`address_shared_at`);
+  `toListing`'s `exact` flag is set explicitly at every call site. The search
+  index does not contain the address. No email or phone is ever revealed.
+  `contact_privacy_test.go` decodes every public read as raw JSON and fails
+  on an `address_line` key, a non-null coordinate, or any email or phone
+  field; `TestOnlyTheShareQuerySetsAddressSharedAt` fails if any query but
+  `ShareConversationAddress` writes `address_shared_at`.
+
+- **A notification email never carries a message's text or an address.** The
+  builders in `internal/email` take only the recipient, the sender's username,
+  the listing's title and the link, and `GetNotificationRecipient` reads no
+  body and no address. `TestNotificationsTakeNoMessageTextOrAddress`,
+  `TestEveryNotificationBuilderIsChecked` and the two
+  `TestNotificationsCarryNoMessageTextOrAddress` tests fail otherwise. A
+  notification never changes or delays a response: it is sent after the
+  write commits, in the background, and a failure or a cap only logs.
 
 - **The API never invents a bill figure.** `bills_estimate_cents` is the owner's
   number or null; `all_in_cents` is null when it is. Filters and sorts on all-in
@@ -346,11 +474,66 @@ These were all found the hard way and will silently regress if undone.
   table itself (`LEFT JOIN messages lm ON lm.id = (SELECT ... LIMIT 1)`) and
   sqlc makes the columns pointers. Check the generated row type whenever a
   query left-joins anything other than a table.
+- **sqlc types a `CASE ... END` column as `interface{}`.** Phase 16's reveal
+  condition was first written as a `CASE` per column and would have reached
+  the handlers untyped. It is a second `LEFT JOIN listings pl ON ... AND
+  c.address_shared_at IS NOT NULL AND l.removed_at IS NULL AND
+  o.suspended_at IS NULL` instead, whose columns sqlc makes pointers. Check
+  the generated row type after writing any computed column.
+- **An offer is a conversation write.** `CreateOffer` runs `makeOffer` in
+  one `s.tx`: open, join or reopen the (listing, poster) conversation, write
+  the offer, `SetOfferConversation`, and post the note as a message. A
+  conversation the poster closed refuses the offer (409); one the owner closed
+  is reopened (`ReopenConversation` matches only `closed_by = owner`).
+  Withdrawing touches no conversation. No offer path, and no migration, may
+  write `address_shared_at`; `TestNoMigrationSetsAddressSharedAt` extends the
+  share-only guard to `migrations/`.
+- **sqlc reads the migrations, temporary tables included.** Migration 13's
+  backfill first left a `CREATE TEMPORARY TABLE offer_backfill` undropped, and
+  sqlc generated an `OfferBackfill` model for it. Drop any helper table at the
+  end of the migration that makes it.
+- **A backfill is tested by staging the database.** `dbtest.NewAt(t, 12)`
+  holds a test database at version 12; seed it, then `staged.MigrateTo(t, 13)`
+  and assert. The generated queries match only the latest schema, so seed a
+  table the migration changes with raw SQL through `staged.Pool`.
+- **`gen.Listing.AddressLine` is a pointer with `omitempty`.** Leaving it nil
+  is what makes the key absent, not null, on public reads. A new field on
+  `Listing` that belongs to the exact address must be set only inside
+  `toListing`'s `if exact` block, and the guard in `contact_privacy_test.go`
+  extended to it.
+- **The search column decides what `q` can find, on the admin surface too.**
+  Migration 12 rebuilt `listings.search` without `address_line`; the admin
+  listing search reads the same column, so an admin cannot search by street
+  either. A field added to the index can be confirmed by probing even if it
+  is hidden from every response.
 - **The fake's conversations run on a strictly increasing clock** (`tick` in
   `internal/httpapi/fake_querier_conversations_test.go`). Unread counts compare
   a message's time with a read marker, and with the wall clock two calls in a
   row can read the same instant, making an unread message look read. Use
   `f.tick()` for any new timestamp the unread rule compares.
+- **A background send must not use the request's context.** gin pools its
+  `*gin.Context` and reuses it once the handler returns, so `notify` gives
+  each send `context.Background()` with its own timeout. It also counts the
+  send on `Server.notifications`: `WaitForNotifications` is what shutdown and
+  the tests wait on. The test harness's `do` calls it after every request;
+  without that, a notification can land in `capturingMailer` after a later
+  verification email, and `token()` reads the wrong link.
+- **A staged test may use a generated query only on tables no later
+  migration changes.** Migration 14 added `users.email_notifications`, and
+  the Phase 17 backfill test, held at version 12, broke because it made users
+  with `dbtest.User` (`RETURNING *` now names a column that does not exist
+  yet). Seed users in a staged database with `Staged.User` and
+  `Staged.Suspend`, which are raw SQL, and do the same for any table a future
+  migration changes.
+- **Notification caps are not route limits.** `NotifyPerRecipient` and
+  `NotifyGlobal` are consulted in `notifications.go` with `Allow`, keyed on the
+  *recipient*; they skip an email and never answer 429, so they are not in
+  `limitedRoutes`. A bucket of burst B over 24 hours lets through up to 2B in
+  any 24 hours; size any new mail cap against Resend's 100 a day with that in
+  mind.
+- **Known gap: `POST /listings` without `bath_type` answers 500.** Nothing
+  refuses it before the `listings_bath_type_known` CHECK. Found in Phase 18's
+  hand check; not yet fixed.
 - **The admin post lists are the one exception to the published-only rule.**
   `ListListingsForAdmin` and `ListRequestsForAdmin` read every row on purpose,
   behind the `/admin` guard. Every other read of a post filters on `status`,
@@ -365,6 +548,12 @@ These were all found the hard way and will silently regress if undone.
 - **`go run ./cmd/migrate down` rolls back every migration**, and ignores a count
   after it. One step is `down-one`. On the development database that means
   re-running `migrate up` and `cmd/seed`.
+- **A stacked pull request merges into its base, even after that base has
+  landed.** GitHub retargets a stacked pull request to `main` only when its base
+  branch is deleted. Messaging's #18–#20 were merged after #17 had already
+  merged, still pointing at `feature/messaging`, so Phases 16–18 missed `main`
+  and needed #21 to land. Before merging a stacked pull request, check that its
+  base reads `main`; retarget it, or delete the merged base branch, if not.
 - **sqlc's nullable-uuid override names the type `UUID`, not `uuid.UUID`**,
   because `import` already supplies the package. The doubled form went unnoticed
   until migration 8 added the first nullable uuid column.
