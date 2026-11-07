@@ -121,15 +121,15 @@ only thing that calls it.
 | 12 | Listing terms: shorter stays, bill estimate and all-in cost, window ranking, monthly availability |
 | 13 | Resend sender: verification and reset emails delivered through Resend; the log without a key |
 | 14 | A new verification link: `POST /auth/verify/resend`, rate-limited, the same answer for any address |
-| 15 | Conversations and messages: message a listing's owner, the inbox, unread counts, closing (on `feature/messaging`, not yet merged) |
-| 16 | Contact privacy: the exact address off public reads and search, `cross_streets`, the owner's address share (on `feature/messaging-privacy`, not yet merged) |
-| 17 | Offers open conversations: an offer opens or joins a conversation with the request's poster, `RequestOffer.conversation`, a backfill (on `feature/messaging-offers`, not yet merged) |
-| 18 | Message notifications: email for a conversation opened, an address shared and a first unread reply, never with the text or the address; the opt-out `PATCH /me/preferences`; caps (on `feature/messaging-notifications`, not yet merged) |
+| 15 | Conversations and messages: message a listing's owner, the inbox, unread counts, closing (merged in #17) |
+| 16 | Contact privacy: the exact address off public reads and search, `cross_streets`, the owner's address share (on `feature/messaging` via #18; reaches `main` with #21) |
+| 17 | Offers open conversations: an offer opens or joins a conversation with the request's poster, `RequestOffer.conversation`, a backfill (on `feature/messaging` via #19; reaches `main` with #21) |
+| 18 | Message notifications: email for a conversation opened, an address shared and a first unread reply, never with the text or the address; the opt-out `PATCH /me/preferences`; caps (on `feature/messaging` via #20; reaches `main` with #21) |
 
-Fifty-two endpoints exist, fourteen of them admin-only; ten are not yet on
-`main`: Phase 15's eight messaging endpoints, Phase 16's
-`POST /conversations/{id}/share-address` and Phase 18's
-`PATCH /me/preferences`. Phase 17 added no endpoint; it changed
+Fifty-two endpoints exist, fourteen of them admin-only; two are not yet on
+`main` until #21 merges: Phase 16's `POST /conversations/{id}/share-address`
+and Phase 18's `PATCH /me/preferences`. Phase 15's eight messaging endpoints
+are on `main`. Phase 17 added no endpoint; it changed
 `POST /requests/{id}/offers` and `GET /requests/{id}/offers`. Read
 [API surface](docs/api.md) for student endpoints, messages and rate limits, and
 [Admin](docs/admin.md) for admin endpoints and `cmd/admin` usage.
@@ -138,19 +138,22 @@ Phases 5–14 are merged into `main` (pull requests #6–#13). Email Delivery is
 complete; its [spec](docs/specs/implemented/email-delivery/index.md) is implemented.
 The roadmap and README split merged in #14. The documentation-current rule and
 the `.gitattributes` that keeps `go.mod`/`go.sum` on LF merged in #15
-(2026-10-15). The pull-request-description rule merged in #16.
+(2026-10-15). The pull-request-description rule merged in #16. Messaging Phase 15 merged in
+#17 (2026-11-06).
 
-**In flight: Messaging with Contact Privacy is complete, pending merges.** The
+**In flight: landing Messaging Phases 16–18 on `main`.** The
 [spec](docs/specs/implemented/messaging/index.md) (Phases 15–18, accepted
 2026-10-16) is fully implemented and moved to `docs/specs/implemented/`.
-Its four phases are four stacked pull requests, none merged. **Merge order:
-#17, then #18, then #19, then Phase 18's**, each into the branch below it
-until the bottom one reaches `main` (or retarget each to `main` as the one
-below merges). #18 additionally waits on the frontend precondition below.
+Its four phases were four stacked pull requests, all merged on 2026-11-06,
+but only #17 into `main`: #18, #19 and #20 still had `feature/messaging` as
+their base when they merged, so Phases 16–18 landed on `feature/messaging`
+and not on `main` (see the stacked-pull-request gotcha below).
+[pull request #21](https://github.com/20age1million/WaterlooStar-Backend/pull/21) brings them from `feature/messaging` into `main`.
+After it merges, record it here and clear this entry.
 
 Phase 15, conversations and
 messages, is complete on `feature/messaging`: migration 11, eight `messages`-tag
-endpoints, two new rate limits. It is open as
+endpoints, two new rate limits. It merged into `main` in
 [pull request #17](https://github.com/20age1million/WaterlooStar-Backend/pull/17).
 Each later phase is a stacked pull request (decided by Claude under the
 developer's delegation, 2026-10-16), with the phase before as its base.
@@ -158,12 +161,13 @@ developer's delegation, 2026-10-16), with the phase before as its base.
 Phase 16, contact privacy and address sharing, is complete on
 `feature/messaging-privacy` (branched from `feature/messaging`): migration 12,
 `cross_streets`, the exact address off every public read and out of search,
-and `POST /conversations/{id}/share-address` with its own rate limit. It is open
-as [pull request #18](https://github.com/20age1million/WaterlooStar-Backend/pull/18),
-**with `feature/messaging` as its base**.
-**Merge order: the frontend's `fix/public-address` (frontend pull request #19)
-must merge to frontend `main` and deploy before Phase 16 reaches `main`.**
-Phase 16 makes `address_line` absent from public reads; a frontend that still
+and `POST /conversations/{id}/share-address` with its own rate limit. It merged
+into `feature/messaging` in
+[pull request #18](https://github.com/20age1million/WaterlooStar-Backend/pull/18)
+and reaches `main` with #21.
+**Precondition met:** the frontend's `fix/public-address` merged to frontend
+`main` on 2026-11-06 (frontend pull request #19), so Phase 16 may reach `main`.
+It had to come first because Phase 16 makes `address_line` absent from public reads; a frontend that still
 reads it shows "undefined" on cards. Drone deploys each repository from `main`
 on its own, so nothing else enforces this order. After it merges, the frontend
 regenerates its types (`Listing.address_line` optional; `cross_streets`;
@@ -177,11 +181,9 @@ Phase 17, offers open conversations, is complete on
 migration 13 (`request_offers.conversation_id` and a backfill), an offer
 opening or joining a conversation with the request's poster in one
 transaction, and `RequestOffer.conversation` (`ConversationRef`: `id`,
-`status`, `poster_replied`). It is open as
+`status`, `poster_replied`). It merged into `feature/messaging` in
 [pull request #19](https://github.com/20age1million/WaterlooStar-Backend/pull/19)
-**with `feature/messaging-privacy` as its base**.
-**Merge order:** Phase 17 merges after Phase 16 (it is stacked on it). Its
-contract change is additive — a new field and a new schema, nothing removed or
+and reaches `main` with #21. Its contract change is additive — a new field and a new schema, nothing removed or
 renamed, no status changed — so it needs **no frontend change first**; the
 frontend's offer code reads only `id`, `request_id`, `note`, `created_at`,
 `listing` and `owner`. One behaviour change a client can meet: offering
@@ -202,9 +204,10 @@ participant: "wants to talk" / "offered you" when a conversation is opened,
 the recipient has not read (one per unread spell). Never the message text or
 the address. Caps: `NotifyPerRecipient` 20 and `NotifyGlobal` 30, each per 24
 hours, sized against Resend's free tier (100 a day, 3,000 a month; see
-[API surface](docs/api.md#notification-emails)). It is open as
+[API surface](docs/api.md#notification-emails)). It merged into
+`feature/messaging` in
 [pull request #20](https://github.com/20age1million/WaterlooStar-Backend/pull/20)
-**with `feature/messaging-offers` as its base**; it merges after #19.
+and reaches `main` with #21.
 Its contract change is additive, so it needs no frontend change first. After
 it merges, the frontend messaging phase must: put the thread at
 `/messages/{conversation id}` (every email links there); add an "Email me
@@ -213,10 +216,16 @@ about messages" switch calling `PATCH /me/preferences` and reading
 notifications off in their settings); and regenerate its types
 (`User.email_notifications`, `PreferencesUpdate`).
 
-**Next:** record each merge here as it lands. The next backend feature is
-saves, views and the question thread (not yet specified; start with
-`feature-start`). Promotion now waits only on the frontend (Admin Portal,
-Phase 16, its messaging phase) and these merges.
+**Until that frontend phase ships, notification emails point at pages that do
+not exist:** `/messages/{id}` is a 404, and there is no settings switch, though
+every email says notifications can be turned off in settings. They are sent
+only where `RESEND_API_KEY` is set. Raised in review on 2026-10-18; the
+frontend messaging phase closes it.
+
+**Next:** record #21's merge here. The next backend feature is saves, views and
+the question thread (not yet specified; start with `feature-start`). Promotion
+waits on #21 and on the frontend's Phase 16 clean-up and messaging phase; the
+frontend Admin Portal merged on 2026-11-06.
 
 **Email goes through Resend**, called with `net/http` (no SDK). Clerk's
 transactional endpoint was chosen first (2026-09-25) and answered 404 with both a
@@ -539,6 +548,12 @@ These were all found the hard way and will silently regress if undone.
 - **`go run ./cmd/migrate down` rolls back every migration**, and ignores a count
   after it. One step is `down-one`. On the development database that means
   re-running `migrate up` and `cmd/seed`.
+- **A stacked pull request merges into its base, even after that base has
+  landed.** GitHub retargets a stacked pull request to `main` only when its base
+  branch is deleted. Messaging's #18–#20 were merged after #17 had already
+  merged, still pointing at `feature/messaging`, so Phases 16–18 missed `main`
+  and needed #21 to land. Before merging a stacked pull request, check that its
+  base reads `main`; retarget it, or delete the merged base branch, if not.
 - **sqlc's nullable-uuid override names the type `UUID`, not `uuid.UUID`**,
   because `import` already supplies the package. The doubled form went unnoticed
   until migration 8 added the first nullable uuid column.

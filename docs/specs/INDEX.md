@@ -109,11 +109,9 @@ endpoint proved closed to the account.
 A verified student messages a listing's owner inside WaterlooStar, and an owner
 answers a housing request with a conversation. Nobody's email or phone is ever
 shown; the exact address reaches a student only when the owner shares it in
-their conversation. Every phase is complete; **none is merged yet**. Each is
-its own stacked pull request: Phase 15 on `feature/messaging` (#17), 16 on
-`feature/messaging-privacy` (#18), 17 on `feature/messaging-offers` (#19) and
-18 on `feature/messaging-notifications` (pull request to be opened, base
-`feature/messaging-offers`).
+their conversation. Every phase is complete, each its own stacked pull request,
+all merged on 2026-11-06: Phase 15 into `main` (#17), and 16 (#18), 17 (#19) and
+18 (#20) into `feature/messaging`, which pull request #21 brings into `main`.
 
 | Phase | Title | Delivered |
 |---|---|---|
@@ -143,7 +141,7 @@ Recorded in the Platform Foundation `index.md` and still in force:
 **Address privacy:** show only an approximate location; the exact address is
 revealed only when the listing's owner shares it in a conversation (refined
 2026-10-16), and nothing but the address is ever revealed. Implemented in
-messaging Phase 16 (on `feature/messaging-privacy`, not yet merged): public
+messaging Phase 16 (reaching `main` with pull request #21): public
 reads carry `neighbourhood` and `cross_streets`, never `address_line` or
 coordinates, and search no longer indexes the address. See
 [the roadmap](../ROADMAP.md#address-privacy).

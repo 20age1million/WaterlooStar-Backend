@@ -4,16 +4,17 @@
 
 **Backend:** Phases 0–14 are shipped: accounts, housing discovery and posting,
 requests and offers, rate limits, admin moderation, listing terms and email
-delivery. **Messaging with contact privacy is built** (Phases 15–18) and
-awaits merge as four stacked pull requests: Phase 15, conversations and
-messages, on `feature/messaging` (#17); Phase 16, address privacy and sharing,
-on `feature/messaging-privacy` (#18); Phase 17, offers opening conversations,
-on `feature/messaging-offers` (#19); Phase 18, email notifications, on
-`feature/messaging-notifications` (pull request to be opened). None is merged.
+delivery. **Messaging with contact privacy is built** (Phases 15–18): Phase
+15, conversations and messages, is on `main` (#17); Phase 16, address privacy
+and sharing, Phase 17, offers opening conversations, and Phase 18, email
+notifications, merged into `feature/messaging` (#18–#20) and reach `main` with
+pull request #21.
 [Backend specs index](specs/INDEX.md).
 
 **Frontend:** housing discovery and posting, requests and offers, session refresh,
-the housing rework and Phase 12's new verification link are shipped.
+the housing rework, Phase 12's new verification link, the Admin Portal (phases
+13–15) and the public-address fix are shipped. Its messaging phase is not yet
+specified.
 [Frontend specs index](https://github.com/20age1million/WaterlooStar-Frontend/blob/main/docs/specs/INDEX.md).
 
 ## How to update this file
@@ -116,15 +117,15 @@ revealed; no email or phone number is shown or collected for contact. Design
 this as part of messaging with contact privacy.
 
 This settles the previously deferred question of whether the street address
-stays public. **Shipped in backend messaging Phase 16** (2026-10-16, on
-`feature/messaging-privacy`, not yet merged): `address_line` is the private
+stays public. **Shipped in backend messaging Phase 16** (2026-10-16; on
+`feature/messaging` via #18, reaching `main` with #21): `address_line` is the private
 exact address, on the owner's own reads and the admin surface only; public
 reads show `neighbourhood` and a new `cross_streets`, with null coordinates;
 search no longer indexes the address; and `POST
 /conversations/{id}/share-address` is the owner's share, per conversation, with
-no un-share. It merges only after the frontend's `fix/public-address` (frontend
-pull request #19) has merged and deployed, so no public page reads a field that
-has gone. No data moved: `address_line` was always separate from
+no un-share. It could reach `main` only after the frontend's `fix/public-address` (frontend
+pull request #19) had merged, so no public page reads a field that has gone;
+that merged on 2026-11-06. No data moved: `address_line` was always separate from
 `neighbourhood`. The earlier context is in the
 [Platform Foundation spec](specs/implemented/platform-foundation/index.md).
 
