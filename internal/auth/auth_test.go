@@ -103,8 +103,12 @@ func TestAccessTokenRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("VerifyAccessToken: %v", err)
 	}
-	if got != want {
+	if got.UserID != want.UserID || got.Role != want.Role || got.Verified != want.Verified {
 		t.Errorf("principal = %+v, want %+v", got, want)
+	}
+	// JWT expiry is whole seconds.
+	if !got.ExpiresAt.Equal(expires.Truncate(time.Second)) {
+		t.Errorf("ExpiresAt = %v, want %v", got.ExpiresAt, expires.Truncate(time.Second))
 	}
 }
 

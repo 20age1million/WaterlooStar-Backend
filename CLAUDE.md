@@ -122,15 +122,13 @@ only thing that calls it.
 | 13 | Resend sender: verification and reset emails delivered through Resend; the log without a key |
 | 14 | A new verification link: `POST /auth/verify/resend`, rate-limited, the same answer for any address |
 | 15 | Conversations and messages: message a listing's owner, the inbox, unread counts, closing (merged in #17) |
-| 16 | Contact privacy: the exact address off public reads and search, `cross_streets`, the owner's address share (on `feature/messaging` via #18; reaches `main` with #21) |
-| 17 | Offers open conversations: an offer opens or joins a conversation with the request's poster, `RequestOffer.conversation`, a backfill (on `feature/messaging` via #19; reaches `main` with #21) |
-| 18 | Message notifications: email for a conversation opened, an address shared and a first unread reply, never with the text or the address; the opt-out `PATCH /me/preferences`; caps (on `feature/messaging` via #20; reaches `main` with #21) |
+| 16 | Contact privacy: the exact address off public reads and search, `cross_streets`, the owner's address share (merged in #21) |
+| 17 | Offers open conversations: an offer opens or joins a conversation with the request's poster, `RequestOffer.conversation`, a backfill (merged in #21) |
+| 18 | Message notifications: email for a conversation opened, an address shared and a first unread reply, never with the text or the address; the opt-out `PATCH /me/preferences`; caps (merged in #21) |
+| 19 | Live updates: `GET /me/stream`, server-sent events fed by PostgreSQL `LISTEN`/`NOTIFY` from triggers (on `feature/live-updates`, not yet merged) |
 
-Fifty-two endpoints exist, fourteen of them admin-only; two are not yet on
-`main` until #21 merges: Phase 16's `POST /conversations/{id}/share-address`
-and Phase 18's `PATCH /me/preferences`. Phase 15's eight messaging endpoints
-are on `main`. Phase 17 added no endpoint; it changed
-`POST /requests/{id}/offers` and `GET /requests/{id}/offers`. Read
+Fifty-three endpoints exist, fourteen of them admin-only. Phase 19's
+`GET /me/stream` is not yet on `main`; the other fifty-two are. Read
 [API surface](docs/api.md) for student endpoints, messages and rate limits, and
 [Admin](docs/admin.md) for admin endpoints and `cmd/admin` usage.
 
@@ -138,94 +136,44 @@ Phases 5–14 are merged into `main` (pull requests #6–#13). Email Delivery is
 complete; its [spec](docs/specs/implemented/email-delivery/index.md) is implemented.
 The roadmap and README split merged in #14. The documentation-current rule and
 the `.gitattributes` that keeps `go.mod`/`go.sum` on LF merged in #15
-(2026-10-15). The pull-request-description rule merged in #16. Messaging Phase 15 merged in
-#17 (2026-11-06).
+(2026-10-15). The pull-request-description rule merged in #16.
 
-**In flight: landing Messaging Phases 16–18 on `main`.** The
-[spec](docs/specs/implemented/messaging/index.md) (Phases 15–18, accepted
-2026-10-16) is fully implemented and moved to `docs/specs/implemented/`.
-Its four phases were four stacked pull requests, all merged on 2026-11-06,
-but only #17 into `main`: #18, #19 and #20 still had `feature/messaging` as
-their base when they merged, so Phases 16–18 landed on `feature/messaging`
-and not on `main` (see the stacked-pull-request gotcha below).
-[pull request #21](https://github.com/20age1million/WaterlooStar-Backend/pull/21) brings them from `feature/messaging` into `main`.
-After it merges, record it here and clear this entry.
+**Messaging with Contact Privacy is merged and deployed** (Phases 15–18, spec in
+`docs/specs/implemented/messaging/`). Phase 15 merged into `main` in
+[#17](https://github.com/20age1million/WaterlooStar-Backend/pull/17)
+(2026-11-06). Phases 16–18 were stacked pull requests
+([#18](https://github.com/20age1million/WaterlooStar-Backend/pull/18),
+[#19](https://github.com/20age1million/WaterlooStar-Backend/pull/19),
+[#20](https://github.com/20age1million/WaterlooStar-Backend/pull/20)) that merged
+into `feature/messaging` rather than `main` (see the stacked-pull-request gotcha
+below), and reached `main` together in
+[#21](https://github.com/20age1million/WaterlooStar-Backend/pull/21), merged
+2026-11-07 and deployed by Drone the same morning (migrations 12–14 applied).
+The local Docker stack (`docker-compose.yml`: Postgres, migrations and the API,
+wired for the frontend on localhost:3000) merged in `cec2b02`.
 
-Phase 15, conversations and
-messages, is complete on `feature/messaging`: migration 11, eight `messages`-tag
-endpoints, two new rate limits. It merged into `main` in
-[pull request #17](https://github.com/20age1million/WaterlooStar-Backend/pull/17).
-Each later phase is a stacked pull request (decided by Claude under the
-developer's delegation, 2026-10-16), with the phase before as its base.
+**Notification emails point at frontend pages that are being built now:**
+`/messages/{id}` and the settings switch arrive with the frontend's messaging
+feature (frontend `feature/messaging`, its Phases 16–17). Until then the emails
+link to a 404 and mention a switch that does not exist. They are sent only where
+`RESEND_API_KEY` is set. Raised in review on 2026-10-18.
 
-Phase 16, contact privacy and address sharing, is complete on
-`feature/messaging-privacy` (branched from `feature/messaging`): migration 12,
-`cross_streets`, the exact address off every public read and out of search,
-and `POST /conversations/{id}/share-address` with its own rate limit. It merged
-into `feature/messaging` in
-[pull request #18](https://github.com/20age1million/WaterlooStar-Backend/pull/18)
-and reaches `main` with #21.
-**Precondition met:** the frontend's `fix/public-address` merged to frontend
-`main` on 2026-11-06 (frontend pull request #19), so Phase 16 may reach `main`.
-It had to come first because Phase 16 makes `address_line` absent from public reads; a frontend that still
-reads it shows "undefined" on cards. Drone deploys each repository from `main`
-on its own, so nothing else enforces this order. After it merges, the frontend
-regenerates its types (`Listing.address_line` optional; `cross_streets`;
-`Conversation.place`, `address_shared_at`, `can_share_address`), adds a
-cross-streets field to the listing form and shows it where it shows the
-neighbourhood, and its messaging phase adds the owner's "Share exact address"
-action with a confirmation; the full list is the spec's "Frontend impact".
+**In flight: Live Updates, Phase 19, complete on `feature/live-updates`.** The
+[spec](docs/specs/implemented/live-updates/index.md) was accepted and built on
+2026-11-08: `GET /me/stream`, server-sent events telling a student's open tabs
+which conversation changed and their unread counts. Migration 15 adds triggers
+that `NOTIFY` on `conversation_events`; `internal/live` holds the listener (one
+dedicated connection per process) and the hub; `internal/httpapi/stream.go`
+serves the stream. See [API surface](docs/api.md#live-updates). It is built at
+the same time as the frontend's messaging Phase 16, which reads it.
+**Merge order: this phase before frontend Phase 16.** After deploy, confirm
+events arrive through production nginx without delay (the spec assumes nginx
+honours `X-Accel-Buffering: no`).
 
-Phase 17, offers open conversations, is complete on
-`feature/messaging-offers` (branched from `feature/messaging-privacy`):
-migration 13 (`request_offers.conversation_id` and a backfill), an offer
-opening or joining a conversation with the request's poster in one
-transaction, and `RequestOffer.conversation` (`ConversationRef`: `id`,
-`status`, `poster_replied`). It merged into `feature/messaging` in
-[pull request #19](https://github.com/20age1million/WaterlooStar-Backend/pull/19)
-and reaches `main` with #21. Its contract change is additive — a new field and a new schema, nothing removed or
-renamed, no status changed — so it needs **no frontend change first**; the
-frontend's offer code reads only `id`, `request_id`, `note`, `created_at`,
-`listing` and `owner`. One behaviour change a client can meet: offering
-against your own request now answers 400 (the frontend never shows the offer
-panel to the poster), and an offer can now answer 409 when the poster closed
-the conversation (the frontend shows the envelope's message already). After
-it merges, the frontend regenerates its types and its messaging phase links
-each offer to `conversation.id` ("Reply") and uses `poster_replied` for the
-Desk home's waiting offers.
-
-Phase 18, message notifications, is complete on
-`feature/messaging-notifications` (branched from `feature/messaging-offers`):
-migration 14 (`users.email_notifications`, default true),
-`PATCH /me/preferences`, `User.email_notifications` on the user's own record,
-and three emails sent through the existing `email.Sender` to the other
-participant: "wants to talk" / "offered you" when a conversation is opened,
-"shared the address" on the first share, and "replied" for the first message
-the recipient has not read (one per unread spell). Never the message text or
-the address. Caps: `NotifyPerRecipient` 20 and `NotifyGlobal` 30, each per 24
-hours, sized against Resend's free tier (100 a day, 3,000 a month; see
-[API surface](docs/api.md#notification-emails)). It merged into
-`feature/messaging` in
-[pull request #20](https://github.com/20age1million/WaterlooStar-Backend/pull/20)
-and reaches `main` with #21.
-Its contract change is additive, so it needs no frontend change first. After
-it merges, the frontend messaging phase must: put the thread at
-`/messages/{conversation id}` (every email links there); add an "Email me
-about messages" switch calling `PATCH /me/preferences` and reading
-`email_notifications` from `GET /me` (every email tells the student to turn
-notifications off in their settings); and regenerate its types
-(`User.email_notifications`, `PreferencesUpdate`).
-
-**Until that frontend phase ships, notification emails point at pages that do
-not exist:** `/messages/{id}` is a 404, and there is no settings switch, though
-every email says notifications can be turned off in settings. They are sent
-only where `RESEND_API_KEY` is set. Raised in review on 2026-10-18; the
-frontend messaging phase closes it.
-
-**Next:** record #21's merge here. The next backend feature is saves, views and
-the question thread (not yet specified; start with `feature-start`). Promotion
-waits on #21 and on the frontend's Phase 16 clean-up and messaging phase; the
-frontend Admin Portal merged on 2026-11-06.
+**Next:** after Phase 19, saves, views and the question thread (not yet
+specified; start with `feature-start`). Promotion waits on the frontend's
+messaging feature (Phases 16–17); the frontend Admin Portal merged on
+2026-11-06 and its home page refresh on 2026-11-07.
 
 **Email goes through Resend**, called with `net/http` (no SDK). Clerk's
 transactional endpoint was chosen first (2026-09-25) and answered 404 with both a
@@ -246,6 +194,22 @@ Messaging is fully built (Phases 15–18); its spec is in
 verification-link form has
 already shipped. Real email needs `RESEND_API_KEY` in the host env file; until
 then an admin can verify accounts by hand.
+
+### Developer decisions — 2026-11-08
+
+Recorded in the [Live Updates spec](docs/specs/implemented/live-updates/index.md):
+
+- **A push channel, not polling**, for the frontend's messaging pages, and the
+  backend built at the same time as the frontend's messaging Phase 16.
+- **PostgreSQL `LISTEN`/`NOTIFY`** to fan signals out, over an in-process hub:
+  it signals only committed changes, works with more than one API process, and
+  carries `cmd/admin`'s moderation to browsers. The developer weighed both,
+  including memory (the hub saves only one connection).
+- **Thin signals:** which conversation changed and how, plus unread counts.
+  Never message text, an address or another student's id.
+- **One stream per tab**, covering all the student's conversations.
+- The frontend's messaging is its Phases 16–17, ahead of the UI/UX Overhaul,
+  which moves to Phase 18 onward ([roadmap](docs/ROADMAP.md)).
 
 ### Developer decisions — 2026-10-14
 
@@ -548,6 +512,17 @@ These were all found the hard way and will silently regress if undone.
 - **`go run ./cmd/migrate down` rolls back every migration**, and ignores a count
   after it. One step is `down-one`. On the development database that means
   re-running `migrate up` and `cmd/seed`.
+- **oapi-codegen prunes schemas no generated operation uses.** `GET /me/stream`
+  is excluded from generation (`exclude-operation-ids`) because the strict
+  handler cannot flush per event, and its event schemas then vanished from
+  `gen` without an error. `skip-prune: true` in `api/oapi-codegen.yaml` keeps
+  them. Remove it and `LiveReady` and friends disappear.
+- **The local Docker API can hold a real Resend key.** `docker compose up`
+  reads `RESEND_API_KEY` from `.env`, and the API running on 2026-11-08 had one.
+  Messaging emails the other participant, and the seeded accounts have
+  real-looking `@uwaterloo.ca` addresses. Recreate it keyless before testing
+  messaging: `RESEND_API_KEY= EMAIL_FROM= docker compose up -d --build`, and
+  check with `docker inspect` (`docs/setup.md`).
 - **A stacked pull request merges into its base, even after that base has
   landed.** GitHub retargets a stacked pull request to `main` only when its base
   branch is deleted. Messaging's #18–#20 were merged after #17 had already

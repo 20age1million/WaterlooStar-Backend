@@ -153,6 +153,13 @@ var limitedRoutes = []limitedRoute{
 		perKey:  ratelimit.PreferencesPerUser,
 		message: "You have changed your settings a lot in a short time. Try again in %s.",
 	},
+	{
+		// Registered on gin by hand (stream.go), so FullPath matches as for
+		// the generated routes.
+		method: http.MethodGet, path: "/me/stream", kind: keyByUser,
+		perKey:  ratelimit.StreamConnectPerUser,
+		message: "Live updates reconnected too often. Try again in %s.",
+	},
 	// The notification caps, NotifyPerRecipient and NotifyGlobal, are not
 	// here: they limit emails, not routes, and are consulted in
 	// notifications.go after the write that triggers one.

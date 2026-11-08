@@ -14,9 +14,8 @@ across both; everything from Phase 4 onward is not.
 
 ## Active
 
-| Feature | Phases | Status | Location |
-|---|---|---|---|
-| [Live Updates](./active/live-updates/index.md) | 1 (Phase 19) | Ready | `docs/specs/active/live-updates/` |
+*None.* Live Updates (Phase 19) is complete on `feature/live-updates`, awaiting
+merge.
 
 ## Implemented
 
@@ -31,6 +30,7 @@ across both; everything from Phase 4 onward is not.
 | [Listing Terms](./implemented/listing-terms/index.md) | 1 (Phase 12) | `docs/specs/implemented/listing-terms/` |
 | [Email Delivery](./implemented/email-delivery/index.md) | 2 (13–14) | `docs/specs/implemented/email-delivery/` |
 | [Messaging with Contact Privacy](./implemented/messaging/index.md) | 4 (15–18) | `docs/specs/implemented/messaging/` |
+| [Live Updates](./implemented/live-updates/index.md) | 1 (Phase 19) | `docs/specs/implemented/live-updates/` |
 
 ### Platform Foundation
 

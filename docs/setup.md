@@ -26,6 +26,20 @@ then says which sender it uses (`docker compose logs api | grep email`).
 Seeding deletes every listing before writing the fixtures, so it is a step you
 take, not one `up` takes for you.
 
+**Testing messaging locally sends real email if the container has a key.**
+Messages, conversations and address shares email the other student, and the
+seeded accounts have real-looking `@uwaterloo.ca` addresses. Before trying
+messaging or running the frontend's end-to-end tests, recreate the API without
+one: `RESEND_API_KEY= EMAIL_FROM= docker compose up -d --build` (a variable set
+in the shell overrides `.env`), then check
+`docker inspect waterloostar-api --format "{{range .Config.Env}}{{println .}}{{end}}"`.
+
+**Live updates through a proxy.** `GET /me/stream` stays open and must not be
+buffered. The API sends `X-Accel-Buffering: no`, which nginx honours by default,
+and a ping every 25 seconds, inside nginx's default 60-second
+`proxy_read_timeout`. A proxy configured to ignore that header, or with a
+shorter read timeout, holds events back or cuts the stream.
+
 ## The API from source
 
 ```bash

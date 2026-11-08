@@ -1,6 +1,6 @@
 # Live Updates
 
-**Status:** Ready
+**Status:** Complete (2026-11-08)
 **Branch:** `feature/live-updates`
 **Ticket / Work Item:** N/A
 **Owner(s):** Developer (Carl Yan), with Claude
@@ -139,7 +139,7 @@ A new package, `internal/live`:
 
 | Phase | Title | Status | Location |
 |---|---|---|---|
-| [19 — Live updates](./phase-19-live-updates.md) | The stream, the triggers, the listener and hub | Ready | `docs/specs/active/live-updates/` |
+| [19 — Live updates](./phase-19-live-updates.md) | The stream, the triggers, the listener and hub | Complete | `docs/specs/implemented/live-updates/` |
 
 ---
 

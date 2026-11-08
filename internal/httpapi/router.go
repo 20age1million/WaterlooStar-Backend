@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -18,6 +19,7 @@ import (
 	"github.com/20age1million/WaterlooStar-Backend/internal/db/sqlcgen"
 	"github.com/20age1million/WaterlooStar-Backend/internal/email"
 	"github.com/20age1million/WaterlooStar-Backend/internal/httpapi/gen"
+	"github.com/20age1million/WaterlooStar-Backend/internal/live"
 	"github.com/20age1million/WaterlooStar-Backend/internal/middleware"
 	"github.com/20age1million/WaterlooStar-Backend/internal/ratelimit"
 )
@@ -41,6 +43,13 @@ type Server struct {
 	mailer       email.Sender
 	limiter      *ratelimit.Limiter
 	buildVersion string
+
+	// live routes conversation signals to this process's open event streams
+	// (GET /me/stream). cmd/api feeds it from a live.Listener.
+	live *live.Hub
+	// heartbeat is how long a stream stays silent before a ping. A field so
+	// tests can shorten it.
+	heartbeat time.Duration
 
 	// notifications counts notification emails still being sent in the
 	// background (notifications.go), so shutdown and tests can wait for them.
@@ -77,6 +86,8 @@ func NewServerWithLimiter(cfg config.Config, log *slog.Logger, q sqlcgen.Querier
 		mailer:       mailer,
 		limiter:      limiter,
 		buildVersion: buildVersion,
+		live:         live.NewHub(live.MaxStreamsPerUser),
+		heartbeat:    StreamHeartbeat,
 	}
 }
 
@@ -87,6 +98,13 @@ func (s *Server) Tokens() *auth.TokenService { return s.tokens }
 // Limiter exposes the rate limiter so the router's middleware and the login
 // handler charge against the same buckets.
 func (s *Server) Limiter() *ratelimit.Limiter { return s.limiter }
+
+// LiveHub is the hub this server's event streams subscribe to. cmd/api starts
+// a live.Listener feeding it and closes it on shutdown.
+func (s *Server) LiveHub() *live.Hub { return s.live }
+
+// SetStreamHeartbeat changes how long a stream may stay silent. For tests.
+func (s *Server) SetStreamHeartbeat(d time.Duration) { s.heartbeat = d }
 
 // NewRouter builds the gin engine with the middleware chain and mounts the
 // generated routes.
@@ -163,6 +181,10 @@ func NewRouter(cfg config.Config, log *slog.Logger, srv *Server) *gin.Engine {
 	// which is a different hook from the strict handler's RequestErrorHandlerFunc
 	// above — that one only covers the request *body*. Both have to be replaced
 	// or a malformed path parameter escapes the documented envelope.
+	// The event stream is in the contract but excluded from generation
+	// (api/oapi-codegen.yaml): it has to flush each event as it goes.
+	r.GET("/me/stream", srv.streamMyEvents)
+
 	gen.RegisterHandlersWithOptions(r, handler, gen.GinServerOptions{
 		ErrorHandler: func(c *gin.Context, err error, status int) {
 			if status == 0 {

@@ -4,17 +4,16 @@
 
 **Backend:** Phases 0–14 are shipped: accounts, housing discovery and posting,
 requests and offers, rate limits, admin moderation, listing terms and email
-delivery. **Messaging with contact privacy is built** (Phases 15–18): Phase
-15, conversations and messages, is on `main` (#17); Phase 16, address privacy
-and sharing, Phase 17, offers opening conversations, and Phase 18, email
-notifications, merged into `feature/messaging` (#18–#20) and reach `main` with
-pull request #21.
+delivery. **Messaging with contact privacy is shipped** (Phases 15–18,
+merged in #17 and #21, deployed 2026-11-07). **Live updates** (Phase 19,
+`GET /me/stream`) are built on `feature/live-updates`, awaiting merge.
 [Backend specs index](specs/INDEX.md).
 
 **Frontend:** housing discovery and posting, requests and offers, session refresh,
 the housing rework, Phase 12's new verification link, the Admin Portal (phases
-13–15) and the public-address fix are shipped. Its messaging phase is not yet
-specified.
+13–15), the public-address fix and the home page refresh are shipped.
+**Messaging** (frontend Phases 16–17) is specified and being built on
+`feature/messaging`.
 [Frontend specs index](https://github.com/20age1million/WaterlooStar-Frontend/blob/main/docs/specs/INDEX.md).
 
 ## How to update this file
@@ -29,12 +28,13 @@ work. The frontend links here rather than keeping its own roadmap.
 ## Goal and launch — decided 2026-10-14, launch gate revised 2026-10-16
 
 The MVP lets students find housing and post housing. Promotion to students starts
-once four pieces are done: the frontend Admin Portal, frontend Phase 16 clean-up,
+once four pieces are done: the frontend Admin Portal, the overhaul's clean-up (now frontend Phase 18),
 the backend's messaging with contact privacy, and a minimal frontend messaging
 phase. On **2026-10-16** the developer put messaging before launch: there is no
 interim contact path, and no phone number or email is published in the meantime.
-The backend's part is built (Phases 15–18, 2026-10-17, awaiting merge), so
-promotion now waits only on the frontend's three pieces and on those merges.
+The backend's part is shipped (Phases 15–18, deployed 2026-11-07) and the
+Admin Portal merged on 2026-11-06, so promotion now waits on the frontend's
+messaging (its Phases 16–17) and the overhaul's clean-up.
 The listing page's pinned mobile bar holds no phone number; the frontend
 messaging phase wires up its Message button.
 
@@ -42,44 +42,33 @@ The target is before the Winter 2027 term, in January 2027. If time runs short,
 cut scope rather than move the date. The community forum is out of scope for
 this roadmap.
 
-## Frontend sequence — decided 2026-10-14, messaging moved 2026-10-16
+## Frontend sequence — decided 2026-10-14, messaging moved 2026-10-16 and 2026-11-08
 
-1. **Admin Portal.** Write a new spec: the earlier `feature/admin-portal` branch
-   is lost. Phase 13 builds the shell, access guard, overview and action ledger;
-   non-admins get 404, as they do from the API. Phase 14 adds user management;
-   Phase 15 adds post moderation. The backend admin contract is complete, so
-   this work is frontend-only.
-2. **UI/UX Overhaul, from Phase 16.** Phase 16 removes all fixture and fake data:
-   the home page feed, section counts and term figures; the invented numbers on
-   `/about`; and the fake question thread on the listing page. It removes header
-   links to features that do not exist: Community, Messages and Saved. It also
-   replaces the home page with the signed-in **variant A, “Desk”**, chosen by the
-   developer on 2026-10-14. This dashboard shows the student's own business:
-   offers waiting on them first, then their places and requests with status,
-   then new places for their dates and students looking. Messages, questions,
-   saved places and saved searches have labelled skeletons until those features
-   exist. The prototype is on the frontend's local branch
-   `t3/signed-in-home-prototypes`, commit `0761309`; Phase 16 builds it properly.
-   The overhaul's later phases are defined in its spec and follow the messaging
-   phase below. Mobile layout is its last phase. Small UI fixes happen any time
-   and are not roadmap items.
-3. **Messaging, before promotion** — moved ahead on 2026-10-16. A minimal
-   phase, numbered by the frontend's own spec, straight after Phase 16 (that
-   placement was decided by Claude under the developer's delegation,
-   2026-10-16): the listing page's Message buttons start a conversation; the
-   inbox and the thread; the owner's “Share exact address” action; closing a
-   conversation; and replying to an offer. It restores the header's Messages
-   link that Phase 16 removes and fills the Desk home's messages skeleton. It
-   can start once backend messaging Phases 15–16 are on `main`; replying to
-   offers needs backend Phase 17 (built on `feature/messaging-offers`, not yet
-   merged: offers carry `conversation`, and the poster replies there). Before backend Phase 16 merges, the frontend
-   stops reading the exact address from public listings, as a small UI fix.
-   Backend Phase 18 sends the notification emails, which link to
-   `/messages/{conversation id}`, so the thread must live at that path; the
-   phase also adds an "Email me about messages" switch
-   (`PATCH /me/preferences`, `email_notifications` on `GET /me`), because every
-   email tells the student to turn notifications off in their settings.
-   Anything beyond the minimum gets its own spec later.
+1. **Admin Portal** (Phases 13–15). Shipped 2026-11-06.
+2. **Messaging, Phases 16–17** — before promotion (2026-10-16), and on
+   **2026-11-08** moved ahead of the overhaul, taking Phase 16. Spec:
+   the frontend's `docs/specs/active/messaging/`. Direction A, "Inbox", chosen
+   from three demos on 2026-11-07. Phase 16: the inbox and thread at
+   `/messages` and `/messages/{conversation id}` (where every notification email
+   links), starting a conversation from the listing page, sending, closing,
+   the header's Messages link with its unread count, and live updates from
+   backend Phase 19's `GET /me/stream` (a channel, not polling, decided
+   2026-11-08). Phase 17: the owner's "Share exact address", cross streets,
+   replying to offers, and an "Email me about messages" switch on a `/settings`
+   page (`PATCH /me/preferences`), because every email tells the student to
+   turn notifications off in their settings. Backend Phase 19 merges before
+   frontend Phase 16.
+3. **UI/UX Overhaul, from Phase 18.** It removes the remaining fixture and fake
+   data (the invented numbers on `/about`, the fake question thread on the
+   listing page; the home page's were removed on 2026-11-07). It replaces the
+   home page with the signed-in **variant A, "Desk"**, chosen by the developer
+   on 2026-10-14: offers waiting on the student first, then their places and
+   requests with status, then new places for their dates and students looking.
+   Its messages panel reads real conversations; questions, saved places and
+   saved searches have labelled skeletons until those features exist. The
+   prototype is on the frontend's local branch `t3/signed-in-home-prototypes`,
+   commit `0761309`. Mobile layout is its last phase. Small UI fixes happen any
+   time and are not roadmap items.
 4. **Photos.**
 5. **Question thread.**
 6. **Poster profiles.**
@@ -97,6 +86,13 @@ student who posted the request, who answers it there by replying (decided by
 Claude under the developer's delegation, 2026-10-16). Email notifications are
 Phase 18. Its spec is
 [docs/specs/implemented/messaging/](specs/implemented/messaging/index.md).
+
+**Live updates** (Phase 19) followed on **2026-11-08**, when the developer
+chose a push channel over polling for the frontend's messaging pages and asked
+for both to be built at the same time: `GET /me/stream`, server-sent events fed
+by PostgreSQL `LISTEN`/`NOTIFY`. Its spec is
+[docs/specs/implemented/live-updates/](specs/implemented/live-updates/index.md).
+It merges before the frontend's messaging Phase 16.
 
 Next come **saves, views and the question thread**, not yet specified. Each
 feature starts with its own backend specification.

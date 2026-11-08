@@ -1332,6 +1332,47 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /me/stream:
+    get:
+      tags: [messages]
+      operationId: streamMyEvents
+      summary: Live updates for your conversations
+      description: |
+        A server-sent event stream (`text/event-stream`) that stays open and
+        tells this tab when one of your conversations changes, with your fresh
+        unread counts. The events are signals, not content: they never carry a
+        message's text, an address or the other student's id. Re-read the
+        conversation through the endpoints above to see what changed.
+
+        Each event is one `event:` line and one `data:` line of JSON:
+
+        - `ready` (`LiveReady`): once on connect. Sent again with
+          `resync: true` when the server may have missed signals; re-read
+          what you show. A client that reconnects after losing the stream
+          should re-read on its `ready` too.
+        - `conversation` (`LiveConversationEvent`): a conversation you are in
+          changed. `change` says how (`LiveChange`).
+        - `unread` (`UnreadCounts`): after every `conversation` event.
+        - `expired`: the session's access token has expired and the stream
+          ends. Reconnect after refreshing the session.
+
+        A comment line (`: ping`) is sent after 25 seconds without an event,
+        so proxies keep the connection open. The response carries
+        `X-Accel-Buffering: no` so nginx streams it unbuffered.
+
+        At most five streams per account at once; a sixth answers 429, as does
+        reconnecting more than 120 times an hour.
+      responses:
+        "200":
+          description: The stream. It ends when the session expires.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /conversations/{id}:
     get:
       tags: [messages]
@@ -2952,6 +2993,43 @@ components:
             $ref: "#/components/schemas/Message"
         meta:
           $ref: "#/components/schemas/PageMeta"
+
+    LiveReady:
+      type: object
+      description: The first event on a stream, and the resync signal.
+      required: [unread, resync]
+      properties:
+        unread:
+          $ref: "#/components/schemas/UnreadCounts"
+        resync:
+          type: boolean
+          description: |
+            True when the server may have missed signals since the last
+            `ready` (its own database listener reconnected). Re-read what you
+            show.
+
+    LiveChange:
+      type: string
+      description: |
+        How a conversation changed.
+        `opened`: it was opened, from a listing or by an offer.
+        `message`: a message was sent in it, by either side.
+        `read`: you marked it read, in this tab or another.
+        `closed`: either side closed it.
+        `address_shared`: the owner shared the exact address.
+        `availability`: whether it can be written in, or what a shared
+        address shows, may have changed (the listing or an account was
+        moderated, paused, republished or corrected).
+      enum: [opened, message, read, closed, address_shared, availability]
+
+    LiveConversationEvent:
+      type: object
+      description: One of your conversations changed. Nothing more.
+      required: [conversation_id, change]
+      properties:
+        conversation_id: { type: string, format: uuid }
+        change:
+          $ref: "#/components/schemas/LiveChange"
 
     UnreadCounts:
       type: object
