@@ -125,7 +125,7 @@ only thing that calls it.
 | 16 | Contact privacy: the exact address off public reads and search, `cross_streets`, the owner's address share (merged in #21) |
 | 17 | Offers open conversations: an offer opens or joins a conversation with the request's poster, `RequestOffer.conversation`, a backfill (merged in #21) |
 | 18 | Message notifications: email for a conversation opened, an address shared and a first unread reply, never with the text or the address; the opt-out `PATCH /me/preferences`; caps (merged in #21) |
-| 19 | Live updates: `GET /me/stream`, server-sent events fed by PostgreSQL `LISTEN`/`NOTIFY` from triggers (on `feature/live-updates`, not yet merged) |
+| 19 | Live updates: `GET /me/stream`, server-sent events fed by PostgreSQL `LISTEN`/`NOTIFY` from triggers (open as #22) |
 
 Fifty-three endpoints exist, fourteen of them admin-only. Phase 19's
 `GET /me/stream` is not yet on `main`; the other fifty-two are. Read
@@ -158,7 +158,8 @@ feature (frontend `feature/messaging`, its Phases 16–17). Until then the email
 link to a 404 and mention a switch that does not exist. They are sent only where
 `RESEND_API_KEY` is set. Raised in review on 2026-10-18.
 
-**In flight: Live Updates, Phase 19, complete on `feature/live-updates`.** The
+**In flight: Live Updates, Phase 19, complete on `feature/live-updates`, open as
+[pull request #22](https://github.com/20age1million/WaterlooStar-Backend/pull/22).** The
 [spec](docs/specs/implemented/live-updates/index.md) was accepted and built on
 2026-11-08: `GET /me/stream`, server-sent events telling a student's open tabs
 which conversation changed and their unread counts. Migration 15 adds triggers
