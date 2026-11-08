@@ -14,7 +14,9 @@ across both; everything from Phase 4 onward is not.
 
 ## Active
 
-*None.*
+| Feature | Phases | Status | Location |
+|---|---|---|---|
+| [Live Updates](./active/live-updates/index.md) | 1 (Phase 19) | Ready | `docs/specs/active/live-updates/` |
 
 ## Implemented
 
