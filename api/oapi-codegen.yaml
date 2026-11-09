@@ -9,3 +9,11 @@ output-options:
   # Handlers take and return typed values; a shape that does not match the
   # contract fails to compile rather than failing in production.
   nullable-type: true
+  # GET /me/stream is a server-sent event stream. The strict handler writes a
+  # response in one copy and cannot flush per event, so the operation is
+  # registered on gin by hand (internal/httpapi/stream.go). Its event schemas
+  # are still generated.
+  # Excluded operations leave their schemas unreferenced; keep them anyway.
+  skip-prune: true
+  exclude-operation-ids:
+    - streamMyEvents

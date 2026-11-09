@@ -81,6 +81,13 @@ var (
 	// person flips the switch a few times at most.
 	PreferencesPerUser = Rule{Name: "preferences_per_user", Burst: 20, Window: time.Hour}
 
+	// StreamConnectPerUser bounds opening GET /me/stream (Phase 19). A tab
+	// reconnects about four times an hour when its access token expires; the
+	// rest absorbs flaky networks and a few tabs. A client reconnecting in a
+	// tight loop meets it. How many streams are open at once is bounded
+	// separately, by live.MaxStreamsPerUser.
+	StreamConnectPerUser = Rule{Name: "stream_connect_per_user", Burst: 120, Window: time.Hour}
+
 	// The two notification caps (messaging, Phase 18) are not route limits.
 	// The handler consults them with Allow after a write commits, keyed on the
 	// *recipient*, and going over skips the email without failing the

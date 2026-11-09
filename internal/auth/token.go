@@ -35,6 +35,10 @@ type Principal struct {
 	UserID   uuid.UUID
 	Role     string
 	Verified bool
+	// ExpiresAt is when the access token this principal came from expires.
+	// Zero when the principal was not read from a token (minting, tests). A
+	// long-lived response, the event stream, ends here.
+	ExpiresAt time.Time
 }
 
 // IsAdmin reports whether the principal holds the admin role.
@@ -129,5 +133,9 @@ func (s *TokenService) VerifyAccessToken(raw string) (Principal, error) {
 		return Principal{}, ErrTokenInvalid
 	}
 
-	return Principal{UserID: userID, Role: claims.Role, Verified: claims.Verified}, nil
+	var expires time.Time
+	if claims.ExpiresAt != nil {
+		expires = claims.ExpiresAt.Time
+	}
+	return Principal{UserID: userID, Role: claims.Role, Verified: claims.Verified, ExpiresAt: expires}, nil
 }

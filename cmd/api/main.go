@@ -15,6 +15,7 @@ import (
 	"github.com/20age1million/WaterlooStar-Backend/internal/db"
 	"github.com/20age1million/WaterlooStar-Backend/internal/email"
 	"github.com/20age1million/WaterlooStar-Backend/internal/httpapi"
+	"github.com/20age1million/WaterlooStar-Backend/internal/live"
 )
 
 // buildVersion is stamped at link time:
@@ -60,7 +61,15 @@ func run() error {
 		Addr:              cfg.Addr(),
 		Handler:           httpapi.NewRouter(cfg, log, api),
 		ReadHeaderTimeout: readHeaderTimeout,
+		// No WriteTimeout: GET /me/stream stays open for the length of a
+		// session. Each stream ends itself when the access token expires.
 	}
+
+	// Live updates: one dedicated connection LISTENs for the triggers'
+	// signals and hands them to this process's open streams. Shutdown closes
+	// the streams first, so draining does not wait out its deadline on them.
+	go live.NewListener(cfg.DatabaseURL, api.LiveHub(), log).Run(ctx)
+	srv.RegisterOnShutdown(api.LiveHub().Close)
 
 	serverErr := make(chan error, 1)
 	go func() {

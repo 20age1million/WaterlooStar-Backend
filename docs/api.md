@@ -2,7 +2,7 @@
 
 ## Endpoints
 
-The API has fifty-two endpoints, fourteen of them admin-only. Everything is
+The API has fifty-three endpoints, fourteen of them admin-only. Everything is
 described in [the OpenAPI contract](../api/openapi.yaml); this is the public and
 student surface. The admin surface is in [Admin](admin.md#endpoints).
 
@@ -40,6 +40,7 @@ student surface. The admin surface is in [Admin](admin.md#endpoints).
 | POST | `/listings/{id}/conversations` | verified | Message a listing's owner; opens a conversation |
 | GET | `/me/conversations` | session | Your conversations, both sides, newest activity first |
 | GET | `/me/conversations/unread` | session | Unread conversation and message counts |
+| GET | `/me/stream` | session | Live updates: a server-sent event stream of changes to your conversations |
 | GET | `/conversations/{id}` | participant | One conversation |
 | GET | `/conversations/{id}/messages` | participant | Its messages, newest first, paginated |
 | POST | `/conversations/{id}/messages` | verified participant | Send a message |
@@ -118,8 +119,48 @@ else gets 404, never 403.
 - **Messages are append-only.** They cannot be edited or deleted, and admins
   have no surface for reading them.
 - **Unread counts are computed**, from the other side's messages and your own
-  read marker, never stored. Poll `GET /me/conversations/unread`; reads are not
-  rate limited.
+  read marker, never stored. `GET /me/conversations/unread` reads them; the
+  live stream below pushes them.
+
+## Live updates
+
+`GET /me/stream` (Phase 19) is a server-sent event stream (`text/event-stream`)
+that tells a signed-in student's open tab when one of their conversations
+changes. The frontend's Next.js server proxies it to the browser; the API has no
+public URL.
+
+| Event | When | Data |
+|---|---|---|
+| `ready` | On connect, and again with `resync: true` when signals may have been missed | `{"unread": {...}, "resync": false}` |
+| `conversation` | A conversation you are in changed | `{"conversation_id": "...", "change": "message"}` |
+| `unread` | After every `conversation` event | `{"conversations": 1, "messages": 3}` |
+| `expired` | The session's access token expired; the stream ends | `{}` |
+
+`change` is one of `opened`, `message`, `read` (yours, in any tab: the other
+side never learns it), `closed`, `address_shared` and `availability` (the
+listing or an account was moderated, paused, republished or its address
+corrected). **Events are signals, not content:** never a message's text, an
+address or the other student's id. The client re-reads through the endpoints
+above, which apply every visibility rule.
+
+A `: ping` comment is sent after 25 seconds of silence, inside nginx's
+60-second read timeout. Each stream ends when its access token expires (15
+minutes), so a signed-out or suspended account stops hearing; the browser's
+`EventSource` reconnects through the frontend, whose middleware refreshes the
+session first. A client re-reads what it shows on every `ready`.
+
+How it works: database triggers (migration 15) `NOTIFY` on the
+`conversation_events` channel for every change, from any writer, only on
+commit. Each API process holds one dedicated connection that `LISTEN`s
+(`internal/live.Listener`) and hands signals to its open streams
+(`internal/live.Hub`). A stream that falls 16 events behind is dropped rather
+than allowed to slow the others; its browser reconnects. If the listener loses
+its connection it reconnects with backoff and resyncs every stream.
+
+Limits: five open streams per account per process (a sixth answers 429) and
+120 connections an hour (`stream_connect_per_user`). The stream is registered on
+gin by hand (`internal/httpapi/stream.go`) and excluded from code generation,
+because the generated strict handler cannot flush per event.
 
 ## Notification emails
 
@@ -178,6 +219,7 @@ The authentication endpoints and the seven write endpoints answer **429** with a
 | `POST /conversations/{id}/messages` | the user | 60 per 10 minutes |
 | `POST /conversations/{id}/share-address` | the user | 20 per hour, including shares that change nothing |
 | `PATCH /me/preferences` | the user | 20 per hour |
+| `GET /me/stream` | the user | 120 connections per hour; at most 5 open at once |
 
 The notification caps above are not route limits: they skip an email and
 never answer 429.
