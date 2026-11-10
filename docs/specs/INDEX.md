@@ -14,8 +14,7 @@ across both; everything from Phase 4 onward is not.
 
 ## Active
 
-*None.* Live Updates (Phase 19) is complete on `feature/live-updates`, awaiting
-merge.
+*None.* Live Updates (Phase 19) merged in #22 on 2026-11-09.
 
 ## Implemented
 

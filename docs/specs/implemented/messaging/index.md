@@ -1,6 +1,6 @@
 # Messaging with Contact Privacy — API Phases 15–18
 
-**Status:** Complete (Phases 15–18), awaiting merge of the four stacked pull requests
+**Status:** Complete (Phases 15–18), merged into `main` in #17 and #21 (2026-11-06 and 2026-11-07)
 **Branch:** `feature/messaging` (Phase 15); each later phase stacks on the one before (`feature/messaging-privacy` for 16, `feature/messaging-offers` for 17, `feature/messaging-notifications` for 18)
 **Ticket / Work Item:** N/A
 **Owner(s):** WaterlooStar backend

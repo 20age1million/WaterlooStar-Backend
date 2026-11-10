@@ -194,4 +194,4 @@ A new package, `internal/live`:
 - `docs/specs/implemented/rate-limiting/index.md` — rule definitions and keys
 - `internal/httpapi/conversations.go`, `messages.go` — the writes the triggers observe
 - `deploy/docker-compose.yml`, `deploy/RATE-LIMITING.md` — the proxy path
-- Frontend: `WaterlooStar-Frontend/docs/specs/active/messaging/` — the consumer
+- Frontend: `WaterlooStar-Frontend/docs/specs/implemented/messaging/` — the consumer
