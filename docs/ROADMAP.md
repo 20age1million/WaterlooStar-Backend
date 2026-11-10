@@ -15,7 +15,7 @@ the housing rework, Phase 12's new verification link, the Admin Portal (phases
 **Messaging** (frontend Phases 16–17): Phase 16, the inbox and thread with live
 updates, merged in frontend #24 on 2026-11-09; Phase 17 (sharing the exact
 address, cross streets, replying to offers, `/settings`) is built on
-`feature/messaging-privacy`, in review.
+`feature/messaging-privacy`, in review as frontend #25.
 [Frontend specs index](https://github.com/20age1million/WaterlooStar-Frontend/blob/main/docs/specs/INDEX.md).
 
 ## How to update this file

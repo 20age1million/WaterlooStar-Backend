@@ -154,8 +154,8 @@ wired for the frontend on localhost:3000) merged in `cec2b02`.
 
 **Notification emails' links:** `/messages/{id}` exists since frontend
 messaging Phase 16 merged (frontend #24, 2026-11-09). The settings switch they
-mention arrives with frontend Phase 17 (`/settings`, on
-`feature/messaging-privacy`, in review); until it merges the emails mention a
+mention arrives with frontend Phase 17 (`/settings`, frontend
+[#25](https://github.com/20age1million/WaterlooStar-Frontend/pull/25), in review); until it merges the emails mention a
 switch that does not exist. They are sent only where `RESEND_API_KEY` is set.
 Raised in review on 2026-10-18.
 
@@ -173,8 +173,8 @@ just after it (frontend #24). **Still to do:** confirm events arrive through
 production nginx without delay (the spec assumes nginx honours
 `X-Accel-Buffering: no`).
 
-**In flight:** nothing in this repository. Branch `docs/frontend-messaging`
-records #22's merge and the frontend's messaging progress in this file and
+**In flight:** [pull request #23](https://github.com/20age1million/WaterlooStar-Backend/pull/23) (`docs/frontend-messaging`, documentation only) records
+#22's merge and the frontend's messaging progress in this file and
 `docs/ROADMAP.md`.
 
 **Next:** saves, views and the question thread (not yet specified; start with
