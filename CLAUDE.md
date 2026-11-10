@@ -152,29 +152,36 @@ below), and reached `main` together in
 The local Docker stack (`docker-compose.yml`: Postgres, migrations and the API,
 wired for the frontend on localhost:3000) merged in `cec2b02`.
 
-**Notification emails point at frontend pages that are being built now:**
-`/messages/{id}` and the settings switch arrive with the frontend's messaging
-feature (frontend `feature/messaging`, its Phases 16–17). Until then the emails
-link to a 404 and mention a switch that does not exist. They are sent only where
-`RESEND_API_KEY` is set. Raised in review on 2026-10-18.
+**Notification emails' links:** `/messages/{id}` exists since frontend
+messaging Phase 16 merged (frontend #24, 2026-11-09). The settings switch they
+mention arrives with frontend Phase 17 (`/settings`, frontend
+[#25](https://github.com/20age1million/WaterlooStar-Frontend/pull/25), in review); until it merges the emails mention a
+switch that does not exist. They are sent only where `RESEND_API_KEY` is set.
+Raised in review on 2026-10-18.
 
-**In flight: Live Updates, Phase 19, complete on `feature/live-updates`, open as
-[pull request #22](https://github.com/20age1million/WaterlooStar-Backend/pull/22).** The
+**Live Updates, Phase 19, merged in
+[pull request #22](https://github.com/20age1million/WaterlooStar-Backend/pull/22)
+on 2026-11-09.** The
 [spec](docs/specs/implemented/live-updates/index.md) was accepted and built on
 2026-11-08: `GET /me/stream`, server-sent events telling a student's open tabs
 which conversation changed and their unread counts. Migration 15 adds triggers
 that `NOTIFY` on `conversation_events`; `internal/live` holds the listener (one
 dedicated connection per process) and the hub; `internal/httpapi/stream.go`
 serves the stream. See [API surface](docs/api.md#live-updates). It is built at
-the same time as the frontend's messaging Phase 16, which reads it.
-**Merge order: this phase before frontend Phase 16.** After deploy, confirm
-events arrive through production nginx without delay (the spec assumes nginx
-honours `X-Accel-Buffering: no`).
+the same time as the frontend's messaging Phase 16, which reads it and merged
+just after it (frontend #24). **Still to do:** confirm events arrive through
+production nginx without delay (the spec assumes nginx honours
+`X-Accel-Buffering: no`).
 
-**Next:** after Phase 19, saves, views and the question thread (not yet
-specified; start with `feature-start`). Promotion waits on the frontend's
-messaging feature (Phases 16–17); the frontend Admin Portal merged on
-2026-11-06 and its home page refresh on 2026-11-07.
+**In flight:** [pull request #23](https://github.com/20age1million/WaterlooStar-Backend/pull/23) (`docs/frontend-messaging`, documentation only) records
+#22's merge and the frontend's messaging progress in this file and
+`docs/ROADMAP.md`.
+
+**Next:** saves, views and the question thread (not yet specified; start with
+`feature-start`). Promotion waits on the frontend's messaging Phase 17 (in
+review) and the overhaul's clean-up; the frontend Admin Portal merged on
+2026-11-06, its home page refresh on 2026-11-07 and messaging Phase 16 on
+2026-11-09.
 
 **Email goes through Resend**, called with `net/http` (no SDK). Clerk's
 transactional endpoint was chosen first (2026-09-25) and answered 404 with both a

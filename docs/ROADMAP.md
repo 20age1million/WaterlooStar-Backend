@@ -6,14 +6,16 @@
 requests and offers, rate limits, admin moderation, listing terms and email
 delivery. **Messaging with contact privacy is shipped** (Phases 15–18,
 merged in #17 and #21, deployed 2026-11-07). **Live updates** (Phase 19,
-`GET /me/stream`) are built on `feature/live-updates`, awaiting merge.
+`GET /me/stream`) merged in #22 on 2026-11-09.
 [Backend specs index](specs/INDEX.md).
 
 **Frontend:** housing discovery and posting, requests and offers, session refresh,
 the housing rework, Phase 12's new verification link, the Admin Portal (phases
 13–15), the public-address fix and the home page refresh are shipped.
-**Messaging** (frontend Phases 16–17) is specified and being built on
-`feature/messaging`.
+**Messaging** (frontend Phases 16–17): Phase 16, the inbox and thread with live
+updates, merged in frontend #24 on 2026-11-09; Phase 17 (sharing the exact
+address, cross streets, replying to offers, `/settings`) is built on
+`feature/messaging-privacy`, in review as frontend #25.
 [Frontend specs index](https://github.com/20age1million/WaterlooStar-Frontend/blob/main/docs/specs/INDEX.md).
 
 ## How to update this file
@@ -33,10 +35,11 @@ the backend's messaging with contact privacy, and a minimal frontend messaging
 phase. On **2026-10-16** the developer put messaging before launch: there is no
 interim contact path, and no phone number or email is published in the meantime.
 The backend's part is shipped (Phases 15–18, deployed 2026-11-07) and the
-Admin Portal merged on 2026-11-06, so promotion now waits on the frontend's
-messaging (its Phases 16–17) and the overhaul's clean-up.
-The listing page's pinned mobile bar holds no phone number; the frontend
-messaging phase wires up its Message button.
+Admin Portal merged on 2026-11-06 and frontend messaging Phase 16 on
+2026-11-09, so promotion now waits on frontend messaging Phase 17 (in review)
+and the overhaul's clean-up.
+The listing page's pinned mobile bar holds no phone number; frontend Phase 16
+wired up its Message button.
 
 The target is before the Winter 2027 term, in January 2027. If time runs short,
 cut scope rather than move the date. The community forum is out of scope for
@@ -47,7 +50,9 @@ this roadmap.
 1. **Admin Portal** (Phases 13–15). Shipped 2026-11-06.
 2. **Messaging, Phases 16–17** — before promotion (2026-10-16), and on
    **2026-11-08** moved ahead of the overhaul, taking Phase 16. Spec:
-   the frontend's `docs/specs/active/messaging/`. Direction A, "Inbox", chosen
+   the frontend's `docs/specs/implemented/messaging/`. Phase 16 merged on
+   2026-11-09 (frontend #24); Phase 17 was built the same day on
+   `feature/messaging-privacy`. Direction A, "Inbox", chosen
    from three demos on 2026-11-07. Phase 16: the inbox and thread at
    `/messages` and `/messages/{conversation id}` (where every notification email
    links), starting a conversation from the listing page, sending, closing,
@@ -56,8 +61,8 @@ this roadmap.
    2026-11-08). Phase 17: the owner's "Share exact address", cross streets,
    replying to offers, and an "Email me about messages" switch on a `/settings`
    page (`PATCH /me/preferences`), because every email tells the student to
-   turn notifications off in their settings. Backend Phase 19 merges before
-   frontend Phase 16.
+   turn notifications off in their settings. Backend Phase 19 merged first,
+   the same day (#22).
 3. **UI/UX Overhaul, from Phase 18.** It removes the remaining fixture and fake
    data (the invented numbers on `/about`, the fake question thread on the
    listing page; the home page's were removed on 2026-11-07). It replaces the
@@ -78,7 +83,7 @@ this roadmap.
 ## Backend sequence — decided 2026-10-14, revised 2026-10-16
 
 **Messaging with contact privacy**, including the address rule below, is
-built: backend Phases 15–18, finished 2026-10-17 and awaiting merge as four
+built and deployed: backend Phases 15–18, finished 2026-10-17, merged as four
 stacked pull requests. It ran in parallel with the frontend Admin Portal and
 UI/UX Overhaul. Since **2026-10-16** promotion waits on it. Answering an offer
 is part of it (backend Phase 17): an offer opens a conversation with the
@@ -92,7 +97,7 @@ chose a push channel over polling for the frontend's messaging pages and asked
 for both to be built at the same time: `GET /me/stream`, server-sent events fed
 by PostgreSQL `LISTEN`/`NOTIFY`. Its spec is
 [docs/specs/implemented/live-updates/](specs/implemented/live-updates/index.md).
-It merges before the frontend's messaging Phase 16.
+It merged in #22 on 2026-11-09, just before the frontend's messaging Phase 16.
 
 Next come **saves, views and the question thread**, not yet specified. Each
 feature starts with its own backend specification.
