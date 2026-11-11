@@ -125,7 +125,7 @@ only thing that calls it.
 | 16 | Contact privacy: the exact address off public reads and search, `cross_streets`, the owner's address share (merged in #21) |
 | 17 | Offers open conversations: an offer opens or joins a conversation with the request's poster, `RequestOffer.conversation`, a backfill (merged in #21) |
 | 18 | Message notifications: email for a conversation opened, an address shared and a first unread reply, never with the text or the address; the opt-out `PATCH /me/preferences`; caps (merged in #21) |
-| 19 | Live updates: `GET /me/stream`, server-sent events fed by PostgreSQL `LISTEN`/`NOTIFY` from triggers (open as #22) |
+| 19 | Live updates: `GET /me/stream`, server-sent events fed by PostgreSQL `LISTEN`/`NOTIFY` from triggers (merged in #22) |
 
 Fifty-three endpoints exist, fourteen of them admin-only. Phase 19's
 `GET /me/stream` is not yet on `main`; the other fifty-two are. Read
@@ -153,10 +153,10 @@ The local Docker stack (`docker-compose.yml`: Postgres, migrations and the API,
 wired for the frontend on localhost:3000) merged in `cec2b02`.
 
 **Notification emails' links:** `/messages/{id}` exists since frontend
-messaging Phase 16 merged (frontend #24, 2026-11-09). The settings switch they
-mention arrives with frontend Phase 17 (`/settings`, frontend
-[#25](https://github.com/20age1million/WaterlooStar-Frontend/pull/25), in review); until it merges the emails mention a
-switch that does not exist. They are sent only where `RESEND_API_KEY` is set.
+messaging Phase 16 merged (frontend #24, 2026-11-09), and the settings switch
+they mention, on `/settings`, since frontend Phase 17 merged (frontend
+[#25](https://github.com/20age1million/WaterlooStar-Frontend/pull/25), 2026-11-10).
+They are sent only where `RESEND_API_KEY` is set.
 Raised in review on 2026-10-18.
 
 **Live Updates, Phase 19, merged in
@@ -173,15 +173,16 @@ just after it (frontend #24). **Still to do:** confirm events arrive through
 production nginx without delay (the spec assumes nginx honours
 `X-Accel-Buffering: no`).
 
-**In flight:** [pull request #23](https://github.com/20age1million/WaterlooStar-Backend/pull/23) (`docs/frontend-messaging`, documentation only) records
-#22's merge and the frontend's messaging progress in this file and
-`docs/ROADMAP.md`.
+**In flight:** nothing in this repository. [pull request #23](https://github.com/20age1million/WaterlooStar-Backend/pull/23)
+(`docs/frontend-messaging`, documentation only) merged on 2026-11-10; it
+recorded #22's merge and the frontend's messaging progress. Frontend messaging
+is complete since frontend #25 merged the same day.
 
 **Next:** saves, views and the question thread (not yet specified; start with
-`feature-start`). Promotion waits on the frontend's messaging Phase 17 (in
-review) and the overhaul's clean-up; the frontend Admin Portal merged on
-2026-11-06, its home page refresh on 2026-11-07 and messaging Phase 16 on
-2026-11-09.
+`feature-start`). Promotion waits only on the frontend overhaul's clean-up;
+the frontend Admin Portal merged on 2026-11-06, its home page refresh on
+2026-11-07 and messaging on 2026-11-09 and 2026-11-10 (Phases 16 and 17,
+frontend #24 and #25).
 
 **Email goes through Resend**, called with `net/http` (no SDK). Clerk's
 transactional endpoint was chosen first (2026-09-25) and answered 404 with both a

@@ -14,8 +14,8 @@ the housing rework, Phase 12's new verification link, the Admin Portal (phases
 13–15), the public-address fix and the home page refresh are shipped.
 **Messaging** (frontend Phases 16–17): Phase 16, the inbox and thread with live
 updates, merged in frontend #24 on 2026-11-09; Phase 17 (sharing the exact
-address, cross streets, replying to offers, `/settings`) is built on
-`feature/messaging-privacy`, in review as frontend #25.
+address, cross streets, replying to offers, `/settings`) merged in frontend
+#25 on 2026-11-10. Messaging is complete on both sides.
 [Frontend specs index](https://github.com/20age1million/WaterlooStar-Frontend/blob/main/docs/specs/INDEX.md).
 
 ## How to update this file
@@ -35,9 +35,9 @@ the backend's messaging with contact privacy, and a minimal frontend messaging
 phase. On **2026-10-16** the developer put messaging before launch: there is no
 interim contact path, and no phone number or email is published in the meantime.
 The backend's part is shipped (Phases 15–18, deployed 2026-11-07) and the
-Admin Portal merged on 2026-11-06 and frontend messaging Phase 16 on
-2026-11-09, so promotion now waits on frontend messaging Phase 17 (in review)
-and the overhaul's clean-up.
+Admin Portal merged on 2026-11-06 and frontend messaging on 2026-11-09 and
+2026-11-10 (Phases 16 and 17), so promotion now waits only on the overhaul's
+clean-up.
 The listing page's pinned mobile bar holds no phone number; frontend Phase 16
 wired up its Message button.
 
@@ -51,8 +51,8 @@ this roadmap.
 2. **Messaging, Phases 16–17** — before promotion (2026-10-16), and on
    **2026-11-08** moved ahead of the overhaul, taking Phase 16. Spec:
    the frontend's `docs/specs/implemented/messaging/`. Phase 16 merged on
-   2026-11-09 (frontend #24); Phase 17 was built the same day on
-   `feature/messaging-privacy`. Direction A, "Inbox", chosen
+   2026-11-09 (frontend #24) and Phase 17 on 2026-11-10 (frontend #25), which
+   shipped messaging. Direction A, "Inbox", chosen
    from three demos on 2026-11-07. Phase 16: the inbox and thread at
    `/messages` and `/messages/{conversation id}` (where every notification email
    links), starting a conversation from the listing page, sending, closing,
