@@ -37,7 +37,7 @@ interim contact path, and no phone number or email is published in the meantime.
 The backend's part is shipped (Phases 15–18, deployed 2026-11-07) and the
 Admin Portal merged on 2026-11-06 and frontend messaging on 2026-11-09 and
 2026-11-10 (Phases 16 and 17), so promotion now waits only on the overhaul's
-clean-up, which is frontend Phase 18 (built on `feature/ui-overhaul`, in review).
+clean-up, which is frontend Phase 18 (frontend #26, in review).
 The listing page's pinned mobile bar holds no phone number; frontend Phase 16
 wired up its Message button.
 
@@ -68,7 +68,8 @@ this roadmap.
    - **Phase 18, honest content and takedowns:** no invented numbers on `/about`,
      no sample question thread, counters or dead buttons on listings, and an
      owner sees a moderator's removal and its reason. Built on
-     `feature/ui-overhaul`, in review. This is the clean-up promotion waits on.
+     `feature/ui-overhaul`, in review as frontend #26. This is the clean-up
+     promotion waits on.
    - **Phase 19, the Dashboard** at `/dashboard`: the student's own page, not
      the home page, which stays the welcome (corrected 2026-11-11; earlier notes
      said this page replaced the home page). Version A, "Columns", of three

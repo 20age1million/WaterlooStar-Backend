@@ -173,14 +173,16 @@ just after it (frontend #24). **Still to do:** confirm events arrive through
 production nginx without delay (the spec assumes nginx honours
 `X-Accel-Buffering: no`).
 
-**In flight:** nothing in this repository. [pull request #23](https://github.com/20age1million/WaterlooStar-Backend/pull/23)
-(`docs/frontend-messaging`, documentation only) merged on 2026-11-10; it
-recorded #22's merge and the frontend's messaging progress. Frontend messaging
-is complete since frontend #25 merged the same day.
+**In flight:** [pull request #24](https://github.com/20age1million/WaterlooStar-Backend/pull/24) (`docs/record-messaging`, documentation only) records
+the merges of #23 and frontend #25 (messaging is complete on both sides) and the
+frontend's UI/UX Overhaul spec, correcting "Desk" to the Dashboard.
+[Pull request #23](https://github.com/20age1million/WaterlooStar-Backend/pull/23)
+(`docs/frontend-messaging`) merged on 2026-11-10.
 
 **Next:** saves, views and the question thread (not yet specified; start with
 `feature-start`). Promotion waits only on the frontend overhaul's clean-up,
-its Phase 18 (built on frontend `feature/ui-overhaul`, in review);
+its Phase 18 (frontend
+[#26](https://github.com/20age1million/WaterlooStar-Frontend/pull/26), in review);
 the frontend Admin Portal merged on 2026-11-06, its home page refresh on
 2026-11-07 and messaging on 2026-11-09 and 2026-11-10 (Phases 16 and 17,
 frontend #24 and #25).
