@@ -125,7 +125,7 @@ only thing that calls it.
 | 16 | Contact privacy: the exact address off public reads and search, `cross_streets`, the owner's address share (merged in #21) |
 | 17 | Offers open conversations: an offer opens or joins a conversation with the request's poster, `RequestOffer.conversation`, a backfill (merged in #21) |
 | 18 | Message notifications: email for a conversation opened, an address shared and a first unread reply, never with the text or the address; the opt-out `PATCH /me/preferences`; caps (merged in #21) |
-| 19 | Live updates: `GET /me/stream`, server-sent events fed by PostgreSQL `LISTEN`/`NOTIFY` from triggers (open as #22) |
+| 19 | Live updates: `GET /me/stream`, server-sent events fed by PostgreSQL `LISTEN`/`NOTIFY` from triggers (merged in #22) |
 
 Fifty-three endpoints exist, fourteen of them admin-only. Phase 19's
 `GET /me/stream` is not yet on `main`; the other fifty-two are. Read
@@ -153,10 +153,10 @@ The local Docker stack (`docker-compose.yml`: Postgres, migrations and the API,
 wired for the frontend on localhost:3000) merged in `cec2b02`.
 
 **Notification emails' links:** `/messages/{id}` exists since frontend
-messaging Phase 16 merged (frontend #24, 2026-11-09). The settings switch they
-mention arrives with frontend Phase 17 (`/settings`, frontend
-[#25](https://github.com/20age1million/WaterlooStar-Frontend/pull/25), in review); until it merges the emails mention a
-switch that does not exist. They are sent only where `RESEND_API_KEY` is set.
+messaging Phase 16 merged (frontend #24, 2026-11-09), and the settings switch
+they mention, on `/settings`, since frontend Phase 17 merged (frontend
+[#25](https://github.com/20age1million/WaterlooStar-Frontend/pull/25), 2026-11-10).
+They are sent only where `RESEND_API_KEY` is set.
 Raised in review on 2026-10-18.
 
 **Live Updates, Phase 19, merged in
@@ -173,15 +173,19 @@ just after it (frontend #24). **Still to do:** confirm events arrive through
 production nginx without delay (the spec assumes nginx honours
 `X-Accel-Buffering: no`).
 
-**In flight:** [pull request #23](https://github.com/20age1million/WaterlooStar-Backend/pull/23) (`docs/frontend-messaging`, documentation only) records
-#22's merge and the frontend's messaging progress in this file and
-`docs/ROADMAP.md`.
+**In flight:** [pull request #24](https://github.com/20age1million/WaterlooStar-Backend/pull/24) (`docs/record-messaging`, documentation only) records
+the merges of #23 and frontend #25 (messaging is complete on both sides) and the
+frontend's UI/UX Overhaul spec, correcting "Desk" to the Dashboard.
+[Pull request #23](https://github.com/20age1million/WaterlooStar-Backend/pull/23)
+(`docs/frontend-messaging`) merged on 2026-11-10.
 
 **Next:** saves, views and the question thread (not yet specified; start with
-`feature-start`). Promotion waits on the frontend's messaging Phase 17 (in
-review) and the overhaul's clean-up; the frontend Admin Portal merged on
-2026-11-06, its home page refresh on 2026-11-07 and messaging Phase 16 on
-2026-11-09.
+`feature-start`). Promotion waits only on the frontend overhaul's clean-up,
+its Phase 18 (frontend
+[#26](https://github.com/20age1million/WaterlooStar-Frontend/pull/26), in review);
+the frontend Admin Portal merged on 2026-11-06, its home page refresh on
+2026-11-07 and messaging on 2026-11-09 and 2026-11-10 (Phases 16 and 17,
+frontend #24 and #25).
 
 **Email goes through Resend**, called with `net/http` (no SDK). Clerk's
 transactional endpoint was chosen first (2026-09-25) and answered 404 with both a
@@ -244,8 +248,10 @@ Recorded in the [Live Updates spec](docs/specs/implemented/live-updates/index.md
 - The signed-in home is variant A, “Desk”: waiting offers, the student's places
   and requests with status, then new places for their dates and students
   looking. Messages, questions, saved places and saved searches use labelled
-  skeletons until they exist. Frontend prototype: local branch
-  `t3/signed-in-home-prototypes`, commit `0761309`; build it in Phase 16.
+  skeletons until they exist. *(Corrected 2026-11-11 and 2026-11-12: it is the
+  student's own page, the **Dashboard** at `/dashboard`, not the home page; it
+  is frontend Phase 19, in version A of three new demos, because the prototype
+  at `0761309` is lost. See the roadmap.)*
 - Backend order: messaging with contact privacy now, alongside the frontend
   portal and overhaul; then saves, views and questions. This supersedes the
   2026-09-27 order.

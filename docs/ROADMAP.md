@@ -14,8 +14,8 @@ the housing rework, Phase 12's new verification link, the Admin Portal (phases
 13–15), the public-address fix and the home page refresh are shipped.
 **Messaging** (frontend Phases 16–17): Phase 16, the inbox and thread with live
 updates, merged in frontend #24 on 2026-11-09; Phase 17 (sharing the exact
-address, cross streets, replying to offers, `/settings`) is built on
-`feature/messaging-privacy`, in review as frontend #25.
+address, cross streets, replying to offers, `/settings`) merged in frontend
+#25 on 2026-11-10. Messaging is complete on both sides.
 [Frontend specs index](https://github.com/20age1million/WaterlooStar-Frontend/blob/main/docs/specs/INDEX.md).
 
 ## How to update this file
@@ -35,9 +35,9 @@ the backend's messaging with contact privacy, and a minimal frontend messaging
 phase. On **2026-10-16** the developer put messaging before launch: there is no
 interim contact path, and no phone number or email is published in the meantime.
 The backend's part is shipped (Phases 15–18, deployed 2026-11-07) and the
-Admin Portal merged on 2026-11-06 and frontend messaging Phase 16 on
-2026-11-09, so promotion now waits on frontend messaging Phase 17 (in review)
-and the overhaul's clean-up.
+Admin Portal merged on 2026-11-06 and frontend messaging on 2026-11-09 and
+2026-11-10 (Phases 16 and 17), so promotion now waits only on the overhaul's
+clean-up, which is frontend Phase 18 (frontend #26, in review).
 The listing page's pinned mobile bar holds no phone number; frontend Phase 16
 wired up its Message button.
 
@@ -51,8 +51,8 @@ this roadmap.
 2. **Messaging, Phases 16–17** — before promotion (2026-10-16), and on
    **2026-11-08** moved ahead of the overhaul, taking Phase 16. Spec:
    the frontend's `docs/specs/implemented/messaging/`. Phase 16 merged on
-   2026-11-09 (frontend #24); Phase 17 was built the same day on
-   `feature/messaging-privacy`. Direction A, "Inbox", chosen
+   2026-11-09 (frontend #24) and Phase 17 on 2026-11-10 (frontend #25), which
+   shipped messaging. Direction A, "Inbox", chosen
    from three demos on 2026-11-07. Phase 16: the inbox and thread at
    `/messages` and `/messages/{conversation id}` (where every notification email
    links), starting a conversation from the listing page, sending, closing,
@@ -63,17 +63,23 @@ this roadmap.
    page (`PATCH /me/preferences`), because every email tells the student to
    turn notifications off in their settings. Backend Phase 19 merged first,
    the same day (#22).
-3. **UI/UX Overhaul, from Phase 18.** It removes the remaining fixture and fake
-   data (the invented numbers on `/about`, the fake question thread on the
-   listing page; the home page's were removed on 2026-11-07). It replaces the
-   home page with the signed-in **variant A, "Desk"**, chosen by the developer
-   on 2026-10-14: offers waiting on the student first, then their places and
-   requests with status, then new places for their dates and students looking.
-   Its messages panel reads real conversations; questions, saved places and
-   saved searches have labelled skeletons until those features exist. The
-   prototype is on the frontend's local branch `t3/signed-in-home-prototypes`,
-   commit `0761309`. Mobile layout is its last phase. Small UI fixes happen any
-   time and are not roadmap items.
+3. **UI/UX Overhaul, Phases 18–20** (spec accepted 2026-11-12, the frontend's
+   `docs/specs/active/ui-overhaul/`).
+   - **Phase 18, honest content and takedowns:** no invented numbers on `/about`,
+     no sample question thread, counters or dead buttons on listings, and an
+     owner sees a moderator's removal and its reason. Built on
+     `feature/ui-overhaul`, in review as frontend #26. This is the clean-up
+     promotion waits on.
+   - **Phase 19, the Dashboard** at `/dashboard`: the student's own page, not
+     the home page, which stays the welcome (corrected 2026-11-11; earlier notes
+     said this page replaced the home page). Version A, "Columns", of three
+     demos (2026-11-12): offers waiting on the student first, then their places
+     and requests with status, then new places for their dates and students
+     looking; a side rail with their latest conversations and "Under
+     construction" for questions, saved places and saved searches. The original
+     "Desk" prototype (`t3/signed-in-home-prototypes`, `0761309`) is lost.
+   - **Phase 20, phone layout** for the remaining screens.
+   Small UI fixes happen any time and are not roadmap items.
 4. **Photos.**
 5. **Question thread.**
 6. **Poster profiles.**
