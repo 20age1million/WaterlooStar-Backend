@@ -179,7 +179,8 @@ recorded #22's merge and the frontend's messaging progress. Frontend messaging
 is complete since frontend #25 merged the same day.
 
 **Next:** saves, views and the question thread (not yet specified; start with
-`feature-start`). Promotion waits only on the frontend overhaul's clean-up;
+`feature-start`). Promotion waits only on the frontend overhaul's clean-up,
+its Phase 18 (built on frontend `feature/ui-overhaul`, in review);
 the frontend Admin Portal merged on 2026-11-06, its home page refresh on
 2026-11-07 and messaging on 2026-11-09 and 2026-11-10 (Phases 16 and 17,
 frontend #24 and #25).
@@ -245,8 +246,10 @@ Recorded in the [Live Updates spec](docs/specs/implemented/live-updates/index.md
 - The signed-in home is variant A, “Desk”: waiting offers, the student's places
   and requests with status, then new places for their dates and students
   looking. Messages, questions, saved places and saved searches use labelled
-  skeletons until they exist. Frontend prototype: local branch
-  `t3/signed-in-home-prototypes`, commit `0761309`; build it in Phase 16.
+  skeletons until they exist. *(Corrected 2026-11-11 and 2026-11-12: it is the
+  student's own page, the **Dashboard** at `/dashboard`, not the home page; it
+  is frontend Phase 19, in version A of three new demos, because the prototype
+  at `0761309` is lost. See the roadmap.)*
 - Backend order: messaging with contact privacy now, alongside the frontend
   portal and overhaul; then saves, views and questions. This supersedes the
   2026-09-27 order.
