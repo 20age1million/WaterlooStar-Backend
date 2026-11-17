@@ -14,7 +14,9 @@ across both; everything from Phase 4 onward is not.
 
 ## Active
 
-*None.* Live Updates (Phase 19) merged in #22 on 2026-11-09.
+| Feature | Phases | Status | Location |
+|---|---|---|---|
+| [Initial Forum](./active/forum/index.md) | 1 | Ready | `docs/specs/active/forum/` |
 
 ## Implemented
 
