@@ -18,6 +18,16 @@ address, cross streets, replying to offers, `/settings`) is built on
 `feature/messaging-privacy`, in review as frontend #25.
 [Frontend specs index](https://github.com/20age1million/WaterlooStar-Frontend/blob/main/docs/specs/INDEX.md).
 
+## Initial forum — authorized 2026-11-17
+
+The developer selected compact design A and requested public list/detail plus
+session-authenticated author-only title/body CRUD in both services. It is built
+and verified locally on `feature/forum` in each repository, with additive
+migration16 and no deployment. Comments, reactions, categories and moderation
+tools are deferred. All three frontend visual previews remain until removal is
+approved. This specific request supersedes the earlier forum exclusion below;
+it does not authorize any other roadmap phase or release.
+
 ## How to update this file
 
 This is the single roadmap for the backend and frontend. Update it in the PR
@@ -42,8 +52,8 @@ The listing page's pinned mobile bar holds no phone number; frontend Phase 16
 wired up its Message button.
 
 The target is before the Winter 2027 term, in January 2027. If time runs short,
-cut scope rather than move the date. The community forum is out of scope for
-this roadmap.
+cut scope rather than move the date. The original plan excluded the community forum; the developer authorized the
+bounded local initial forum on2026-11-17 as recorded above.
 
 ## Frontend sequence — decided 2026-10-14, messaging moved 2026-10-16 and 2026-11-08
 

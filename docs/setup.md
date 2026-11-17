@@ -72,6 +72,12 @@ curl localhost:8080/healthz
 
 `make help` lists every target.
 
+## Forum
+
+The local stack applies migration 16 automatically when rebuilt. The forum needs
+no fixture seed; preserve existing data and follow [the forum local workflow](forum.md).
+That guide gives keyless Compose commands and the separate real-database checks.
+
 ## Email
 
 Verification and password-reset emails go through Resend when `RESEND_API_KEY`

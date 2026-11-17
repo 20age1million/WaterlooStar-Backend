@@ -44,6 +44,17 @@ type EmailVerificationToken struct {
 	CreatedAt  time.Time
 }
 
+type ForumPost struct {
+	ID        uuid.UUID
+	AuthorID  uuid.UUID
+	Title     string
+	Body      string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt *time.Time
+	Search    interface{}
+}
+
 type HousingRequest struct {
 	ID                 uuid.UUID
 	PosterID           uuid.UUID

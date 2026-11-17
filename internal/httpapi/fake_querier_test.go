@@ -36,6 +36,8 @@ type fakeQuerier struct {
 	adminActions      []sqlcgen.AdminAction
 	conversations     []sqlcgen.Conversation
 	messages          []sqlcgen.Message
+	forumPosts        []sqlcgen.ForumPost
+	forumErr          error
 
 	// lastTick is the conversation clock's last reading. See tick.
 	lastTick time.Time

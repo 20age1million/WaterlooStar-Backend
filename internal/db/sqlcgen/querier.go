@@ -30,6 +30,7 @@ type Querier interface {
 	CountAdmins(ctx context.Context) (int64, error)
 	// The same filters, counted, so the page total describes the whole inbox.
 	CountConversationsForUser(ctx context.Context, arg CountConversationsForUserParams) (int64, error)
+	CountForumPosts(ctx context.Context, search *string) (int64, error)
 	CountListings(ctx context.Context, arg CountListingsParams) (int64, error)
 	CountListingsForAdmin(ctx context.Context, arg CountListingsForAdminParams) (int64, error)
 	CountMessages(ctx context.Context, conversationID uuid.UUID) (int64, error)
@@ -66,6 +67,9 @@ type Querier interface {
 	// Every lookup here filters on consumed/revoked and expiry in SQL rather than in
 	// Go, so a caller cannot forget the check and accept a spent token.
 	CreateEmailVerificationToken(ctx context.Context, arg CreateEmailVerificationTokenParams) error
+	// An account must still be active when the INSERT executes. Verification is
+	// deliberately not required for forum posts.
+	CreateForumPost(ctx context.Context, arg CreateForumPostParams) (ForumPost, error)
 	CreateListing(ctx context.Context, arg CreateListingParams) (Listing, error)
 	CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error)
 	// An owner's answer to a request: one of their own listings, with an optional
@@ -86,6 +90,7 @@ type Querier interface {
 	// What cmd/seed calls before reseeding.
 	DeleteAllRequests(ctx context.Context) error
 	DeleteExpiredTokens(ctx context.Context) error
+	DeleteForumPost(ctx context.Context, arg DeleteForumPostParams) (uuid.UUID, error)
 	// The existing conversation between this student and this listing, open or
 	// closed, so starting a second one can answer 409 and name it. The unique
 	// constraint is the real guarantee.
@@ -102,6 +107,7 @@ type Querier interface {
 	// lateral subquery, so sqlc knows its columns are null for a conversation with
 	// no messages yet.
 	GetConversationForParticipant(ctx context.Context, arg GetConversationForParticipantParams) (GetConversationForParticipantRow, error)
+	GetForumPost(ctx context.Context, id uuid.UUID) (GetForumPostRow, error)
 	// Fetch for an ownership check. Returns the row whatever its status, so a
 	// handler can tell "not yours" from "does not exist" — and then deliberately
 	// answer 404 for both.
@@ -162,6 +168,8 @@ type Querier interface {
 	// lateral subquery, so sqlc knows its columns are null for a conversation with
 	// no messages yet.
 	ListConversationsForUser(ctx context.Context, arg ListConversationsForUserParams) ([]ListConversationsForUserRow, error)
+	// Every public read keeps deletion and account suspension filtering in SQL.
+	ListForumPosts(ctx context.Context, arg ListForumPostsParams) ([]ListForumPostsRow, error)
 	// Only published rows are ever served. Filtering here rather than in Go means a
 	// handler cannot forget and expose somebody's draft.
 	// Filtered browse. Every parameter is optional and they compose: the
@@ -309,6 +317,8 @@ type Querier interface {
 	// What is waiting for a user across every conversation they are in: messages
 	// from the other side newer than the user's own read marker.
 	UnreadCountsForUser(ctx context.Context, userID uuid.UUID) (UnreadCountsForUserRow, error)
+	// Ownership, deletion and current account state constrain the write itself.
+	UpdateForumPost(ctx context.Context, arg UpdateForumPostParams) (ForumPost, error)
 	// Every field is optional: an edit form sends what changed, and COALESCE leaves
 	// the rest alone. A PUT would make every omitted field a deletion.
 	UpdateListing(ctx context.Context, arg UpdateListingParams) (Listing, error)

@@ -93,6 +93,24 @@ that way; everything from Phase 4 onward is not.
 
 ---
 
+
+## Local forum delivery — 2026-11-17
+
+The developer selected forum design A and authorized initial title/body CRUD.
+It is implemented and verified locally on `feature/forum` in this repository;
+there is no PR, push, merge or deployment. The other service has its own feature
+branch/spec and meets this one through `api/openapi.yaml`.
+
+Public readers can list/search/page posts and open details. Any authenticated
+active account may create a post; only its session-derived author may edit or
+delete it. Delete hides the stored row with `deleted_at`. Comments, reactions,
+categories and forum moderation tools are intentionally deferred.
+
+The frontend's three `/forum-preview/{a,b,c}` prototypes remain unchanged;
+removal still requires the developer's approval. No further forum phase is
+authorized. See `docs/forum.md` and `docs/specs/implemented/forum/` for the local
+commands, implementation notes and verification results.
+
 ## Where things stand
 
 **Remote:** `origin` → `github.com/20age1million/WaterlooStar-Backend`. The rework
@@ -310,6 +328,14 @@ Recorded in the [Live Updates spec](docs/specs/implemented/live-updates/index.md
   (20 an hour). The phase doc's Implementation Notes say why.
 
 ---
+
+## Forum rules
+
+- Forum authorship is derived from the authenticated session, never input.
+- Update/delete queries constrain post ID, author ID, active account and nondeleted state.
+- Public forum queries hide deleted posts and suspended authors in SQL.
+- Any authenticated active account can use the forum; housing's verified-only posting rule does not apply.
+- Append migrations; forum storage is migration16 and no earlier migration was rewritten.
 
 ## Rules that bind
 
