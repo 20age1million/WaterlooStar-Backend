@@ -48,6 +48,11 @@ tags:
     description: |
       Housing Available - places students are offering. Public: browsing does
       not require an account.
+  - name: forum
+    description: |
+      Public student discussions. Any signed-in, active account may post; only
+      the author may edit or delete. Authorship always comes from the session.
+      Comments, reactions, categories and moderation tools are not part of this API.
   - name: messages
     description: |
       Conversations between two students about one listing: its **owner**, and
@@ -407,6 +412,138 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /forum/posts:
+    get:
+      tags: [forum]
+      operationId: listForumPosts
+      summary: Browse forum posts
+      description: |
+        Public posts, newest first with stable ordering. Deleted posts and posts
+        by suspended accounts are excluded. Search covers title and body only.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - name: q
+          in: query
+          description: Full-text title/body search; supports quoted phrases and exclusion.
+          schema: { type: string, maxLength: 200 }
+      responses:
+        "200":
+          description: A page of public posts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForumPostPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [forum]
+      operationId: createForumPost
+      summary: Create a forum post
+      description: |
+        Any signed-in, active account may post, verified or not. The author is
+        derived from the session and cannot be supplied or changed by a caller.
+        Title and body are plain text, trimmed before validation and storage.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForumPostWrite"
+      responses:
+        "201":
+          description: The new public post.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForumPost"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: The account is suspended, or the CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /forum/posts/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [forum]
+      operationId: getForumPost
+      summary: Read a forum post
+      description: Deleted posts and posts by suspended accounts answer 404.
+      security: []
+      responses:
+        "200":
+          description: A public post in full.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForumPost"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    patch:
+      tags: [forum]
+      operationId: updateForumPost
+      summary: Edit your forum post
+      description: |
+        Author-only. Supply at least one title/body field; omitted fields are
+        preserved. Explicit nulls and blank values are invalid. Another author's,
+        deleted and missing post answer the same 404. Authorship never changes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForumPostUpdate"
+      responses:
+        "200":
+          description: The updated post.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForumPost"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: The account is suspended, or the CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [forum]
+      operationId: deleteForumPost
+      summary: Delete your forum post
+      description: |
+        Author-only. Soft-deletes the post, removing it from public lists and
+        details while preserving stored content. Another author's, already deleted
+        and missing post answer the same 404. There is no restore endpoint.
+      responses:
+        "204":
+          description: Deleted.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: The account is suspended, or the CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
   /listings:
@@ -2567,6 +2704,62 @@ components:
             Your estimate of the tenant's monthly share of the bills not in the
             rent. 0 when everything is included; null or absent when you would
             rather not say.
+
+    ForumPost:
+      type: object
+      description: A plain-text student discussion. Never includes author email or private account fields.
+      required: [id, title, body, author, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        body: { type: string }
+        author:
+          $ref: "#/components/schemas/ListingOwner"
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ForumPostPage:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ForumPost"
+        meta:
+          $ref: "#/components/schemas/PageMeta"
+
+    ForumPostWrite:
+      type: object
+      required: [title, body]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: 1–200 Unicode characters after trimming whitespace.
+        body:
+          type: string
+          minLength: 1
+          maxLength: 8000
+          description: 1–8,000 Unicode characters after trimming whitespace; plain text.
+
+    ForumPostUpdate:
+      type: object
+      description: |
+        Supply at least one field. Null is represented so it can receive a
+        field-level validation error; it is not an accepted replacement value.
+      properties:
+        title:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 200
+        body:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 8000
 
     ListingOwner:
       type: object

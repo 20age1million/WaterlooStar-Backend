@@ -12,12 +12,17 @@ Requires Docker Desktop; running from source also requires Go 1.26+. sqlc and
 oapi-codegen are pinned as `go.mod` tool dependencies.
 
 ```bash
-cp .env.example .env
-docker compose up -d --build         # API on localhost:8080; PostgreSQL and migrations included
-docker compose run --rm api seed     # optional: 6 listings, 5 requests; deletes every listing first
+cp -n .env.example .env
+RESEND_API_KEY= EMAIL_FROM= docker compose --env-file .env.example up -d --build
+# API on localhost:8080; PostgreSQL and pending migrations included. No reseed.
 curl localhost:8080/healthz          # {"database":"ok","status":"ok"}
 docker compose logs api             # verification and reset links, and notification emails, without RESEND_API_KEY
 ```
+
+The forum now supports public post browsing and details, with authenticated
+title/body creation and author-only editing/deletion. Migration `000016_forum_posts`
+is additive; deleted forum posts are hidden using `deleted_at`. Comments,
+reactions, categories and moderation tools are deferred. See [the forum guide](docs/forum.md).
 
 ## Further reading
 

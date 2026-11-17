@@ -82,6 +82,12 @@ nothing**: the listing in it is the public shape, and the exact address
 reaches the poster only if you share it in the conversation. You cannot offer
 against your own request (400).
 
+## Forum
+
+The five `/forum/posts` operations provide public list/detail and authenticated
+owner CRUD. See [the forum contract and local workflow](forum.md). No comments,
+reactions, categories or moderation endpoints are implemented.
+
 ## Messages
 
 A conversation is between two students about one listing: its **owner** and the

@@ -1,6 +1,6 @@
 # Initial Forum — WaterlooStar API
 
-**Status:** Ready
+**Status:** Complete
 **Branch:** `feature/forum`
 **Date:** 2026-11-17
 
@@ -54,7 +54,7 @@ migration, or change authentication semantics.
 
 | Phase | Status | Specification |
 |---|---|---|
-| 1 — initial forum api | Ready | [Phase 1](./phase-1-initial-forum-api.md) |
+| 1 — initial forum api | Complete | [Phase 1](./phase-1-initial-forum-api.md) |
 
 ## Completion criteria
 

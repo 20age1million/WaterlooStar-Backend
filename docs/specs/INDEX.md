@@ -14,14 +14,13 @@ across both; everything from Phase 4 onward is not.
 
 ## Active
 
-| Feature | Phases | Status | Location |
-|---|---|---|---|
-| [Initial Forum](./active/forum/index.md) | 1 | Ready | `docs/specs/active/forum/` |
+*No product implementation is in progress.*
 
 ## Implemented
 
 | Feature | Phases | Location |
 |---|---|---|
+| [Initial Forum](./implemented/forum/index.md) | 1 (initial CRUD) | `docs/specs/implemented/forum/` |
 | [Platform Foundation](./implemented/platform-foundation/index.md) | 3 (0–2) | `docs/specs/implemented/platform-foundation/` |
 | [Discovery](./implemented/discovery/index.md) | 1 (Phase 3) | `docs/specs/implemented/discovery/` |
 | [Listing Write Path](./implemented/listing-write-path/index.md) | 1 (Phase 4) | `docs/specs/implemented/listing-write-path/` |
