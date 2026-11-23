@@ -120,6 +120,11 @@ var limitedRoutes = []limitedRoute{
 		message: "You have posted a lot in a short time. Try again in %s.",
 	},
 	{
+		method: http.MethodPost, path: "/forum/posts", kind: keyByUser,
+		perKey:  ratelimit.WritePerUser,
+		message: "You have posted a lot in a short time. Try again in %s.",
+	},
+	{
 		method: http.MethodPost, path: "/requests", kind: keyByUser,
 		perKey:  ratelimit.WritePerUser,
 		message: "You have posted a lot in a short time. Try again in %s.",
